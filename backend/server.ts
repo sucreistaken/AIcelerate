@@ -7,7 +7,7 @@ import http from "http";
 import { Server as SocketServer } from "socket.io";
 
 import routes from "./routes/index";
-import { setupSocketHandler } from "./socketHandler";
+// DISABLED: import { setupSocketHandler } from "./socketHandler";
 import { setupCollabNamespace } from "./socketHandler-v2";
 import { errorHandler } from "./middleware/errorHandler";
 import { startJobProcessor } from "./queues/jobProcessor";
@@ -22,7 +22,18 @@ if (!API_KEY) {
 
 // ---- Express app
 const app = express();
-app.use(cors({ origin: true, credentials: true }));
+const ALLOWED_ORIGINS = (process.env.FRONTEND_URL || "http://localhost:5173")
+  .split(",")
+  .map((o) => o.trim());
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      if (!origin || ALLOWED_ORIGINS.includes(origin)) cb(null, true);
+      else cb(new Error("CORS not allowed"));
+    },
+    credentials: true,
+  })
+);
 app.use(express.json({ limit: "2mb" }));
 
 // ---- Routes (all delegated to ./routes/)
@@ -35,13 +46,13 @@ app.use(errorHandler);
 const PORT = Number(process.env.PORT || 4000);
 const httpServer = http.createServer(app);
 const io = new SocketServer(httpServer, {
-  cors: { origin: true, credentials: true },
+  cors: { origin: ALLOWED_ORIGINS, credentials: true },
 });
 
 app.set("io", io);
 
-// ---- Socket.IO: legacy rooms
-setupSocketHandler(io);
+// DISABLED: Socket.IO legacy rooms (v1)
+// setupSocketHandler(io);
 
 // ---- Socket.IO V2: /collab namespace
 setupCollabNamespace(io);
@@ -55,3 +66,13 @@ connectDB().finally(() => {
     console.log(`Backend running at http://localhost:${PORT}`);
   });
 });
+
+// ---- Graceful shutdown
+function shutdown(signal: string) {
+  console.log(`\n${signal} received – shutting down…`);
+  io.close();
+  httpServer.close(() => process.exit(0));
+  setTimeout(() => process.exit(1), 5000);
+}
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));

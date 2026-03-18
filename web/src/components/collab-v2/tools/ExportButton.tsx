@@ -1,3 +1,4 @@
+import { logger } from "../../../utils/logger";
 import { useState } from "react";
 import { channelToolApi } from "../../../services/channelToolApi";
 
@@ -36,7 +37,7 @@ export default function ExportButton({ channelId, toolType, label }: Props) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
-      console.error("Export failed:", err);
+      logger.error("Export failed:", err);
     } finally {
       setExporting(false);
     }

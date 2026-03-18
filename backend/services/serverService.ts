@@ -4,9 +4,8 @@ import { channelService } from "./channelService";
 import { eventBus } from "../events/eventBus";
 import { badRequest, notFound, forbidden } from "../middleware/errorHandler";
 
-function generateId(): string {
-  return `srv-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-}
+import { generateId as _genId } from "../utils/idGenerator";
+const generateId = () => _genId("srv");
 
 function generateInviteCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";

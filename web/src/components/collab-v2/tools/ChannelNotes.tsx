@@ -1,3 +1,4 @@
+import { logger } from "../../../utils/logger";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useChannelToolStore } from "../../../stores/channelToolStore";
@@ -106,7 +107,7 @@ export default function ChannelNotes({ channelId, topic, serverName, userId, nic
       setFormCategory("concept");
       setShowForm(false);
     } catch (err) {
-      console.error("Failed to add note:", err);
+      logger.error("Failed to add note:", err);
     } finally {
       setSubmitting(false);
     }
@@ -118,7 +119,7 @@ export default function ChannelNotes({ channelId, topic, serverName, userId, nic
       updateNoteInStore(channelId, updated);
       getCollabSocket().emit("tool:notes:pin", { channelId, note: updated });
     } catch (err) {
-      console.error("Failed to pin note:", err);
+      logger.error("Failed to pin note:", err);
     }
   }
 
@@ -128,7 +129,7 @@ export default function ChannelNotes({ channelId, topic, serverName, userId, nic
       removeNoteFromStore(channelId, noteId);
       getCollabSocket().emit("tool:notes:delete", { channelId, noteId });
     } catch (err) {
-      console.error("Failed to delete note:", err);
+      logger.error("Failed to delete note:", err);
     }
   }
 
@@ -156,7 +157,7 @@ export default function ChannelNotes({ channelId, topic, serverName, userId, nic
       getCollabSocket().emit("tool:notes:edit", { channelId, note: updated });
       cancelEdit();
     } catch (err) {
-      console.error("Failed to edit note:", err);
+      logger.error("Failed to edit note:", err);
     }
   }
 

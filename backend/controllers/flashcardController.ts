@@ -32,7 +32,8 @@ const FLASHCARDS_PATH = path.join(DATA_DIR, "flashcards.json");
 
 ensureDataFiles([{ path: FLASHCARDS_PATH, initial: [] }]);
 
-const rid = () => `fc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+import { generateId } from "../utils/idGenerator";
+const rid = () => generateId("fc");
 
 export function loadFlashcards(): Flashcard[] {
   return readJSON<Flashcard[]>(FLASHCARDS_PATH) || [];

@@ -1,3 +1,4 @@
+import { logger } from "../utils/logger";
 // src/stores/roomStore.ts
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
@@ -304,7 +305,7 @@ export const useRoomStore = create<RoomState>()(
             socket.emit("deepdive:ai-response", { message: aiMsg });
           }
         } catch (err) {
-          console.error("Deep dive AI error:", err);
+          logger.error("Deep dive AI error:", err);
         }
       },
 
@@ -364,7 +365,7 @@ export const useRoomStore = create<RoomState>()(
             socket.emit("fc:ai-generated", { cards });
           }
         } catch (err) {
-          console.error("Flashcard generation error:", err);
+          logger.error("Flashcard generation error:", err);
         }
       },
 
@@ -397,7 +398,7 @@ export const useRoomStore = create<RoomState>()(
             });
           }
         } catch (err) {
-          console.error("Mind map AI error:", err);
+          logger.error("Mind map AI error:", err);
         }
       },
 

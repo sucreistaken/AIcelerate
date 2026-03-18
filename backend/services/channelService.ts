@@ -1,10 +1,9 @@
 import { channelRepo, Channel } from "../repositories/channelRepo";
 import { serverRepo } from "../repositories/serverRepo";
 import { badRequest, notFound, forbidden } from "../middleware/errorHandler";
+import { generateId as _genId } from "../utils/idGenerator";
 
-function generateId(): string {
-  return `ch-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-}
+const generateId = () => _genId("ch");
 
 export const channelService = {
   async create(

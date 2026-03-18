@@ -1,3 +1,4 @@
+import { logger } from "../../../utils/logger";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { useChannelToolStore } from "../../../stores/channelToolStore";
@@ -168,7 +169,7 @@ export default function ChannelDeepDive({ channelId, topic, serverName, userId, 
         aiMessage,
       });
     } catch (err) {
-      console.error("Deep dive chat failed:", err);
+      logger.error("Deep dive chat failed:", err);
     } finally {
       setLoading(false);
     }
@@ -192,7 +193,7 @@ export default function ChannelDeepDive({ channelId, topic, serverName, userId, 
       setSavedMsgId(msg.id);
       setTimeout(() => setSavedMsgId(null), 2000);
     } catch (err) {
-      console.error("Failed to save as note:", err);
+      logger.error("Failed to save as note:", err);
     }
   }
 

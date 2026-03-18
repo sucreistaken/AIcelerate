@@ -1,3 +1,4 @@
+import { logger } from "../../../utils/logger";
 import { useState } from "react";
 import { channelToolApi } from "../../../services/channelToolApi";
 import { getCollabSocket } from "../../../services/collabSocket";
@@ -28,7 +29,7 @@ export default function LockToggle({ channelId, userId, locked, lockedBy, isOwne
         getCollabSocket().emit("tool:lock", { channelId, lockedBy: userId });
       }
     } catch (err) {
-      console.error("Lock toggle failed:", err);
+      logger.error("Lock toggle failed:", err);
     } finally {
       setToggling(false);
     }

@@ -1,3 +1,4 @@
+import { logger } from "../utils/logger";
 import { io, Socket } from "socket.io-client";
 import { API_BASE } from "../config";
 
@@ -22,7 +23,7 @@ export function getCollabSocket(): Socket {
       if (_authenticatedUserId) {
         collabSocket!.emit("auth", { userId: _authenticatedUserId }, (response: any) => {
           if (!response.ok) {
-            console.error("Re-auth failed after reconnect:", response.error);
+            logger.error("Re-auth failed after reconnect:", response.error);
           }
         });
       }

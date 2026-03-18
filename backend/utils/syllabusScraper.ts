@@ -1,3 +1,4 @@
+import { logger } from "./logger";
 import axios from "axios";
 import * as cheerio from "cheerio";
 
@@ -15,7 +16,7 @@ export async function fetchLearningOutcomes(courseCode: string): Promise<string[
     if (formattedCode.length < 3) return [];
 
     const url = `https://ce.ieu.edu.tr/en/syllabus/type/read/id/${formattedCode}`;
-    console.log(`📡 Syllabus aranıyor: ${url}`);
+    logger.info(`📡 Syllabus aranıyor: ${url}`);
 
     // 2. İsteği At
     const { data } = await axios.get(url, {
@@ -53,16 +54,16 @@ export async function fetchLearningOutcomes(courseCode: string): Promise<string[
     });
 
     if (outcomes.length > 0) {
-      console.log(`✅ ${courseCode} için ${outcomes.length} kazanım bulundu.`);
+      logger.info(`✅ ${courseCode} için ${outcomes.length} kazanım bulundu.`);
     } else {
-      console.log(`⚠️ ${courseCode} için kazanım bulunamadı (veya format farklı).`);
+      logger.info(`⚠️ ${courseCode} için kazanım bulunamadı (veya format farklı).`);
     }
 
     return outcomes;
 
   } catch (error: any) {
     // 404 hatası veya network hatası olursa sessizce boş dizi dön
-    console.warn(`❌ Syllabus çekilemedi (${courseCode}):`, error.message);
+    logger.warn(`❌ Syllabus çekilemedi (${courseCode}):`, error.message);
     return [];
   }
 }

@@ -1,3 +1,4 @@
+import { logger } from "../utils/logger";
 import React, { useState, useRef } from "react";
 import { Plan, ModuleT ,LearningOutcome} from "../types";
 import { exportToPdf } from "../utils/pdfExport";
@@ -30,7 +31,7 @@ export default function PlanPane({ plan }: { plan: Plan }) {
     try {
       await exportToPdf(planRef.current, plan.topic || "LessonPlan");
     } catch (err) {
-      console.error("PDF export error:", err);
+      logger.error("PDF export error:", err);
     } finally {
       setPdfLoading(false);
     }

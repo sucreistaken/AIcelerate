@@ -1,3 +1,4 @@
+import { logger } from "../utils/logger";
 import { jobQueue, Job } from "./jobQueue";
 
 type JobHandler = (payload: any) => Promise<any>;
@@ -42,13 +43,13 @@ async function processNext(): Promise<void> {
 export function startJobProcessor(intervalMs = 2000): void {
   if (intervalId) return;
   intervalId = setInterval(processNext, intervalMs);
-  console.log(`[JobProcessor] Started (interval: ${intervalMs}ms)`);
+  logger.info(`[JobProcessor] Started (interval: ${intervalMs}ms)`);
 }
 
 export function stopJobProcessor(): void {
   if (intervalId) {
     clearInterval(intervalId);
     intervalId = null;
-    console.log("[JobProcessor] Stopped");
+    logger.info("[JobProcessor] Stopped");
   }
 }

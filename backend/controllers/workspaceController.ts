@@ -118,9 +118,7 @@ function defaultWorkspace(): RoomWorkspace {
   };
 }
 
-function genId(prefix: string): string {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-}
+import { generateId as genId } from "../utils/idGenerator";
 
 // ====== Workspace CRUD ======
 

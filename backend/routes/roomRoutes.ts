@@ -1,3 +1,4 @@
+import { logger } from "../utils/logger";
 import { Router } from "express";
 import {
   createRoom,
@@ -11,6 +12,7 @@ import { loadWorkspace } from "../controllers/workspaceController";
 import { getLesson, upsertLesson } from "../controllers/lessonControllers";
 import { getModel, stripCodeFences, tryParseJSON } from "../services/aiService";
 import { buildCondensedContext } from "../services/loModuleService";
+import { getDigestOrFallback } from "../services/lessonDigestService";
 
 const router = Router();
 
@@ -76,7 +78,23 @@ router.post("/rooms/:id/deepdive/ask", async (req, res) => {
     const plan = lesson.plan as any;
     const modules = plan?.modules || [];
     const emphases = (lesson as any).professorEmphases || plan?.emphases || [];
-    const { lecContext: roomLec, sldContext: roomSld } = buildCondensedContext(lesson);
+
+    // Use digest for room chat (saves ~8K tokens per message)
+    const isFirstMessage = !history || history.length === 0;
+    let contentBlock: string;
+
+    if (isFirstMessage) {
+      const { lecContext: roomLec, sldContext: roomSld } = buildCondensedContext(lesson);
+      contentBlock = `=== TRANSCRIPT EXCERPT ===\n${roomLec.slice(0, 6000)}\n\n=== SLIDE CONTENT EXCERPT ===\n${roomSld.slice(0, 4000)}`;
+    } else {
+      const { context: digestCtx, isDigest } = getDigestOrFallback(lessonId);
+      if (isDigest) {
+        contentBlock = `=== LESSON DIGEST ===\n${digestCtx}`;
+      } else {
+        const { lecContext: roomLec, sldContext: roomSld } = buildCondensedContext(lesson);
+        contentBlock = `=== TRANSCRIPT EXCERPT ===\n${roomLec.slice(0, 3000)}\n\n=== SLIDE CONTENT EXCERPT ===\n${roomSld.slice(0, 2000)}`;
+      }
+    }
 
     const context = `
 === LESSON INFORMATION ===
@@ -88,11 +106,7 @@ ${modules.slice(0, 6).map((m: any, i: number) => `${i + 1}. ${m.title || m.name 
 === PROFESSOR EMPHASES ===
 ${emphases.slice(0, 6).map((e: any) => `- ${e.statement || e}${e.why ? ` (${e.why})` : ''}`).join('\n') || 'None'}
 
-=== TRANSCRIPT EXCERPT ===
-${roomLec.slice(0, 6000)}
-
-=== SLIDE CONTENT EXCERPT ===
-${roomSld.slice(0, 4000)}
+${contentBlock}
 `;
 
     const recentHistory = (history || []).slice(-10);
@@ -127,7 +141,7 @@ Respond helpfully, concisely, and with academic accuracy. If the question relate
     }
     res.json({ ok: true, text: cleanText, suggestions });
   } catch (err: any) {
-    console.error("Room deep dive error:", err);
+    logger.error("Room deep dive error:", err);
     res.status(500).json({ ok: false, error: err.message || "AI chat failed" });
   }
 });
@@ -171,7 +185,7 @@ Vary difficulty. Return ONLY valid JSON array, no other text.`;
     const cards = JSON.parse(jsonMatch[0]);
     res.json({ ok: true, cards });
   } catch (err: any) {
-    console.error("Room flashcard generation error:", err);
+    logger.error("Room flashcard generation error:", err);
     res.status(500).json({ ok: false, error: err.message || "Generation failed" });
   }
 });
@@ -203,7 +217,7 @@ Provide a clear, concise explanation. Respond in the same language as the questi
     const text = result.response.text();
     res.json({ ok: true, text });
   } catch (err: any) {
-    console.error("Room mindmap AI error:", err);
+    logger.error("Room mindmap AI error:", err);
     res.status(500).json({ ok: false, error: err.message || "AI failed" });
   }
 });

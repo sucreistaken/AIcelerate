@@ -1,3 +1,4 @@
+import { logger } from "../../../utils/logger";
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { useChannelToolStore } from "../../../stores/channelToolStore";
@@ -130,7 +131,7 @@ export default function ChannelFlashcards({ channelId, topic, serverName, userId
       getCollabSocket().emit("tool:flashcard:add", { channelId, card });
       setFront(""); setBack(""); setCardTopic(""); setShowAddForm(false);
     } catch (err) {
-      console.error("Failed to add flashcard:", err);
+      logger.error("Failed to add flashcard:", err);
     }
   }
 
@@ -142,7 +143,7 @@ export default function ChannelFlashcards({ channelId, topic, serverName, userId
       await loadToolData(channelId);
       getCollabSocket().emit("tool:data:update", { channelId });
     } catch (err) {
-      console.error("Failed to generate flashcards:", err);
+      logger.error("Failed to generate flashcards:", err);
     } finally {
       setGenerating(false);
     }
@@ -158,7 +159,7 @@ export default function ChannelFlashcards({ channelId, topic, serverName, userId
       await loadToolData(channelId);
       getCollabSocket().emit("tool:data:update", { channelId });
     } catch (err) {
-      console.error("Failed to extract flashcards:", err);
+      logger.error("Failed to extract flashcards:", err);
     } finally {
       setExtracting(false);
     }
@@ -201,7 +202,7 @@ export default function ChannelFlashcards({ channelId, topic, serverName, userId
         setShowHint(false);
       }
     } catch (err) {
-      console.error("Failed to review flashcard:", err);
+      logger.error("Failed to review flashcard:", err);
     } finally {
       setReviewing(false);
     }

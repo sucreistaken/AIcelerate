@@ -47,8 +47,8 @@ ensureDataFiles([
   { path: QUIZ_PATH, initial: { packs: [] as QuizPack[] } },
 ]);
 
-// Random id oluştur
-const rid = (p: string) => `${p}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+import { generateId } from "../utils/idGenerator";
+const rid = (p: string) => generateId(p);
 
 // 🧠 1. Quiz üretme
 export const generateQuizFromEmphases = (count = 5, lessonIds?: string[]) => {

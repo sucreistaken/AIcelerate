@@ -1,3 +1,4 @@
+import { logger } from "../utils/logger";
 import { Router } from "express";
 import {
   listCourses, getCourse, createCourse, updateCourse, deleteCourse,
@@ -7,6 +8,7 @@ import {
 import { assembleCourseWideContext } from "../controllers/contextAssembler";
 import { upsertLesson } from "../controllers/lessonControllers";
 import { getModel } from "../services/aiService";
+import { SCHEMAS } from "../prompts/schemas";
 
 const router = Router();
 
@@ -105,7 +107,7 @@ Answer directly, reference specific lessons, end with 3 suggested follow-up ques
     }
     return res.json({ ok: true, text, suggestions });
   } catch (e: any) {
-    console.error("Course chat error:", e);
+    logger.error("Course chat error:", e);
     return res.status(500).json({ ok: false, error: e.message });
   }
 });
@@ -136,15 +138,21 @@ ${ki ? `Themes: ${ki.overview.courseThemes.join(', ')}` : ''}
 
 Return JSON: { "days": [{ "day": "Monday", "slots": [{ "time": "Morning", "activity": "..." }] }], "tips": ["..."] }`;
 
-    const result = await getModel().generateContent(prompt);
+    const result = await getModel().generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        maxOutputTokens: 2000,
+        responseMimeType: "application/json",
+        responseSchema: SCHEMAS.STUDY_SCHEDULE,
+      } as any,
+    });
     const text = result.response.text();
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return res.status(500).json({ ok: false, error: "Failed to parse schedule" });
-    const parsed = JSON.parse(jsonMatch[0]);
+    logger.info(`[AI] STUDY_SCHEDULE | ~${Math.ceil(prompt.length / 4)} in, ~${Math.ceil(text.length / 4)} out | max=2000`);
+    const parsed = JSON.parse(text);
     const schedule = { courseId, generatedAt: new Date().toISOString(), examDate: effectiveExamDate !== "Not specified" ? effectiveExamDate : undefined, days: parsed.days || [], tips: parsed.tips || [] };
     return res.json({ ok: true, schedule });
   } catch (e: any) {
-    console.error("Schedule generation error:", e);
+    logger.error("Schedule generation error:", e);
     return res.status(500).json({ ok: false, error: e.message });
   }
 });

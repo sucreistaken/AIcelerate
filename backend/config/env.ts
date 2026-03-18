@@ -1,7 +1,8 @@
+import { logger } from "../utils/logger";
 function requireEnv(name: string): string {
   const val = process.env[name];
   if (!val) {
-    console.error(`Missing required env var: ${name}. Check backend/.env`);
+    logger.error(`Missing required env var: ${name}. Check backend/.env`);
     process.exit(1);
   }
   return val;

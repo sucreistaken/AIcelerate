@@ -1,3 +1,4 @@
+import { logger } from "../../utils/logger";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRoomStore } from "../../stores/roomStore";
@@ -88,7 +89,7 @@ export default function SharedMindMap() {
           attachNodeHandlers();
         }
       } catch (err: any) {
-        console.error("Mermaid render error:", err);
+        logger.error("Mermaid render error:", err);
         setError("Failed to render mind map");
       }
     };

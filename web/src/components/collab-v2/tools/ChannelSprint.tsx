@@ -1,3 +1,4 @@
+import { logger } from "../../../utils/logger";
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { useChannelToolStore } from "../../../stores/channelToolStore";
@@ -105,7 +106,7 @@ export default function ChannelSprint({ channelId, topic, userId, nickname }: Pr
         sprint: res.sprint,
       });
     } catch (err) {
-      console.error("Failed to start sprint:", err);
+      logger.error("Failed to start sprint:", err);
     } finally {
       setStarting(false);
     }
@@ -121,7 +122,7 @@ export default function ChannelSprint({ channelId, topic, userId, nickname }: Pr
         sprint: res.sprint,
       });
     } catch (err) {
-      console.error("Failed to pause sprint:", err);
+      logger.error("Failed to pause sprint:", err);
     }
   }
 
@@ -135,7 +136,7 @@ export default function ChannelSprint({ channelId, topic, userId, nickname }: Pr
         sprint: res.sprint,
       });
     } catch (err) {
-      console.error("Failed to resume sprint:", err);
+      logger.error("Failed to resume sprint:", err);
     }
   }
 
@@ -149,7 +150,7 @@ export default function ChannelSprint({ channelId, topic, userId, nickname }: Pr
         sprint: res.sprint,
       });
     } catch (err) {
-      console.error("Failed to reset sprint:", err);
+      logger.error("Failed to reset sprint:", err);
     }
   }
 
@@ -163,7 +164,7 @@ export default function ChannelSprint({ channelId, topic, userId, nickname }: Pr
         sprint: res.sprint,
       });
     } catch (err) {
-      console.error("Failed to update status:", err);
+      logger.error("Failed to update status:", err);
     }
   }
 

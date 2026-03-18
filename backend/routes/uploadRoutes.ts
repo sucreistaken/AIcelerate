@@ -1,3 +1,4 @@
+import { logger } from "../utils/logger";
 import { Router } from "express";
 import multer from "multer";
 import path from "path";
@@ -8,14 +9,18 @@ import readline from "readline";
 import { EventEmitter } from "events";
 import { getLesson, upsertLesson } from "../controllers/lessonControllers";
 import { getModel } from "../services/aiService";
+import { rateLimiter } from "../middleware/rateLimiter";
 
 const router = Router();
-const upload = multer({ dest: path.join(os.tmpdir(), "learncraft_uploads") });
+const upload = multer({
+  dest: path.join(os.tmpdir(), "learncraft_uploads"),
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB
+});
 
 type Job = { emitter: EventEmitter; done: boolean; transcript: string };
 const jobs = new Map<string, Job>();
 
-function uid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
+import { uid } from "../utils/idGenerator";
 
 function formatTimestamp(seconds: number): string {
   const totalSeconds = Math.floor(seconds);
@@ -26,7 +31,7 @@ function formatTimestamp(seconds: number): string {
 }
 
 // POST /api/transcribe/start
-router.post("/transcribe/start", upload.single("file"), async (req, res) => {
+router.post("/transcribe/start", rateLimiter("transcribe", 3, 60_000), upload.single("file"), async (req, res) => {
   try {
     const file = (req as any).file as Express.Multer.File | undefined;
     const { lessonId } = req.body as { lessonId?: string };
@@ -38,9 +43,21 @@ router.post("/transcribe/start", upload.single("file"), async (req, res) => {
 
     const pyPath = path.resolve(__dirname, "..", "transcribe", "run.py");
     const pythonBin = process.env.PYTHON_BIN || "python";
-    console.log("[STT] start", { jobId, lessonId, file: file.originalname, tmp: file.path, pyPath });
+    logger.info("[STT] start", { jobId, lessonId, file: file.originalname, tmp: file.path, pyPath });
 
+    const PROCESS_TIMEOUT = 5 * 60 * 1000; // 5 minutes
     const proc = spawn(pythonBin, [pyPath, file.path, "--lang", "en"], { stdio: ["ignore", "pipe", "pipe"] });
+
+    const killTimer = setTimeout(() => {
+      proc.kill("SIGKILL");
+      const job = jobs.get(jobId);
+      if (job && !job.done) {
+        job.done = true;
+        emitter.emit("msg", { type: "error", message: "Transcription timed out" });
+      }
+      try { fs.unlinkSync(file.path); } catch { }
+    }, PROCESS_TIMEOUT);
+
     proc.stderr.on("data", (d) => {
       const msg = String(d || "").trim();
       if (msg) emitter.emit("msg", { type: "log", message: msg.slice(0, 800) });
@@ -60,6 +77,7 @@ router.post("/transcribe/start", upload.single("file"), async (req, res) => {
     });
 
     proc.on("close", (code) => {
+      clearTimeout(killTimer);
       const job = jobs.get(jobId);
       if (!job) return;
       job.done = true;
@@ -74,13 +92,13 @@ router.post("/transcribe/start", upload.single("file"), async (req, res) => {
 
     return res.json({ ok: true, jobId });
   } catch (e: any) {
-    console.error("[STT] start error:", e);
+    logger.error("[STT] start error:", e);
     return res.status(500).json({ ok: false, error: e?.message || "server error" });
   }
 });
 
 // POST /api/slides/upload
-router.post("/slides/upload", upload.single("file"), async (req, res) => {
+router.post("/slides/upload", rateLimiter("slides-upload", 5, 60_000), upload.single("file"), async (req, res) => {
   try {
     const file = (req as any).file as Express.Multer.File | undefined;
     const { lessonId } = req.body as { lessonId?: string };
@@ -93,14 +111,21 @@ router.post("/slides/upload", upload.single("file"), async (req, res) => {
     const newPath = file.path + originalExt;
     fs.renameSync(file.path, newPath);
     file.path = newPath;
-    console.log(`[OCR] Starting for lesson ${lessonId}, file: ${file.path}`);
+    logger.info(`[OCR] Starting for lesson ${lessonId}, file: ${file.path}`);
 
+    const OCR_TIMEOUT = 5 * 60 * 1000; // 5 minutes
     const proc = spawn(pythonBin, [pyPath, file.path]);
     let stdoutData = ""; let stderrData = "";
+    const ocrTimer = setTimeout(() => {
+      proc.kill("SIGKILL");
+      try { fs.unlinkSync(file.path); } catch { }
+      if (!res.headersSent) res.status(504).json({ ok: false, error: "OCR timed out" });
+    }, OCR_TIMEOUT);
     proc.stdout.on("data", (data) => { stdoutData += data.toString(); });
-    proc.stderr.on("data", (data) => { stderrData += data.toString(); console.error("[OCR Stderr]:", data.toString()); });
+    proc.stderr.on("data", (data) => { stderrData += data.toString(); });
 
     proc.on("close", async (code) => {
+      clearTimeout(ocrTimer);
       try {
         try { fs.unlinkSync(file.path); } catch { }
         if (code !== 0) {
@@ -121,7 +146,7 @@ router.post("/slides/upload", upload.single("file"), async (req, res) => {
         const markerRegex = /\[\[\[IMAGE_ANALYSIS_REQUIRED:(.*?)\]\]\]/g;
         const matches = [...extractedText.matchAll(markerRegex)];
         if (matches.length > 0) {
-          console.log(`[AI Analysis] Found ${matches.length} images to analyze...`);
+          logger.info(`[AI Analysis] Found ${matches.length} images to analyze...`);
           await Promise.all(matches.map(async (match) => {
             const marker = match[0];
             const imgPath = match[1].trim();
@@ -146,7 +171,7 @@ router.post("/slides/upload", upload.single("file"), async (req, res) => {
                 else extractedText = extractedText.replace(marker, `\n${description}\n`);
                 fs.unlinkSync(imgPath);
               } catch (err) {
-                console.error(`[AI Analysis Error] ${imgPath}:`, err);
+                logger.error(`[AI Analysis Error] ${imgPath}:`, err);
                 extractedText = extractedText.replace(marker, "\n[Görsel Analizi Başarısız]\n");
               }
             } else {
@@ -159,12 +184,12 @@ router.post("/slides/upload", upload.single("file"), async (req, res) => {
         if (lesson) upsertLesson({ id: lessonId, slideText: extractedText });
         return res.json({ ok: true, text: extractedText });
       } catch (err: any) {
-        console.error("[OCR Handler Error]:", err);
+        logger.error("[OCR Handler Error]:", err);
         if (!res.headersSent) return res.status(500).json({ ok: false, error: "Internal processing error", details: err.message });
       }
     });
   } catch (e: any) {
-    console.error("[OCR] error:", e);
+    logger.error("[OCR] error:", e);
     return res.status(500).json({ ok: false, error: e.message });
   }
 });

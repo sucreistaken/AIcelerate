@@ -1,3 +1,4 @@
+import { logger } from "../../../utils/logger";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useChannelToolStore } from "../../../stores/channelToolStore";
 import { channelToolApi } from "../../../services/channelToolApi";
@@ -55,7 +56,7 @@ export default function ChannelMindMap({ channelId, topic, serverName, userId, n
           containerRef.current.innerHTML = svg;
         }
       } catch (err) {
-        console.error("Mermaid render error:", err);
+        logger.error("Mermaid render error:", err);
         if (!cancelled && containerRef.current) {
           containerRef.current.innerHTML = `<pre style="padding: 16px; color: var(--text); white-space: pre-wrap;">${mermaidCode}</pre>`;
         }
@@ -80,7 +81,7 @@ export default function ChannelMindMap({ channelId, topic, serverName, userId, n
       getCollabSocket().emit("tool:mindmap:update", { channelId, mindMap: res.mindMap });
       setCustomTopic("");
     } catch (err) {
-      console.error("Mind map generation failed:", err);
+      logger.error("Mind map generation failed:", err);
     } finally {
       setGenerating(false);
     }

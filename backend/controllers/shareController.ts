@@ -29,7 +29,8 @@ const SHARES_PATH = path.join(DATA_DIR, "shares.json");
 
 ensureDataFiles([{ path: SHARES_PATH, initial: [] }]);
 
-const rid = () => `share-${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36)}`;
+import { generateId } from "../utils/idGenerator";
+const rid = () => generateId("share");
 
 function loadShares(): SharedBundle[] {
   return readJSON<SharedBundle[]>(SHARES_PATH) || [];

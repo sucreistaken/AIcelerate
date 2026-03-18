@@ -9,9 +9,8 @@ if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
-function generateId(): string {
-  return `mat-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-}
+import { generateId as _genId } from "../utils/idGenerator";
+const generateId = () => _genId("mat");
 
 interface MaterialData {
   id: string;

@@ -1,3 +1,4 @@
+import { logger } from "../utils/logger";
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { LoStudyModule } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
@@ -29,7 +30,7 @@ export default function LoStudyPane({ modules }: Props) {
     try {
       await exportToPdf(loContentRef.current, "LO_Study_Modules");
     } catch (err) {
-      console.error("PDF export error:", err);
+      logger.error("PDF export error:", err);
     } finally {
       setPdfLoading(false);
     }
@@ -47,7 +48,7 @@ export default function LoStudyPane({ modules }: Props) {
           setCompletedIds(parsed);
         }
       } catch (e) {
-        console.error('Failed to parse LO progress:', e);
+        logger.error('Failed to parse LO progress:', e);
       }
     }
   }, [currentLessonId]);

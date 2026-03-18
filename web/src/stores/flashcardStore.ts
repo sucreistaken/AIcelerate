@@ -81,8 +81,8 @@ export const useFlashcardStore = create<FlashcardState>((set, get) => ({
     try {
       const res = await flashcardApi.generate(lessonId);
       if (res.ok) {
-        await get().fetchAll();
-        await get().fetchStats();
+        // Fetch all cards and stats in parallel (was sequential)
+        await Promise.all([get().fetchAll(), get().fetchStats()]);
         return res.generated || 0;
       }
       return 0;

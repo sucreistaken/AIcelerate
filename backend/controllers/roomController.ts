@@ -69,9 +69,8 @@ function generateCode(): string {
   return code;
 }
 
-function generateId(): string {
-  return `room-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-}
+import { generateId as _genId } from "../utils/idGenerator";
+const generateId = () => _genId("room");
 
 // ====== CRUD ======
 

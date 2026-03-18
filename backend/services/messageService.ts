@@ -3,9 +3,8 @@ import { channelService } from "./channelService";
 import { eventBus } from "../events/eventBus";
 import { badRequest, notFound, forbidden } from "../middleware/errorHandler";
 
-function generateId(): string {
-  return `msg-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-}
+import { generateId as _genId } from "../utils/idGenerator";
+const generateId = () => _genId("msg");
 
 function parseMentions(content: string): string[] {
   const matches = content.match(/@(\S+)/g);

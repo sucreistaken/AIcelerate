@@ -77,7 +77,8 @@ ensureDataFiles([
   },
 ]);
 
-const rid = () => `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+import { generateId } from "../utils/idGenerator";
+const rid = () => generateId("task");
 
 function loadSchedules(): ScheduleStore {
   return (

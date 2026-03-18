@@ -1,3 +1,4 @@
+import { logger } from "../../../utils/logger";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Channel, LessonContextInfo } from "../../../types";
@@ -70,7 +71,7 @@ export default function ChannelToolRouter({ channel, serverId, serverName, userI
       socket.emit("channel:lesson:linked", { channelId: channel.id, lessonId, lessonTitle });
       channelToolApi.getLessonContext(channel.id).then(setLessonCtx).catch(() => {});
     } catch (err) {
-      console.error("Failed to link lesson:", err);
+      logger.error("Failed to link lesson:", err);
     }
   };
 
@@ -83,7 +84,7 @@ export default function ChannelToolRouter({ channel, serverId, serverName, userI
       const socket = getCollabSocket();
       socket.emit("channel:lesson:unlinked", { channelId: channel.id });
     } catch (err) {
-      console.error("Failed to unlink lesson:", err);
+      logger.error("Failed to unlink lesson:", err);
     }
   };
 

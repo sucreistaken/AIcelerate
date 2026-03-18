@@ -79,6 +79,9 @@ export type Lesson = {
   // 🗺️ Mindmap cache
   mindmapCache?: { code: string; generatedAt: string };
   mindmapModuleCache?: { [moduleIndex: string]: { code: string; generatedAt: string } };
+
+  // Compact AI digest (generated after plan creation)
+  digest?: import("../services/lessonDigestService").LessonDigest;
 };
 
 type GlobalMemory = {

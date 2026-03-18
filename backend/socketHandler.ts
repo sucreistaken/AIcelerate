@@ -1,3 +1,4 @@
+import { logger } from "./utils/logger";
 // backend/socketHandler.ts
 import { Server as SocketServer, Socket } from "socket.io";
 import {
@@ -38,6 +39,24 @@ interface RoomState {
 }
 
 const activeRooms = new Map<string, RoomState>();
+const roomLastActivity = new Map<string, number>();
+
+// Cleanup inactive rooms every 30 minutes
+const ROOM_INACTIVITY_MS = 24 * 60 * 60 * 1000; // 24 hours
+setInterval(() => {
+  const now = Date.now();
+  for (const [roomId, lastActive] of roomLastActivity) {
+    const state = activeRooms.get(roomId);
+    if (state && state.participants.size === 0 && now - lastActive > ROOM_INACTIVITY_MS) {
+      activeRooms.delete(roomId);
+      roomLastActivity.delete(roomId);
+    }
+  }
+}, 30 * 60 * 1000);
+
+function touchRoom(roomId: string) {
+  roomLastActivity.set(roomId, Date.now());
+}
 
 function getRoomState(roomId: string): RoomState {
   if (!activeRooms.has(roomId)) {
@@ -46,6 +65,7 @@ function getRoomState(roomId: string): RoomState {
       chat: [],
     });
   }
+  touchRoom(roomId);
   return activeRooms.get(roomId)!;
 }
 
@@ -69,17 +89,11 @@ function broadcastChat(io: SocketServer, roomId: string, msg: any) {
   io.to(roomId).emit("room:chat", msg);
 }
 
-function msgId(): string {
-  return `msg-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
-}
-
-function genId(prefix: string): string {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-}
+import { generateId, uid as msgId } from "./utils/idGenerator";
 
 export function setupSocketHandler(io: SocketServer) {
   io.on("connection", (socket: Socket) => {
-    console.log(`[Socket] Connected: ${socket.id}`);
+    logger.info(`[Socket] Connected: ${socket.id}`);
 
     // ========== ROOM LIFECYCLE ==========
 
@@ -112,7 +126,7 @@ export function setupSocketHandler(io: SocketServer) {
       if (callback) callback({ ok: true, room, workspace });
       broadcastPresence(io, room.id);
       broadcastChat(io, room.id, sysMsg);
-      console.log(`[Socket] ${data.user.nickname} created room ${room.code}`);
+      logger.info(`[Socket] ${data.user.nickname} created room ${room.code}`);
     });
 
     socket.on("room:join", (data: { roomId: string; user: StudyUser }, callback) => {
@@ -152,7 +166,7 @@ export function setupSocketHandler(io: SocketServer) {
       broadcastPresence(io, room.id);
       broadcastMemberUpdate(io, room.id);
       broadcastChat(io, room.id, sysMsg);
-      console.log(`[Socket] ${data.user.nickname} joined room ${room.code}`);
+      logger.info(`[Socket] ${data.user.nickname} joined room ${room.code}`);
     });
 
     socket.on("room:leave", () => {
@@ -179,6 +193,7 @@ export function setupSocketHandler(io: SocketServer) {
       };
       state.chat.push(msg);
       if (state.chat.length > 200) state.chat = state.chat.slice(-200);
+      touchRoom(roomId);
       broadcastChat(io, roomId, msg);
     });
 
@@ -206,7 +221,7 @@ export function setupSocketHandler(io: SocketServer) {
 
       // Create and save user message
       const userMsg: SharedChatMessage = {
-        id: genId("ddmsg"),
+        id: generateId("ddmsg"),
         role: "user",
         text: data.text,
         authorId: userId,
@@ -455,7 +470,7 @@ export function setupSocketHandler(io: SocketServer) {
 
     socket.on("disconnect", () => {
       handleLeave(io, socket);
-      console.log(`[Socket] Disconnected: ${socket.id}`);
+      logger.info(`[Socket] Disconnected: ${socket.id}`);
     });
   });
 }

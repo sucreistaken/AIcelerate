@@ -1,38 +1,49 @@
-# Claude AI
+# ── AI Assistants ──
 .claude/
-
-# Gemini AI
 .gemini/
 
-# Node.js
+# ── Node.js ──
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+package-lock.json
 
-# Environment files
+# ── Environment ──
 .env
 .env.local
 .env.*.local
+backend/.env
 
-# Build outputs
+# ── Build outputs ──
 dist/
 build/
+web/dist/
+*.tsbuildinfo
 
-# OS files
+# ── Runtime data (JSON persistence) ──
+backend/data/
+backend/backend/data/
+
+# ── OS files ──
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# IDE
+# ── IDE ──
 .idea/
 .vscode/
 *.swp
 *.swo
+*.code-workspace
 
-# Logs
+# ── Logs ──
 logs/
 *.log
 
-# Temporary files
+# ── Temporary files ──
 tmp/
 temp/
+
+# ── Docs/plans (generated) ──
+docs/plans/

@@ -1,3 +1,4 @@
+import { logger } from "../utils/logger";
 import {
   channelToolRepo,
   ChannelToolData,
@@ -10,9 +11,7 @@ import { getModel, stripCodeFences } from "./aiService";
 import { channelService } from "./channelService";
 import { getLesson } from "../controllers/lessonControllers";
 
-function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-}
+import { generateId } from "../utils/idGenerator";
 
 // ── Token utilities (from contextAssembler.ts pattern) ────────────────────────
 function estimateTokens(text: string): number {
@@ -262,8 +261,12 @@ ${toolCtx ? `- Questions MUST be based on the provided lecture material
 - Reference learning outcomes in explanations where relevant` : ''}
 - Return ONLY valid JSON array`;
 
-      const result = await getModel().generateContent(prompt);
+      const result = await getModel().generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 3000 },
+      });
       const text = result.response.text();
+      logger.info(`[AI] CHANNEL_QUIZ | ~${Math.ceil(prompt.length / 4)} in, ~${Math.ceil(text.length / 4)} out | max=3000`);
       const parsed = JSON.parse(stripCodeFences(text));
 
       const questions: QuizQuestion[] = (Array.isArray(parsed) ? parsed : []).map((q: any) => ({
@@ -285,7 +288,7 @@ ${toolCtx ? `- Questions MUST be based on the provided lecture material
       channelToolRepo.save(channelId, data);
       return { data, sourcesSummary: toolCtx?.meta.sourcesSummary || null };
     } catch (err) {
-      console.error("channelToolService.generateQuiz error:", err);
+      logger.error("channelToolService.generateQuiz error:", err);
       throw new Error("Failed to generate quiz");
     }
   },
@@ -403,8 +406,12 @@ ${toolCtx ? `- Flashcards MUST be based on the provided lecture material
 - Include cards that test understanding of common traps and errors` : ''}
 - Return ONLY valid JSON array`;
 
-      const result = await getModel().generateContent(prompt);
+      const result = await getModel().generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 2000 },
+      });
       const text = result.response.text();
+      logger.info(`[AI] CHANNEL_FLASHCARDS | ~${Math.ceil(prompt.length / 4)} in, ~${Math.ceil(text.length / 4)} out | max=2000`);
       const parsed = JSON.parse(stripCodeFences(text)) as Array<{
         front: string;
         back: string;
@@ -430,7 +437,7 @@ ${toolCtx ? `- Flashcards MUST be based on the provided lecture material
 
       return { cards: newCards, sourcesSummary: toolCtx?.meta.sourcesSummary || null };
     } catch (err) {
-      console.error("channelToolService.generateFlashcards error:", err);
+      logger.error("channelToolService.generateFlashcards error:", err);
       throw new Error("Failed to generate flashcards");
     }
   },
@@ -688,8 +695,12 @@ ${toolCtx ? `- Flashcards MUST be based on the provided lecture material
 
       const prompt = `You are a study assistant for '${serverName}' helping with '${topic}'.${lessonBlock} Answer clearly and educationally. Previous conversation: ${context}\n\nStudent ${nickname} asks: ${text}`;
 
-      const result = await getModel().generateContent(prompt);
+      const result = await getModel().generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 2500 },
+      });
       const aiText = result.response.text();
+      logger.info(`[AI] CHANNEL_DEEP_DIVE | ~${Math.ceil(prompt.length / 4)} in, ~${Math.ceil(aiText.length / 4)} out | max=2500`);
 
       const aiMessage: DeepDiveMessage = {
         id: generateId(),
@@ -705,7 +716,7 @@ ${toolCtx ? `- Flashcards MUST be based on the provided lecture material
 
       return { userMessage, aiMessage };
     } catch (err) {
-      console.error("channelToolService.deepDiveChat error:", err);
+      logger.error("channelToolService.deepDiveChat error:", err);
       throw new Error("Failed to generate AI response");
     }
   },
@@ -739,8 +750,12 @@ ${toolCtx ? `- Flashcards MUST be based on the provided lecture material
 
       const prompt = `${contextBlock}Create a Mermaid.js mindmap diagram about '${topic}' for study group '${serverName}'. Use \`mindmap\` syntax. Return ONLY the Mermaid code, no markdown fences.`;
 
-      const result = await getModel().generateContent(prompt);
+      const result = await getModel().generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 1500 },
+      });
       const rawText = result.response.text();
+      logger.info(`[AI] CHANNEL_MINDMAP | ~${Math.ceil(prompt.length / 4)} in, ~${Math.ceil(rawText.length / 4)} out | max=1500`);
       const mermaidCode = stripCodeFences(rawText);
 
       data.mindMap = {
@@ -753,7 +768,7 @@ ${toolCtx ? `- Flashcards MUST be based on the provided lecture material
 
       return { mindMap: data.mindMap, sourcesSummary: toolCtx?.meta.sourcesSummary || null };
     } catch (err) {
-      console.error("channelToolService.generateMindMap error:", err);
+      logger.error("channelToolService.generateMindMap error:", err);
       throw new Error("Failed to generate mind map");
     }
   },

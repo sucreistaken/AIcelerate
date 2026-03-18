@@ -1,3 +1,4 @@
+import { logger } from "../utils/logger";
 import { Router } from "express";
 import { buildConnections, getConnections } from "../controllers/connectionsController";
 import { listLessons, getLesson } from "../controllers/lessonControllers";
@@ -10,7 +11,7 @@ router.get("/connections", (_req, res) => {
     const connections = getConnections();
     res.json({ ok: true, connections });
   } catch (err: any) {
-    console.error("GET /api/connections error:", err);
+    logger.error("GET /api/connections error:", err);
     res.status(500).json({ ok: false, error: err.message || "Failed to get connections" });
   }
 });
@@ -20,7 +21,7 @@ router.post("/connections/build", async (_req, res) => {
     const connections = await buildConnections(getModel());
     res.json({ ok: true, connections });
   } catch (err: any) {
-    console.error("POST /api/connections/build error:", err);
+    logger.error("POST /api/connections/build error:", err);
     res.status(500).json({ ok: false, error: err.message || "Failed to build connections" });
   }
 });
@@ -70,12 +71,14 @@ Write in a clear, educational tone. Use paragraphs, not bullet points.`;
 
     const result = await getModel().generateContent({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: 2000 },
     });
     const analysis = result.response.text();
+    logger.info(`[AI] CONNECTION_DEEP_DIVE | ~${Math.ceil(prompt.length / 4)} in, ~${Math.ceil(analysis.length / 4)} out | max=2000`);
 
     res.json({ ok: true, analysis });
   } catch (err: any) {
-    console.error("POST /api/connections/deep-dive error:", err);
+    logger.error("POST /api/connections/deep-dive error:", err);
     res.status(500).json({ ok: false, error: err.message || "Failed to generate deep dive" });
   }
 });

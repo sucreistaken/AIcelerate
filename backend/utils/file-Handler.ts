@@ -1,3 +1,4 @@
+import { logger } from "./logger";
 // backend/utils/fileHandler.ts
 import fs from "fs";
 import path from "path";
@@ -12,7 +13,7 @@ export const readJSON = <T = any>(filePath: string): T | null => {
     const data = fs.readFileSync(filePath, "utf-8");
     return JSON.parse(data) as T;
   } catch (e) {
-    console.error("readJSON error:", e);
+    logger.error("readJSON error:", e);
     return null;
   }
 };
@@ -22,7 +23,7 @@ export const writeJSON = (filePath: string, data: unknown) => {
     ensureDir(path.dirname(filePath));
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
   } catch (e) {
-    console.error("writeJSON error:", e);
+    logger.error("writeJSON error:", e);
   }
 };
 

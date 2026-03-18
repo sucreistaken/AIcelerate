@@ -40,7 +40,8 @@ const NOTIFICATIONS_PATH = path.join(DATA_DIR, "notifications.json");
 
 ensureDataFiles([{ path: NOTIFICATIONS_PATH, initial: [] }]);
 
-const rid = () => `notif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+import { generateId } from "../utils/idGenerator";
+const rid = () => generateId("notif");
 
 function loadNotifications(): AppNotification[] {
   return readJSON<AppNotification[]>(NOTIFICATIONS_PATH) || [];

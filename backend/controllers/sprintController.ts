@@ -38,7 +38,8 @@ ensureDataFiles([
   },
 ]);
 
-const rid = () => `sprint-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+import { generateId } from "../utils/idGenerator";
+const rid = () => generateId("sprint");
 
 function loadSprint(): SprintData {
   return (

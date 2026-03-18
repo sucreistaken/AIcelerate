@@ -8,9 +8,8 @@ function generateFriendCode(nickname: string): string {
   return `${clean}#${tag}`;
 }
 
-function generateId(): string {
-  return `u-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-}
+import { generateId as _genId } from "../utils/idGenerator";
+const generateId = () => _genId("u");
 
 const AVATAR_COLORS = [
   "#6C5CE7", "#00B894", "#FDCB6E", "#E17055", "#0984E3",

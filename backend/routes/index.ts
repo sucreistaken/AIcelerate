@@ -1,14 +1,15 @@
 import { Router } from "express";
+import { rateLimiter } from "../middleware/rateLimiter";
 
 import lessonRoutes from "./lessonRoutes";
 import uploadRoutes from "./uploadRoutes";
 import quizRoutes from "./quizRoutes";
-import weaknessRoutes from "./weaknessRoutes";
+// DISABLED: import weaknessRoutes from "./weaknessRoutes";
 import flashcardRoutes from "./flashcardRoutes";
-import sprintRoutes from "./sprintRoutes";
+// DISABLED: import sprintRoutes from "./sprintRoutes";
 import connectionRoutes from "./connectionRoutes";
 import shareRoutes from "./shareRoutes";
-import roomRoutes from "./roomRoutes";
+// DISABLED: import roomRoutes from "./roomRoutes";
 import courseRoutes from "./courseRoutes";
 import schedulerRoutes from "./schedulerRoutes";
 import notificationRoutes from "./notificationRoutes";
@@ -24,6 +25,12 @@ router.get("/health", (_req, res) => res.json({ ok: true }));
 // Auth
 router.use("/api", authRoutes);
 
+// Global rate limit for AI-heavy endpoints (20 req/min per user)
+router.use(
+  "/api",
+  rateLimiter("ai-global", 20, 60_000)
+);
+
 // Core lesson & AI routes
 router.use("/api", lessonRoutes);
 
@@ -33,14 +40,14 @@ router.use("/api", uploadRoutes);
 // Quiz
 router.use("/api", quizRoutes);
 
-// Weakness tracker
-router.use("/api", weaknessRoutes);
+// DISABLED: Weakness tracker
+// router.use("/api", weaknessRoutes);
 
 // Flashcards
 router.use("/api", flashcardRoutes);
 
-// Sprint / Pomodoro
-router.use("/api", sprintRoutes);
+// DISABLED: Sprint / Pomodoro
+// router.use("/api", sprintRoutes);
 
 // Cross-lesson connections
 router.use("/api", connectionRoutes);
@@ -48,8 +55,8 @@ router.use("/api", connectionRoutes);
 // Share
 router.use("/api", shareRoutes);
 
-// Legacy rooms
-router.use("/api", roomRoutes);
+// DISABLED: Legacy rooms (v1) - replaced by roomRoutes2
+// router.use("/api", roomRoutes);
 
 // Courses
 router.use("/api", courseRoutes);

@@ -1,7 +1,9 @@
+import { logger } from "../utils/logger";
 // controllers/connectionsController.ts
 import path from "path";
 import { readJSON, writeJSON } from "../utils/file-Handler";
 import { listLessons, getMemory } from "./lessonControllers";
+import { SCHEMAS } from "../prompts/schemas";
 
 export type ConceptConnection = {
   concept: string;
@@ -162,9 +164,17 @@ Return a JSON array of objects: [{"concept": "...", "insight": "..."}]
 Concepts:
 ${JSON.stringify(batch, null, 2)}`;
 
-      const result = await model.generateContent({ contents: [{ role: "user", parts: [{ text: prompt }] }] });
+      const result = await model.generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          maxOutputTokens: 1500,
+          responseMimeType: "application/json",
+          responseSchema: SCHEMAS.CONNECTION_INSIGHTS,
+        },
+      });
       const raw = result.response.text();
-      const parsed = JSON.parse(stripCodeFences(raw));
+      logger.info(`[AI] CONNECTION_INSIGHTS | ~${Math.ceil(prompt.length / 4)} in, ~${Math.ceil(raw.length / 4)} out | max=1500`);
+      const parsed = JSON.parse(raw);
 
       if (Array.isArray(parsed)) {
         const insightMap = new Map<string, string>();
@@ -179,7 +189,7 @@ ${JSON.stringify(batch, null, 2)}`;
         }
       }
     } catch (err) {
-      console.warn("AI insights generation failed (connections still saved):", err);
+      logger.warn("AI insights generation failed (connections still saved):", err);
     }
   }
 

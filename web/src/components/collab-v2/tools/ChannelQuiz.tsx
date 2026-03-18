@@ -1,3 +1,4 @@
+import { logger } from "../../../utils/logger";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useChannelToolStore } from "../../../stores/channelToolStore";
@@ -52,7 +53,7 @@ export default function ChannelQuiz({ channelId, topic, serverName, userId, nick
       setResult(null);
       setShowResults(false);
     } catch (err) {
-      console.error("Failed to generate quiz:", err);
+      logger.error("Failed to generate quiz:", err);
     } finally {
       setGenerating(false);
     }
@@ -87,7 +88,7 @@ export default function ChannelQuiz({ channelId, topic, serverName, userId, nick
         result: { userId, nickname, questionId: question.id, correct: answerResult.correct, scores: answerResult.scores },
       });
     } catch (err) {
-      console.error("Failed to submit answer:", err);
+      logger.error("Failed to submit answer:", err);
       setSelectedIndex(null);
     }
   }
