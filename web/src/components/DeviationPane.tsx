@@ -1,6 +1,7 @@
 // src/components/DeviationPane.tsx
 import React from "react";
 import { motion } from "framer-motion";
+import PaneInfoBanner from "./ui/PaneInfoBanner";
 
 interface DeviationSegment {
     index: number;
@@ -237,6 +238,12 @@ export default function DeviationPane({
 
     return (
         <div className="grid-gap-12">
+            <PaneInfoBanner
+                id="deviation"
+                title="Sapma Analizi Nedir?"
+                description="Dersin slaytlardan ne kadar saptığını segmentler halinde gösterir."
+                tips={["Skor göstergesi", "Segment detayı", "Ekstra konular", "Eksik konular"]}
+            />
             {/* --- Summary Section --- */}
             <section className="lc-section">
                 <div

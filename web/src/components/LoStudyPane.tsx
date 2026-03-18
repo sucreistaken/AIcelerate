@@ -4,6 +4,7 @@ import { LoStudyModule } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLessonStore } from "../stores/lessonStore";
 import { exportToPdf } from "../utils/pdfExport";
+import PaneInfoBanner from "./ui/PaneInfoBanner";
 
 type Props = {
   modules: LoStudyModule[];
@@ -143,9 +144,16 @@ export default function LoStudyPane({ modules }: Props) {
       display: 'grid',
       gridTemplateColumns: '1fr 2fr',
       gap: 16,
-      height: '80vh',
       minHeight: 500
     }}>
+      <div style={{ gridColumn: '1 / -1' }}>
+        <PaneInfoBanner
+          id="lo-study"
+          title="Öğrenme Çıktıları Çalışması"
+          description="Dersin öğrenme çıktılarına göre yapılandırılmış çalışma modülleri."
+          tips={["Modül bazlı çalışma", "İlerleme takibi", "Quiz soruları", "PDF export"]}
+        />
+      </div>
       {/* Left Sidebar */}
       <aside style={{
         display: 'flex',

@@ -93,6 +93,85 @@ export function ListSkeleton({ count = 3 }: { count?: number }) {
     );
 }
 
+// Quiz Skeleton
+export function QuizSkeleton() {
+    return (
+        <div className="lc-section" style={{ padding: '32px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <Skeleton width="40%" height={24} />
+                <Skeleton width={80} height={28} />
+            </div>
+            <div style={{ marginBottom: '20px', padding: '20px', borderRadius: '12px', background: 'var(--bg)' }}>
+                <Skeleton width="80%" height={20} />
+                <div style={{ marginTop: '16px', display: 'grid', gap: '10px' }}>
+                    {Array.from({ length: 4 }).map((_, i) => (
+                        <Skeleton key={i} height={44} />
+                    ))}
+                </div>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <Skeleton width={100} height={36} />
+                <Skeleton width={120} height={36} />
+            </div>
+        </div>
+    );
+}
+
+// Flashcard Skeleton
+export function FlashcardSkeleton() {
+    return (
+        <div className="lc-section" style={{ padding: '32px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px' }}>
+                <Skeleton width="35%" height={22} />
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <Skeleton width={60} height={24} />
+                    <Skeleton width={60} height={24} />
+                </div>
+            </div>
+            <div style={{
+                maxWidth: 480, margin: '0 auto', padding: '40px 24px',
+                borderRadius: '16px', background: 'var(--bg)', textAlign: 'center',
+            }}>
+                <Skeleton width="70%" height={24} />
+                <div style={{ marginTop: '16px' }}>
+                    <Skeleton lines={2} />
+                </div>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '24px' }}>
+                <Skeleton width={70} height={36} />
+                <Skeleton width={70} height={36} />
+                <Skeleton width={70} height={36} />
+                <Skeleton width={70} height={36} />
+            </div>
+        </div>
+    );
+}
+
+// Deep Dive Chat Skeleton
+export function DeepDiveSkeleton() {
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '24px' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <Skeleton width={32} height={32} variant="circular" />
+                <Skeleton width="30%" height={18} />
+            </div>
+            {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} style={{
+                    padding: '16px', borderRadius: '12px', background: 'var(--bg)',
+                    alignSelf: i % 2 === 0 ? 'flex-end' : 'flex-start',
+                    maxWidth: '70%',
+                }}>
+                    <Skeleton lines={i === 1 ? 3 : 1} />
+                </div>
+            ))}
+            <div style={{ marginTop: 'auto', display: 'flex', gap: '8px' }}>
+                <Skeleton height={44} />
+                <Skeleton width={44} height={44} />
+            </div>
+        </div>
+    );
+}
+
 // Table Skeleton
 export function TableSkeleton({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
     return (

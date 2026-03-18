@@ -1,5 +1,6 @@
 import React from "react";
 import { Plan } from "../types";
+import PaneInfoBanner from "./ui/PaneInfoBanner";
 
 /** Helper: Ortalama hesaplama */
 function average(ns: number[]) {
@@ -23,6 +24,12 @@ export default function AlignmentPane({
 
   return (
     <div className="grid-gap-12">
+      <PaneInfoBanner
+        id="alignment"
+        title="Eşleştirme Analizi Nedir?"
+        description="Ders içeriğinin slaytlarla ne kadar örtüştüğünü analiz eder."
+        tips={["Slayt eşleşme", "Süre analizi", "Kapsam skoru"]}
+      />
       <section className="lc-section grid-gap-10">
         <div className="fw-800 fs-18">Eşleştirme Özeti</div>
 

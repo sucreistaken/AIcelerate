@@ -47,3 +47,5 @@ temp/
 
 # ── Docs/plans (generated) ──
 docs/plans/
+PLAN-*.md
+CLAUDE.md

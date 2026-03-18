@@ -2,6 +2,7 @@ import { logger } from "../utils/logger";
 import React, { useState, useRef } from "react";
 import { Plan, ModuleT ,LearningOutcome} from "../types";
 import { exportToPdf } from "../utils/pdfExport";
+import PaneInfoBanner from "./ui/PaneInfoBanner";
 
 /** Yardımcı fonksiyon: Dakikayı okunabilir formata çevirir */
 function prettyMinutes(min?: number) {
@@ -39,6 +40,12 @@ export default function PlanPane({ plan }: { plan: Plan }) {
 
   return (
     <div className="grid-gap-16" ref={planRef}>
+      <PaneInfoBanner
+        id="plan"
+        title="Öğrenme Planı Nedir?"
+        description="AI dersinizi analiz ederek haftalık bir öğrenme planı oluşturur."
+        tips={["Haftalık plan", "Zorluk seviyesi", "Ana kavramlar", "PDF export"]}
+      />
       <header className="lc-section pad-b-10">
         <div className="plan-header">
           <div>

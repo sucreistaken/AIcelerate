@@ -6,6 +6,8 @@ import { useUiStore } from "../stores/uiStore";
 import { courseApi } from "../services/api";
 import { Course, CourseProgress, WeeklySchedule, ModeId } from "../types";
 import { motion, AnimatePresence } from "framer-motion";
+import { ConfirmModal } from "./ui/ConfirmModal";
+import PaneInfoBanner from "./ui/PaneInfoBanner";
 
 const CHAT_STORAGE_PREFIX = 'lc.course-chat.';
 
@@ -182,6 +184,8 @@ export default function CourseDashboard() {
   const [chatLoading, setChatLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "progress" | "schedule">("overview");
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  const [confirmRebuild, setConfirmRebuild] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     fetchCourses();
@@ -253,6 +257,12 @@ export default function CourseDashboard() {
   if (!course) {
     return (
       <div className="lc-section" style={{ padding: 24 }}>
+        <PaneInfoBanner
+          id="course-dashboard"
+          title="Course Dashboard Nedir?"
+          description="Derslerinizi kurslara gruplayarak AI'ın dersler arası bağlantı kurmasını sağlayın."
+          tips={["Kurs oluştur", "Ders ata", "İlerleme takibi", "Haftalık plan"]}
+        />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <h2 className="h2">Courses</h2>
           <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>+ New Course</button>
@@ -308,6 +318,26 @@ export default function CourseDashboard() {
 
   return (
     <div className="lc-section" style={{ padding: 24 }}>
+      <ConfirmModal
+        isOpen={confirmRebuild}
+        onConfirm={() => { setConfirmRebuild(false); rebuildIndex(course.id); }}
+        onCancel={() => setConfirmRebuild(false)}
+        title="Knowledge Index Yeniden Oluştur"
+        message="Knowledge Index yeniden oluşturulsun mu? Bu işlem biraz zaman alabilir."
+        confirmLabel="Evet, Oluştur"
+        cancelLabel="İptal"
+        variant="warning"
+      />
+      <ConfirmModal
+        isOpen={confirmDelete}
+        onConfirm={async () => { setConfirmDelete(false); await deleteCourse(course.id); }}
+        onCancel={() => setConfirmDelete(false)}
+        title="Kursu Sil"
+        message={`"${course.code}" kursu silinecek. Bu işlem geri alınamaz.`}
+        confirmLabel="Evet, Sil"
+        cancelLabel="İptal"
+        variant="danger"
+      />
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
         <div>
@@ -326,15 +356,13 @@ export default function CourseDashboard() {
           <button className="btn btn-ghost" onClick={() => exportCourse(course.id)} title="Export course data">
             Export
           </button>
-          <button className="btn btn-ghost" onClick={() => {
-            if (confirm("Knowledge Index yeniden oluşturulsun mu? Bu işlem biraz zaman alabilir.")) rebuildIndex(course.id);
-          }} title="Rebuild Knowledge Index">
+          <button className="btn btn-ghost" onClick={() => setConfirmRebuild(true)} title="Rebuild Knowledge Index">
             Rebuild Index
           </button>
           <button
             className="btn btn-ghost"
             style={{ color: "var(--danger, #ef4444)" }}
-            onClick={async () => { if (confirm(`Delete course "${course.code}"?`)) await deleteCourse(course.id); }}
+            onClick={() => setConfirmDelete(true)}
           >
             Delete
           </button>

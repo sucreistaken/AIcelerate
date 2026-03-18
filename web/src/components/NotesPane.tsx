@@ -7,6 +7,9 @@ import { useRoomStore } from "../stores/roomStore";
 import { motion, AnimatePresence } from "framer-motion";
 import { exportToPdf } from "../utils/pdfExport";
 import TagInput from "./ui/TagInput";
+import { ConfirmModal } from "./ui/ConfirmModal";
+import PaneInfoBanner from "./ui/PaneInfoBanner";
+import { useGamificationStore } from "../stores/gamificationStore";
 
 const NOTE_MAX_CHARS = 10000;
 
@@ -29,6 +32,7 @@ export default function NotesPane() {
     const [editContent, setEditContent] = useState("");
     const [searchInput, setSearchInput] = useState(searchQuery);
     const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [showClearConfirm, setShowClearConfirm] = useState(false);
 
     useEffect(() => {
         const timer = setTimeout(() => setSearchQuery(searchInput), 200);
@@ -49,6 +53,7 @@ export default function NotesPane() {
     const handleCreateNote = () => {
         if (!newContent.trim()) return;
         addNote(newContent.trim(), 'manual', undefined, newTitle.trim() || undefined, newTags);
+        useGamificationStore.getState().addXp('note-create');
         setNewTitle(""); setNewContent(""); setNewTags([]); setShowCreator(false);
     };
 
@@ -148,6 +153,22 @@ export default function NotesPane() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
         >
+            <ConfirmModal
+                isOpen={showClearConfirm}
+                onConfirm={() => { setShowClearConfirm(false); clearAllNotes(); }}
+                onCancel={() => setShowClearConfirm(false)}
+                title="Tüm Notları Sil"
+                message="Tüm notlarınız silinecek. Bu işlem geri alınamaz."
+                confirmLabel="Evet, Sil"
+                cancelLabel="İptal"
+                variant="danger"
+            />
+            <PaneInfoBanner
+                id="notes"
+                title="Notlar Nedir?"
+                description="Ders sırasında kişisel notlar oluşturun, etiketleyin ve düzenleyin."
+                tips={["Etiketleme", "Arama", "PDF export", "Sabitleme"]}
+            />
             {/* Header */}
             <div className="nt-header">
                 <div className="nt-header-left">
@@ -182,7 +203,7 @@ export default function NotesPane() {
                             </button>
                             <button
                                 className="nt-btn nt-btn--danger"
-                                onClick={() => { if (confirm('Delete all notes?')) clearAllNotes(); }}
+                                onClick={() => setShowClearConfirm(true)}
                             >
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                             </button>

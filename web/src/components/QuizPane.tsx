@@ -8,6 +8,7 @@ import { useUiStore } from "../stores/uiStore";
 import { exportToPdf } from "../utils/pdfExport";
 import { withRetry } from "../utils/apiRetry";
 import PaneInfoBanner from "./ui/PaneInfoBanner";
+import { useGamificationStore } from "../stores/gamificationStore";
 
 const QUIZ_ANSWERS_KEY_PREFIX = 'lc.quiz.answers.';
 const QUIZ_EVAL_KEY_PREFIX = 'lc.quiz.eval.';
@@ -21,10 +22,19 @@ function parseDifficulty(q: string): { difficulty: string; cleanQ: string } {
 
 function getDifficultyColor(d: string): string {
   switch (d.toLowerCase()) {
-    case 'easy': return '#00b894';
-    case 'medium': return '#fdcb6e';
-    case 'hard': return '#e17055';
+    case 'easy': return 'var(--easy)';
+    case 'medium': return 'var(--medium)';
+    case 'hard': return 'var(--hard)';
     default: return 'var(--muted)';
+  }
+}
+
+function getDifficultyBg(d: string): string {
+  switch (d.toLowerCase()) {
+    case 'easy': return 'var(--easy-bg)';
+    case 'medium': return 'var(--medium-bg)';
+    case 'hard': return 'var(--hard-bg)';
+    default: return 'var(--card-hover)';
   }
 }
 
@@ -199,7 +209,12 @@ export default function QuizPane({
         setEvalResults(map);
         setShowDashboard(true);
         saveToHistory(j.results);
-        toast.success("Değerlendirme tamamlandı!");
+        // Award XP for each answered question
+        const answeredCount = j.results.length;
+        for (let i = 0; i < answeredCount; i++) {
+          useGamificationStore.getState().addXp('quiz-answer');
+        }
+        toast.success(`Değerlendirme tamamlandı! +${answeredCount * 10} XP`);
       } else {
         toast.error("Değerlendirme yapılamadı.");
       }
@@ -253,7 +268,8 @@ export default function QuizPane({
     return { total, correct, partial, incorrect, score, topMissed };
   }, [evalResults]);
 
-  const gradeColor = (g: string) => g === 'correct' ? '#00b894' : g === 'partial' ? '#fdcb6e' : '#e17055';
+  const gradeColor = (g: string) => g === 'correct' ? 'var(--success)' : g === 'partial' ? 'var(--warning)' : 'var(--danger)';
+  const gradeBg = (g: string) => g === 'correct' ? 'var(--success-soft)' : g === 'partial' ? 'var(--warning-soft)' : 'var(--danger-soft)';
   const gradeLabel = (g: string) => g === 'correct' ? 'Dogru' : g === 'partial' ? 'Kismen' : 'Yanlis';
 
   return (
@@ -401,8 +417,8 @@ export default function QuizPane({
                   <div className="fw-700 mb-2" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     {difficulty && (
                       <span style={{
-                        fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4,
-                        background: getDifficultyColor(difficulty) + '22', color: getDifficultyColor(difficulty),
+                        fontSize: 'var(--fs-xs)', fontWeight: 600, padding: "2px 8px", borderRadius: 'var(--radius-xs)',
+                        background: getDifficultyBg(difficulty), color: getDifficultyColor(difficulty),
                       }}>
                         {difficulty}
                       </span>

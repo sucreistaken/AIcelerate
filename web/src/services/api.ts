@@ -877,3 +877,28 @@ export const notificationApi = {
         }
     },
 };
+
+// ============ Gamification ============
+export const gamificationApi = {
+    async addXp(action: string, amount?: number): Promise<{ ok: boolean; totalXp?: number; earned?: number; streakDays?: number; error?: string }> {
+        try {
+            const res = await fetch(`${API_BASE}/api/xp/add`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action, amount }),
+            });
+            return await res.json();
+        } catch (error) {
+            return { ok: false, error: 'Failed to add XP' };
+        }
+    },
+
+    async getStats(): Promise<{ ok: boolean; totalXp?: number; streakDays?: number; todayXp?: number; error?: string }> {
+        try {
+            const res = await fetch(`${API_BASE}/api/xp/stats`);
+            return await res.json();
+        } catch (error) {
+            return { ok: false, error: 'Failed to get stats' };
+        }
+    },
+};

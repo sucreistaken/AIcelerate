@@ -6,6 +6,8 @@ import { Card, CardHeader, CardBody } from "./ui/Card";
 import { Button } from "./ui/Button";
 import { Select } from "./ui/Select";
 import { Badge } from "./ui/Badge";
+import { ConfirmModal } from "./ui/ConfirmModal";
+import PaneInfoBanner from "./ui/PaneInfoBanner";
 
 function timeAgo(dateStr: string, lang: 'tr' | 'en'): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -28,18 +30,14 @@ export default function CheatSheetPane(props: {
   const [language, setLanguage] = useState<'tr' | 'en'>('tr');
   const [pdfLoading, setPdfLoading] = useState(false);
   const [prevLang, setPrevLang] = useState<'tr' | 'en'>(language);
+  const [showLangConfirm, setShowLangConfirm] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
   // Auto-regenerate on language change
   useEffect(() => {
     if (language !== prevLang && cheatSheet) {
       setPrevLang(language);
-      const confirmed = confirm(
-        language === 'tr'
-          ? 'Dil değişti. Cheat sheet yeniden oluşturulsun mu?'
-          : 'Language changed. Regenerate cheat sheet?'
-      );
-      if (confirmed) onGenerate(language);
+      setShowLangConfirm(true);
     } else {
       setPrevLang(language);
     }
@@ -93,6 +91,24 @@ export default function CheatSheetPane(props: {
 
   return (
     <Card padding="md">
+      <ConfirmModal
+        isOpen={showLangConfirm}
+        onConfirm={() => { setShowLangConfirm(false); onGenerate(language); }}
+        onCancel={() => setShowLangConfirm(false)}
+        title={language === 'tr' ? 'Dil Değişikliği' : 'Language Change'}
+        message={language === 'tr'
+          ? 'Dil değişti. Cheat sheet yeniden oluşturulsun mu?'
+          : 'Language changed. Regenerate cheat sheet?'}
+        confirmLabel={language === 'tr' ? 'Evet, Oluştur' : 'Yes, Regenerate'}
+        cancelLabel={language === 'tr' ? 'İptal' : 'Cancel'}
+        variant="warning"
+      />
+      <PaneInfoBanner
+        id="cheat-sheet"
+        title="Cheat Sheet Nedir?"
+        description="Ders materyalinden tek sayfalık, sınav odaklı ultra özet oluşturur."
+        tips={["Formüller", "Dikkat noktaları", "Hızlı quiz", "PDF export"]}
+      />
       <CardHeader>
         <div>
           <div className="u-font-extrabold u-text-lg">{t.title}</div>

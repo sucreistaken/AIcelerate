@@ -24,8 +24,13 @@ export { Tabs, TabsList, TabsTrigger, TabsContent } from "./Tabs";
 export type { TabsProps, TabsListProps, TabsTriggerProps, TabsContentProps } from "./Tabs";
 
 // Existing components (re-export for convenience)
-export { Skeleton, CardSkeleton, ListSkeleton, TableSkeleton } from "./Skeleton";
+export { Skeleton, CardSkeleton, ListSkeleton, TableSkeleton, QuizSkeleton, FlashcardSkeleton, DeepDiveSkeleton } from "./Skeleton";
+export { ProgressRing } from "./ProgressRing";
+export { StreakBadge } from "./StreakBadge";
+export { ProgressStepper } from "./ProgressStepper";
 export { EmptyState, NoPlanEmpty, NoQuizEmpty, NoLessonsEmpty, NoCheatSheetEmpty } from "./EmptyState";
 export { ThemeToggle } from "./ThemeToggle";
 export { ToastProvider } from "./Toast";
 export { ErrorBoundary, PaneErrorBoundary } from "./ErrorBoundary";
+export { ConfirmModal, useConfirmModal } from "./ConfirmModal";
+export type { ConfirmModalProps } from "./ConfirmModal";

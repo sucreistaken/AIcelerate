@@ -3,6 +3,8 @@ import { deepDiveApi } from "../services/api";
 import { useLessonStore } from "../stores/lessonStore";
 import { useNotesStore } from "../stores/notesStore";
 import { motion, AnimatePresence } from "framer-motion";
+import PaneInfoBanner from "./ui/PaneInfoBanner";
+import { useGamificationStore } from "../stores/gamificationStore";
 
 interface Message {
   role: 'user' | 'model';
@@ -205,6 +207,7 @@ export default function DeepDivePane() {
       ? { ...s, messages: [...s.messages, { role: 'user' as const, content: text, timestamp: Date.now() }] }
       : s));
     setLoading(true);
+    useGamificationStore.getState().addXp('deep-dive-ask');
 
     // Add placeholder AI message for streaming
     const placeholderMsg: Message = { role: 'model', content: '', timestamp: Date.now() };
@@ -307,6 +310,12 @@ export default function DeepDivePane() {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
     >
+      <PaneInfoBanner
+        id="deep-dive"
+        title="Deep Dive Nedir?"
+        description="Ders konusu hakkında AI ile derinlemesine sohbet edin."
+        tips={["Soru sor", "Sınav hazırlığı", "Kavram açıklaması", "Not olarak kaydet"]}
+      />
       {/* ---- Minimal Header ---- */}
       <div className="dd-topbar">
         <div className="dd-topbar-left">

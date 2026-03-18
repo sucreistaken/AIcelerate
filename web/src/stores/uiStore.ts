@@ -2,8 +2,10 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { ModeId } from '../types';
+import { setLanguage as setI18nLanguage, initLanguage } from '../utils/i18n';
 
 type Theme = 'light' | 'dark' | 'system';
+type Language = 'tr' | 'en';
 
 interface SttProgress {
     progress: number;
@@ -44,10 +46,14 @@ interface UiState {
     // Left panel
     leftPanelCollapsed: boolean;
 
+    // Language
+    language: Language;
+
     // Actions
     setMode: (mode: ModeId) => void;
     setTheme: (theme: Theme) => void;
     toggleTheme: () => void;
+    setLanguage: (lang: Language) => void;
     setIsLoading: (loading: boolean, message?: string | null) => void;
     setShowNewLessonModal: (show: boolean) => void;
     setNewLessonTitle: (title: string) => void;
@@ -102,7 +108,8 @@ export const useUiStore = create<UiState>()(
             loModulesLoading: false,
             cheatErr: null,
             devErr: null,
-            leftPanelCollapsed: false,
+            leftPanelCollapsed: true,
+            language: initLanguage(),
 
             // Actions
             setMode: (mode) => {
@@ -162,12 +169,18 @@ export const useUiStore = create<UiState>()(
             setCheatErr: (err) => set({ cheatErr: err }),
             setDevErr: (err) => set({ devErr: err }),
             toggleLeftPanel: () => set((s) => ({ leftPanelCollapsed: !s.leftPanelCollapsed })),
+
+            setLanguage: (lang) => {
+                set({ language: lang });
+                setI18nLanguage(lang);
+            },
         }),
         {
             name: 'learncraft-ui-storage',
             partialize: (state) => ({
                 theme: state.theme,
                 leftPanelCollapsed: state.leftPanelCollapsed,
+                language: state.language,
             }),
         }
     )

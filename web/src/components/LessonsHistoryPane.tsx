@@ -7,6 +7,8 @@ import { API_BASE } from "../config";
 import { ModeId, SharedBundle } from "../types";
 import { lessonsApi, sharesApi } from "../services/api";
 import { useCourseStore } from "../stores/courseStore";
+import { ConfirmModal } from "./ui/ConfirmModal";
+import PaneInfoBanner from "./ui/PaneInfoBanner";
 
 // Tarih formatlayıcı (Örn: "2 Ara 2025, 14:30")
 const formatDate = (d?: string, locale: string = "tr-TR") => {
@@ -76,6 +78,7 @@ export default function LessonsHistoryPane({ setMode, setQuiz, onSelectLesson, c
   const [shares, setShares] = useState<SharedBundle[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false);
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
@@ -87,10 +90,11 @@ export default function LessonsHistoryPane({ setMode, setQuiz, onSelectLesson, c
 
   const handleBulkDelete = async () => {
     if (!selectedIds.size) return;
-    if (!confirm(lang === 'tr'
-      ? `${selectedIds.size} ders silinecek. Emin misiniz?`
-      : `Delete ${selectedIds.size} lessons. Are you sure?`
-    )) return;
+    setShowBulkConfirm(true);
+  };
+
+  const executeBulkDelete = async () => {
+    setShowBulkConfirm(false);
     setBulkDeleting(true);
     for (const id of selectedIds) {
       await lessonsApi.delete(id);
@@ -259,6 +263,24 @@ export default function LessonsHistoryPane({ setMode, setQuiz, onSelectLesson, c
 
   return (
     <div className="history-pane">
+      <ConfirmModal
+        isOpen={showBulkConfirm}
+        onConfirm={executeBulkDelete}
+        onCancel={() => setShowBulkConfirm(false)}
+        title={lang === 'tr' ? 'Toplu Silme' : 'Bulk Delete'}
+        message={lang === 'tr'
+          ? `${selectedIds.size} ders silinecek. Emin misiniz?`
+          : `Delete ${selectedIds.size} lessons. Are you sure?`}
+        confirmLabel={lang === 'tr' ? 'Evet, Sil' : 'Yes, Delete'}
+        cancelLabel={lang === 'tr' ? 'İptal' : 'Cancel'}
+        variant="danger"
+      />
+      <PaneInfoBanner
+        id="lessons-history"
+        title="Ders Geçmişi"
+        description="Tüm derslerinizi görüntüleyin, arayın ve yönetin."
+        tips={["Ders ara", "Toplu silme", "Kurs atama", "Paylaşımlar"]}
+      />
       {/* Header */}
       <div className="flex-between mb-4 items-center">
         <h2 className="text-xl font-bold m-0">{t.myLessons}</h2>

@@ -16,6 +16,7 @@ import notificationRoutes from "./notificationRoutes";
 import collabRoutes from "./collabRoutes";
 import authRoutes from "./authRoutes";
 import roomRoutes2 from "./roomRoutes2";
+import gamificationRoutes from "./gamificationRoutes";
 
 const router = Router();
 
@@ -72,5 +73,8 @@ router.use("/api/collab", collabRoutes);
 
 // Rooms V2 (Discord-style, /api/rooms/*)
 router.use("/api", roomRoutes2);
+
+// Gamification (XP, streak)
+router.use("/api", gamificationRoutes);
 
 export default router;

@@ -29,6 +29,8 @@ import ShareModal from "./components/ui/ShareModal";
 import NicknamePrompt from "./components/ui/NicknamePrompt";
 import IdentityBadge from "./components/ui/IdentityBadge";
 import NotificationBell from "./components/ui/NotificationBell";
+import { StreakBadge } from "./components/ui/StreakBadge";
+import { ProgressStepper } from "./components/ui/ProgressStepper";
 import SchedulerWidget from "./components/SchedulerWidget";
 import AuthGuard from "./components/auth/AuthGuard";
 import AmbientBackground from "./components/ui/AmbientBackground";
@@ -492,6 +494,18 @@ export default function App() {
               >
                 &#9881;
               </button>
+              <StreakBadge />
+              <button
+                onClick={() => ui.setLanguage(ui.language === 'tr' ? 'en' : 'tr')}
+                title={ui.language === 'tr' ? 'Switch to English' : 'Türkçeye geç'}
+                style={{
+                  background: "none", border: "1px solid var(--border)", borderRadius: "var(--radius-full)",
+                  padding: "3px 8px", fontSize: 11, fontWeight: 600, cursor: "pointer",
+                  color: "var(--muted)", transition: "all 0.15s",
+                }}
+              >
+                {ui.language === 'tr' ? 'EN' : 'TR'}
+              </button>
               <ShareButton />
               <ThemeToggle />
             </div>
@@ -756,6 +770,9 @@ export default function App() {
                         >
                           {ui.isLoading ? "Analyzing..." : "Plan & Analyze"}
                         </button>
+
+                        <ProgressStepper isActive={ui.isLoading} />
+
                         {!canSubmit && !ui.isLoading && (
                           <div style={{ fontSize: 11, color: "var(--muted)", textAlign: "center", marginTop: 6 }}>
                             Slayt ve transkript alanlarini doldurun

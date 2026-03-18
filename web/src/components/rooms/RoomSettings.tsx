@@ -3,6 +3,7 @@ import type { StudyServer } from "../../types";
 import { useRoomStore2 } from "../../stores/roomStore2";
 import { useAuthStore } from "../../stores/authStore";
 import { roomsApi } from "../../services/roomsApi";
+import { ConfirmModal } from "../ui/ConfirmModal";
 
 interface Props {
   room: StudyServer;
@@ -17,6 +18,7 @@ export default function RoomSettings({ room, onClose }: Props) {
   const [inviteCode, setInviteCode] = useState(room.inviteCode);
   const [copied, setCopied] = useState(false);
   const isOwner = user?.id === room.ownerId;
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const copyInvite = () => {
     navigator.clipboard.writeText(inviteCode);
@@ -69,7 +71,7 @@ export default function RoomSettings({ room, onClose }: Props) {
               </button>
               <button
                 className="sh-room-settings__btn sh-room-settings__btn--danger"
-                onClick={() => { if (user && confirm("Delete this room permanently?")) { deleteRoom(room.id, user.id); onClose(); } }}
+                onClick={() => setShowDeleteConfirm(true)}
               >
                 Delete Room
               </button>
@@ -77,6 +79,16 @@ export default function RoomSettings({ room, onClose }: Props) {
           )}
         </div>
       </div>
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onConfirm={() => { setShowDeleteConfirm(false); if (user) { deleteRoom(room.id, user.id); onClose(); } }}
+        onCancel={() => setShowDeleteConfirm(false)}
+        title="Delete Room"
+        message="Delete this room permanently? This action cannot be undone."
+        confirmLabel="Yes, Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+      />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { useUiStore } from '../stores/uiStore';
 import { API_BASE } from '../config';
 import { lessonsApi, planApi, loApi, cheatSheetApi, deviationApi, uploadApi } from '../services/api';
 import { invalidateLessonCache } from '../utils/cacheInvalidation';
+import { useGamificationStore } from '../stores/gamificationStore';
 
 export function useLesson() {
     const store = useLessonStore();
@@ -90,6 +91,7 @@ export function useLesson() {
             if (result.lessonId) {
                 invalidateLessonCache(result.lessonId);
             }
+            useGamificationStore.getState().addXp('plan-create');
             ui.setMode('alignment');
             return result.plan;
         } catch (e: any) {
@@ -207,6 +209,7 @@ export function useLesson() {
                 throw new Error(result.error || 'Failed to generate cheat sheet');
             }
             store.setCheatSheet(result.cheatSheet || null);
+            useGamificationStore.getState().addXp('cheat-sheet-create');
             ui.setMode('cheat-sheet');
         } catch (e: any) {
             ui.setCheatErr(e.message);

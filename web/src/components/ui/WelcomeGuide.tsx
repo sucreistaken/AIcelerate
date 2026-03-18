@@ -1,131 +1,244 @@
 import React from "react";
 import { motion } from "framer-motion";
+import { useLessonStore } from "../../stores/lessonStore";
+import { useUiStore } from "../../stores/uiStore";
+import { ModeId } from "../../types";
 
-const steps = [
-  {
-    num: 1,
-    icon: "\uD83D\uDCDA",
-    title: "Ders Materyalini Yukle",
-    desc: "Sol panelden slayt (PDF) ve/veya ders kaydini (ses dosyasi) yukleyin. Manuel olarak da yapistirabilirsiniz.",
-    color: "#6366f1",
-  },
-  {
-    num: 2,
-    icon: "\uD83E\uDDE0",
-    title: "Plan & Analyze",
-    desc: "AI dersinizi analiz edip ogrenme plani, vurgular, quiz sorulari ve eslestirme tablosu olusturur.",
-    color: "#00b894",
-  },
-  {
-    num: 3,
-    icon: "\uD83D\uDE80",
-    title: "Modulleri Kesfet",
-    desc: "Ust sekmelerden Deep Dive, Quiz, Mind Map, Cheat Sheet gibi calisma araclarina eris.",
-    color: "#e17055",
-  },
+interface LessonSummary {
+  id: string;
+  title: string;
+  date?: string;
+  highlights?: string[];
+  plan?: { modules?: any[] };
+}
+
+function timeAgoShort(d: string): string {
+  const diff = Date.now() - new Date(d).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}dk`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}sa`;
+  const days = Math.floor(hours / 24);
+  return `${days}g`;
+}
+
+const studyTools: Array<{ id: ModeId; icon: string; label: string; desc: string; color: string }> = [
+  { id: "deep-dive", icon: "\uD83D\uDCAC", label: "Deep Dive", desc: "AI ile sohbet et", color: "var(--accent-2)" },
+  { id: "quiz", icon: "\uD83C\uDFAF", label: "Quiz", desc: "Kendini test et", color: "var(--hard)" },
+  { id: "flashcards", icon: "\uD83C\uDCCF", label: "Flashcards", desc: "Kartlarla tekrar", color: "var(--medium)" },
+  { id: "mindmap", icon: "\uD83E\uDDE0", label: "Mind Map", desc: "Kavram haritasi", color: "var(--success)" },
+  { id: "cheat-sheet", icon: "\uD83D\uDCCB", label: "Cheat Sheet", desc: "Sinav ozeti", color: "#8b5cf6" },
+  { id: "connections", icon: "\uD83D\uDD17", label: "Connections", desc: "Dersler arasi bag", color: "#06b6d4" },
 ];
 
-const features = [
-  { icon: "\uD83D\uDCAC", label: "Deep Dive", desc: "AI ile ders hakkinda sohbet et" },
-  { icon: "\uD83D\uDDFA\uFE0F", label: "Mind Map", desc: "Kavram haritasi ile gorsel ogren" },
-  { icon: "\u2753", label: "Quiz", desc: "Kendini test et, AI degerlendirsin" },
-  { icon: "\uD83C\uDCCF", label: "Flashcards", desc: "SM-2 ile tekrarli kartlarla calis" },
-  { icon: "\uD83D\uDCCB", label: "Cheat Sheet", desc: "Tek sayfa sinav ozeti" },
-  { icon: "\uD83D\uDD17", label: "Connections", desc: "Dersler arasi baglantilari kes\uFE0Ffet" },
-];
+const stagger = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.06 } },
+};
+const fadeUp = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.35 } },
+};
 
 export default function WelcomeGuide() {
+  const lessons = useLessonStore((s) => s.lessons) as LessonSummary[];
+  const setCurrentLessonId = useLessonStore((s) => s.setCurrentLessonId);
+  const setMode = useUiStore((s) => s.setMode);
+  const toggleLeftPanel = useUiStore((s) => s.toggleLeftPanel);
+  const leftPanelCollapsed = useUiStore((s) => s.leftPanelCollapsed);
+
+  const recentLessons = [...lessons]
+    .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime())
+    .slice(0, 4);
+
+  const totalLessons = lessons.length;
+  const totalConcepts = lessons.reduce((sum, l) => sum + (l.highlights?.length || 0), 0);
+
+  const handleContinue = (lessonId: string) => {
+    setCurrentLessonId(lessonId);
+    setMode("plan");
+  };
+
+  const handleNewLesson = () => {
+    if (leftPanelCollapsed) toggleLeftPanel();
+  };
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      style={{ maxWidth: 640, margin: "0 auto", padding: "32px 20px" }}
+      initial="hidden"
+      animate="show"
+      variants={stagger}
+      style={{ maxWidth: 720, margin: "0 auto", padding: "var(--space-8) var(--space-5)" }}
     >
       {/* Hero */}
-      <div style={{ textAlign: "center", marginBottom: 32 }}>
-        <div style={{ fontSize: 48, marginBottom: 8 }}>&#127891;</div>
-        <h2 style={{ fontSize: 22, fontWeight: 800, margin: "0 0 8px", color: "var(--text)" }}>
-          AIcelerate'e Hosgeldiniz
-        </h2>
-        <p style={{ fontSize: 14, color: "var(--muted)", maxWidth: 420, margin: "0 auto" }}>
-          Ders materyallerinizi yukleyin, AI destekli ogrenme araclarindan faydalanin.
-          Asagidaki 3 adimi takip ederek baslayin.
-        </p>
-      </div>
-
-      {/* Steps */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 32 }}>
-        {steps.map((s, i) => (
-          <motion.div
-            key={s.num}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 + i * 0.1 }}
-            style={{
-              display: "flex", gap: 16, alignItems: "flex-start",
-              padding: 16, borderRadius: 12,
-              background: "var(--input-bg)", border: "1px solid var(--border)",
-            }}
-          >
-            <div style={{
-              width: 40, height: 40, borderRadius: 10, display: "flex",
-              alignItems: "center", justifyContent: "center", flexShrink: 0,
-              background: s.color + "18", color: s.color, fontSize: 20, fontWeight: 800,
-            }}>
-              {s.num}
-            </div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 2, color: "var(--text)" }}>
-                {s.icon} {s.title}
-              </div>
-              <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.5 }}>
-                {s.desc}
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Feature Grid */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--muted)", marginBottom: 10, textTransform: "uppercase", letterSpacing: 1 }}>
-          Kullanabileceginiz Araclar
+      <motion.div variants={fadeUp} style={{ textAlign: "center", marginBottom: "var(--space-10)" }}>
+        <div style={{
+          width: 64, height: 64, borderRadius: "var(--radius-lg)", margin: "0 auto var(--space-4)",
+          background: "linear-gradient(135deg, var(--accent-2), #8b5cf6)",
+          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28,
+        }}>
+          &#127891;
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 8 }}>
-          {features.map((f) => (
-            <div
-              key={f.label}
-              style={{
-                padding: "10px 12px", borderRadius: 8,
-                background: "var(--input-bg)", border: "1px solid var(--border)",
-              }}
-            >
-              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
-                {f.icon} {f.label}
-              </div>
-              <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
-                {f.desc}
-              </div>
+        <h1 style={{
+          fontFamily: "var(--font-display)", fontSize: "var(--fs-3xl)", fontWeight: "var(--fw-bold)",
+          margin: "0 0 var(--space-2)", letterSpacing: "-0.03em", lineHeight: "var(--lh-tight)",
+          color: "var(--text)",
+        }}>
+          {totalLessons > 0 ? "Tekrar hosgeldin!" : "AIcelerate'e hosgeldin"}
+        </h1>
+        <p style={{
+          fontSize: "var(--fs-md)", color: "var(--text-secondary)", maxWidth: 440, margin: "0 auto",
+          lineHeight: "var(--lh-relaxed)",
+        }}>
+          {totalLessons > 0
+            ? `${totalLessons} ders, ${totalConcepts} kavram. Kaldığın yerden devam et.`
+            : "Ders materyalini yukle, AI analiz etsin. Quiz, flashcard, mind map ve daha fazlasi."
+          }
+        </p>
+      </motion.div>
+
+      {/* Stats Row (only if has lessons) */}
+      {totalLessons > 0 && (
+        <motion.div variants={fadeUp} style={{
+          display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--space-3)",
+          marginBottom: "var(--space-8)",
+        }}>
+          {[
+            { value: totalLessons, label: "Ders", color: "var(--accent-2)" },
+            { value: totalConcepts, label: "Kavram", color: "var(--success)" },
+            { value: lessons.filter(l => l.plan?.modules?.length).length, label: "Planli", color: "#8b5cf6" },
+          ].map((stat) => (
+            <div key={stat.label} style={{
+              textAlign: "center", padding: "var(--space-5) var(--space-3)",
+              borderRadius: "var(--radius-md)", background: "var(--card)", border: "1px solid var(--border)",
+            }}>
+              <div style={{ fontSize: "var(--fs-2xl)", fontWeight: "var(--fw-bold)", color: stat.color }}>{stat.value}</div>
+              <div style={{ fontSize: "var(--fs-xs)", color: "var(--muted)", marginTop: 2 }}>{stat.label}</div>
             </div>
           ))}
-        </div>
-      </div>
+        </motion.div>
+      )}
 
-      {/* Keyboard hint */}
-      <div style={{
-        textAlign: "center", fontSize: 11, color: "var(--muted)",
-        padding: "12px 16px", borderRadius: 8,
-        background: "var(--input-bg)", border: "1px solid var(--border)",
-      }}>
-        <b>Ipucu:</b> Sekmeler arasinda hizla gecmek icin klavyede <kbd style={{
-          padding: "1px 5px", borderRadius: 3, background: "var(--border)",
-          fontSize: 11, fontWeight: 600, fontFamily: "monospace",
-        }}>1</kbd>-<kbd style={{
-          padding: "1px 5px", borderRadius: 3, background: "var(--border)",
-          fontSize: 11, fontWeight: 600, fontFamily: "monospace",
-        }}>9</kbd> tuslarini kullanabilirsiniz.
-      </div>
+      {/* Recent Lessons */}
+      {recentLessons.length > 0 && (
+        <motion.div variants={fadeUp} style={{ marginBottom: "var(--space-8)" }}>
+          <div style={{
+            fontSize: "var(--fs-xs)", fontWeight: "var(--fw-semibold)", color: "var(--muted)",
+            textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "var(--space-3)",
+          }}>
+            Son Dersler
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+            {recentLessons.map((l) => (
+              <motion.button
+                key={l.id}
+                whileHover={{ x: 4 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => handleContinue(l.id)}
+                style={{
+                  display: "flex", alignItems: "center", gap: "var(--space-4)",
+                  padding: "var(--space-4) var(--space-5)",
+                  borderRadius: "var(--radius-md)", background: "var(--card)",
+                  border: "1px solid var(--border)", cursor: "pointer",
+                  textAlign: "left", width: "100%", transition: "all 0.15s",
+                  fontFamily: "var(--font-body)",
+                }}
+              >
+                <div style={{
+                  width: 40, height: 40, borderRadius: "var(--radius-sm)",
+                  background: "var(--accent-2)", opacity: 0.12,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  flexShrink: 0, position: "relative",
+                }}>
+                  <span style={{ position: "absolute", fontSize: 18, opacity: 1 }}>&#128218;</span>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontSize: "var(--fs-base)", fontWeight: "var(--fw-medium)", color: "var(--text)",
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                    {l.title}
+                  </div>
+                  <div style={{ fontSize: "var(--fs-xs)", color: "var(--muted)", marginTop: 1 }}>
+                    {l.highlights?.length || 0} kavram
+                    {l.date && ` \u00B7 ${timeAgoShort(l.date)} once`}
+                  </div>
+                </div>
+                <span style={{ fontSize: "var(--fs-sm)", color: "var(--accent-2)", fontWeight: "var(--fw-semibold)" }}>
+                  Devam et &rarr;
+                </span>
+              </motion.button>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* New Lesson CTA */}
+      <motion.div variants={fadeUp} style={{ marginBottom: "var(--space-8)" }}>
+        <motion.button
+          whileHover={{ scale: 1.01, y: -2 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={handleNewLesson}
+          style={{
+            width: "100%", padding: "var(--space-6)",
+            borderRadius: "var(--radius-lg)", border: "2px dashed var(--border)",
+            background: "transparent", cursor: "pointer",
+            display: "flex", flexDirection: "column", alignItems: "center", gap: "var(--space-2)",
+            transition: "all 0.2s", fontFamily: "var(--font-body)",
+          }}
+        >
+          <div style={{
+            width: 48, height: 48, borderRadius: "var(--radius-md)",
+            background: "var(--accent-2)", display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 24, color: "#fff",
+          }}>
+            +
+          </div>
+          <div style={{ fontSize: "var(--fs-md)", fontWeight: "var(--fw-semibold)", color: "var(--text)" }}>
+            Yeni Ders Yukle
+          </div>
+          <div style={{ fontSize: "var(--fs-sm)", color: "var(--muted)" }}>
+            PDF slayt veya ses dosyasi yukle, AI analiz etsin
+          </div>
+        </motion.button>
+      </motion.div>
+
+      {/* Study Tools Grid */}
+      <motion.div variants={fadeUp}>
+        <div style={{
+          fontSize: "var(--fs-xs)", fontWeight: "var(--fw-semibold)", color: "var(--muted)",
+          textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "var(--space-3)",
+        }}>
+          Calisma Araclari
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "var(--space-3)" }}>
+          {studyTools.map((tool) => (
+            <motion.button
+              key={tool.id}
+              whileHover={{ y: -3, scale: 1.01 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => setMode(tool.id)}
+              style={{
+                display: "flex", alignItems: "center", gap: "var(--space-3)",
+                padding: "var(--space-4)", borderRadius: "var(--radius-md)",
+                background: "var(--card)", border: "1px solid var(--border)",
+                cursor: "pointer", textAlign: "left", width: "100%",
+                transition: "all 0.15s", fontFamily: "var(--font-body)",
+              }}
+            >
+              <span style={{ fontSize: 22, lineHeight: 1 }}>{tool.icon}</span>
+              <div>
+                <div style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-semibold)", color: "var(--text)" }}>
+                  {tool.label}
+                </div>
+                <div style={{ fontSize: "var(--fs-xs)", color: "var(--muted)", marginTop: 1 }}>
+                  {tool.desc}
+                </div>
+              </div>
+            </motion.button>
+          ))}
+        </div>
+      </motion.div>
     </motion.div>
   );
 }

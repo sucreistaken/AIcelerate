@@ -6,6 +6,7 @@ import { useLessonStore } from "../stores/lessonStore";
 import { motion, AnimatePresence } from "framer-motion";
 import { exportToPdf } from "../utils/pdfExport";
 import PaneInfoBanner from "./ui/PaneInfoBanner";
+import { useGamificationStore } from "../stores/gamificationStore";
 
 interface ModuleInfo {
     id: number;
@@ -384,10 +385,13 @@ export default function MindMapPane() {
 
     // Toggle learned status
     const toggleLearned = useCallback((nodeName: string) => {
-        setLearnedNodes(prev => ({
-            ...prev,
-            [nodeName]: !prev[nodeName]
-        }));
+        setLearnedNodes(prev => {
+            const wasLearned = prev[nodeName];
+            if (!wasLearned) {
+                useGamificationStore.getState().addXp('mindmap-learn');
+            }
+            return { ...prev, [nodeName]: !wasLearned };
+        });
     }, []);
 
     // Calculate progress

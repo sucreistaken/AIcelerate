@@ -5,11 +5,12 @@ import { useFlashcardStore } from "../stores/flashcardStore";
 import { useLessonStore } from "../stores/lessonStore";
 import { useRoomStore } from "../stores/roomStore";
 import PaneInfoBanner from "./ui/PaneInfoBanner";
+import { useGamificationStore } from "../stores/gamificationStore";
 
-function getDifficultyFromEF(ef: number): { label: string; color: string } {
-  if (ef >= 2.5) return { label: "Kolay", color: "#00b894" };
-  if (ef >= 1.8) return { label: "Orta", color: "#fdcb6e" };
-  return { label: "Zor", color: "#e17055" };
+function getDifficultyFromEF(ef: number): { label: string; color: string; bg: string } {
+  if (ef >= 2.5) return { label: "Kolay", color: "var(--easy)", bg: "var(--easy-bg)" };
+  if (ef >= 1.8) return { label: "Orta", color: "var(--medium)", bg: "var(--medium-bg)" };
+  return { label: "Zor", color: "var(--hard)", bg: "var(--hard-bg)" };
 }
 
 function ReviewMode() {
@@ -35,6 +36,7 @@ function ReviewMode() {
   const handleReview = useCallback((cardId: string, q: number) => {
     setReviewedQualities(prev => [...prev, q]);
     review(cardId, q);
+    useGamificationStore.getState().addXp('flashcard-review');
   }, [review]);
 
   // Session summary
@@ -125,7 +127,7 @@ function ReviewMode() {
           </span>
           <span style={{
             fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
-            background: getDifficultyFromEF(card.easeFactor).color + '22',
+            background: getDifficultyFromEF(card.easeFactor).bg,
             color: getDifficultyFromEF(card.easeFactor).color,
           }}>
             {getDifficultyFromEF(card.easeFactor).label}
@@ -386,7 +388,7 @@ function BrowseMode() {
                   <span className="fc-card__meta-sep" />
                   <span style={{
                     fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 4,
-                    background: getDifficultyFromEF(card.easeFactor).color + '22',
+                    background: getDifficultyFromEF(card.easeFactor).bg,
                     color: getDifficultyFromEF(card.easeFactor).color,
                   }}>
                     {getDifficultyFromEF(card.easeFactor).label}
