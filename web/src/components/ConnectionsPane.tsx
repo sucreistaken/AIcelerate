@@ -4,6 +4,7 @@ import { ConceptConnection } from "../types";
 import { useConnectionsStore } from "../stores/connectionsStore";
 import { useLessonStore } from "../stores/lessonStore";
 import { useUiStore } from "../stores/uiStore";
+import PaneInfoBanner from "./ui/PaneInfoBanner";
 
 // ─── Helpers ────────────────────────────────────────────
 
@@ -414,9 +415,18 @@ function GraphView({
                     setHoveredNode(n.fullConcept);
                     const rect = (e.target as SVGElement).closest("svg")?.getBoundingClientRect();
                     if (rect) {
+                      let tx = e.clientX - rect.left;
+                      let ty = e.clientY - rect.top - 30;
+                      // Clamp tooltip within SVG bounds
+                      const tooltipW = 220;
+                      const tooltipH = 30;
+                      if (tx + tooltipW > rect.width) tx = rect.width - tooltipW - 8;
+                      if (tx < 8) tx = 8;
+                      if (ty < 8) ty = e.clientY - rect.top + 15;
+                      if (ty + tooltipH > rect.height) ty = rect.height - tooltipH - 8;
                       setTooltip({
-                        x: e.clientX - rect.left,
-                        y: e.clientY - rect.top - 30,
+                        x: tx,
+                        y: ty,
                         text: `${n.fullConcept} | ${Math.round(n.strength * 100)}% | ${n.lessonIds.length} lesson(s)`,
                       });
                     }
@@ -622,6 +632,12 @@ export default function ConnectionsPane() {
             </button>
           </div>
         </div>
+        <PaneInfoBanner
+          id="connections"
+          title="Connections Nedir?"
+          description="Birden fazla dersinizde gecen ortak kavramlari otomatik tespit eder. Strength yuzdesi, kavramin dersler arasinda ne kadar guclu baglandigini gosterir. Build Connections ile tum derslerinizi analiz edin."
+          tips={["Guc %70+ = Cok guclu baglanti", "Graph view ile gorsel kesfet", "Kavrama tikla = detay paneli"]}
+        />
 
         {error && (
           <div style={{ padding: "8px 14px", background: "var(--card-hover)", borderRadius: "var(--radius-sm)", color: "var(--warning)", fontSize: 13, marginBottom: 10 }}>

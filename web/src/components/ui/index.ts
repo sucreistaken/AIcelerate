@@ -28,4 +28,4 @@ export { Skeleton, CardSkeleton, ListSkeleton, TableSkeleton } from "./Skeleton"
 export { EmptyState, NoPlanEmpty, NoQuizEmpty, NoLessonsEmpty, NoCheatSheetEmpty } from "./EmptyState";
 export { ThemeToggle } from "./ThemeToggle";
 export { ToastProvider } from "./Toast";
-export { ErrorBoundary } from "./ErrorBoundary";
+export { ErrorBoundary, PaneErrorBoundary } from "./ErrorBoundary";

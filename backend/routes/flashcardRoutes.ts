@@ -43,6 +43,18 @@ router.get("/flashcards", (req, res) => {
   res.json({ ok: true, cards });
 });
 
+router.patch("/flashcards/:cardId", (req, res) => {
+  const { front, back } = req.body as { front?: string; back?: string };
+  if (!front && !back) return res.status(400).json({ ok: false, error: "front or back required" });
+  const cards = loadFlashcards();
+  const card = cards.find(c => c.id === req.params.cardId);
+  if (!card) return res.status(404).json({ ok: false, error: "Card not found" });
+  if (front) card.front = front;
+  if (back) card.back = back;
+  saveFlashcards(cards);
+  res.json({ ok: true, card });
+});
+
 router.delete("/flashcards/:cardId", (req, res) => {
   const ok = deleteFlashcard(req.params.cardId);
   if (!ok) return res.status(404).json({ ok: false, error: "Card not found" });

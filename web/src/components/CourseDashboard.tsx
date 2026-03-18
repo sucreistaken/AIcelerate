@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
+import toast from "react-hot-toast";
 import { useCourseStore } from "../stores/courseStore";
 import { useLessonStore } from "../stores/lessonStore";
 import { useUiStore } from "../stores/uiStore";
@@ -237,7 +238,9 @@ export default function CourseDashboard() {
       if (result.ok && result.text) {
         setChatHistory((h) => [...h, { role: "assistant", content: result.text!, suggestions: result.suggestions }]);
       }
-    } catch { /* ignore */ }
+    } catch (err: any) {
+      toast.error("Sohbet hatası: " + (err?.message || "Bilinmeyen hata"));
+    }
     setChatLoading(false);
   }, [chatInput, course, chatHistory]);
 
@@ -323,7 +326,9 @@ export default function CourseDashboard() {
           <button className="btn btn-ghost" onClick={() => exportCourse(course.id)} title="Export course data">
             Export
           </button>
-          <button className="btn btn-ghost" onClick={() => rebuildIndex(course.id)} title="Rebuild Knowledge Index">
+          <button className="btn btn-ghost" onClick={() => {
+            if (confirm("Knowledge Index yeniden oluşturulsun mu? Bu işlem biraz zaman alabilir.")) rebuildIndex(course.id);
+          }} title="Rebuild Knowledge Index">
             Rebuild Index
           </button>
           <button

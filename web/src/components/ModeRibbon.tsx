@@ -1,58 +1,61 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import { ModeId } from "../types";
 
+interface TabDef {
+  id: ModeId;
+  label: string;
+  desc: string;
+}
+
 interface TabGroup {
   label: string;
-  tabs: { id: ModeId; label: string }[];
+  tabs: TabDef[];
 }
 
 const GROUPS: TabGroup[] = [
   {
     label: "Course",
     tabs: [
-      { id: "course-dashboard", label: "Dashboard" },
+      { id: "course-dashboard", label: "Dashboard", desc: "Kurs genel bakis, ilerleme ve AI sohbet" },
     ],
   },
   {
     label: "Analysis",
     tabs: [
-      { id: "plan", label: "Plan" },
-      { id: "alignment", label: "Alignment" },
-      { id: "deviation", label: "Deviation" },
+      { id: "plan", label: "Plan", desc: "AI tarafindan olusturulan ogrenme plani ve moduller" },
+      { id: "alignment", label: "Alignment", desc: "Slayt ve transkript eslesmesi - konularin ne kadar ortustugunu goster" },
+      { id: "deviation", label: "Deviation", desc: "Hocanin slayttan ne kadar saptigini analiz et" },
     ],
   },
   {
     label: "Study",
     tabs: [
-      { id: "lecturer-note", label: "Notes" },
-      { id: "deep-dive", label: "Deep Dive" },
-      { id: "lo-study", label: "LO Study" },
-      { id: "mindmap", label: "Mind Map" },
+      { id: "lecturer-note", label: "Notes", desc: "Hocanin vurguladigi onemli noktalar ve sinav uyarilari" },
+      { id: "deep-dive", label: "Deep Dive", desc: "Ders icerigine dayali AI sohbet - soru sor, aciklama al" },
+      { id: "lo-study", label: "LO Study", desc: "Ogrenme ciktilarina gore moduler calisma" },
+      { id: "mindmap", label: "Mind Map", desc: "Dersin kavram haritasi - tikla, kesfet, ogren" },
     ],
   },
   {
     label: "Practice",
     tabs: [
-      { id: "quiz", label: "Quiz" },
-      { id: "flashcards", label: "Flashcards" },
-      { id: "exam-sprint", label: "Sprint" },
-      { id: "weakness", label: "Weakness" },
+      { id: "quiz", label: "Quiz", desc: "AI uretimi sorularla kendini test et ve degerlendir" },
+      { id: "flashcards", label: "Flashcards", desc: "SM-2 tekrarli ogrenme kartlari - her gun gozden gecir" },
     ],
   },
   {
     label: "Resources",
     tabs: [
-      { id: "cheat-sheet", label: "Cheat Sheet" },
-      { id: "notes", label: "My Notes" },
-      { id: "connections", label: "Connections" },
+      { id: "cheat-sheet", label: "Cheat Sheet", desc: "Tek sayfalik sinav odakli ultra ozet" },
+      { id: "notes", label: "My Notes", desc: "Kayitli notlarin - AI yanitlarindan veya elle olustur" },
+      { id: "connections", label: "Connections", desc: "Dersler arasi ortak kavramlari kesfet" },
     ],
   },
   {
     label: "Manage",
     tabs: [
-      { id: "history", label: "Lessons" },
-      { id: "study-room", label: "Room" },
-      { id: "study-hub", label: "Study Hub" },
+      { id: "history", label: "Lessons", desc: "Tum derslerini goruntule, ara ve yonet" },
+      { id: "study-hub", label: "Study Hub", desc: "Isbirlikci calisma odalari - arkadaslarinla birlikte ogren" },
     ],
   },
 ];
@@ -148,6 +151,7 @@ export default function ModeRibbon({
                       aria-selected={mode === t.id}
                       onClick={() => setMode(t.id)}
                       className={`tab ${mode === t.id ? "tab--active" : ""}`}
+                      title={t.desc}
                     >
                       {t.label}
                     </button>

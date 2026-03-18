@@ -1,9 +1,11 @@
+import { logger } from "../utils/logger";
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import mermaid from "mermaid";
 import { deepDiveApi } from "../services/api";
 import { useLessonStore } from "../stores/lessonStore";
 import { motion, AnimatePresence } from "framer-motion";
 import { exportToPdf } from "../utils/pdfExport";
+import PaneInfoBanner from "./ui/PaneInfoBanner";
 
 interface ModuleInfo {
     id: number;
@@ -73,7 +75,7 @@ export default function MindMapPane() {
         try {
             await exportToPdf(svgContainerRef.current, "MindMap", { orientation: "landscape" });
         } catch (err) {
-            console.error("PDF export error:", err);
+            logger.error("PDF export error:", err);
         } finally {
             setPdfLoading(false);
         }
@@ -83,6 +85,7 @@ export default function MindMapPane() {
     // Progress tracking state
     const [learnedNodes, setLearnedNodes] = useState<LearnedNodes>({});
     const [allNodes, setAllNodes] = useState<string[]>([]);
+    const [nodeSearch, setNodeSearch] = useState('');
 
     useEffect(() => {
         mermaid.initialize({
@@ -135,7 +138,7 @@ export default function MindMapPane() {
                     return;
                 }
             } catch (e) {
-                console.error('Failed to parse saved mindmap:', e);
+                logger.error('Failed to parse saved mindmap:', e);
             }
         }
 
@@ -207,7 +210,7 @@ export default function MindMapPane() {
             try {
                 setLearnedNodes(JSON.parse(saved));
             } catch (e) {
-                console.error('Failed to parse saved progress:', e);
+                logger.error('Failed to parse saved progress:', e);
             }
         }
     }, [currentLessonId]);
@@ -284,7 +287,7 @@ export default function MindMapPane() {
                                             e.stopPropagation(); // Prevent event bubbling
                                             // Get nodeName from data attribute to avoid stale closure
                                             const clickedNodeName = (e.currentTarget as HTMLElement).getAttribute('data-node-name') || '';
-                                            console.log('[MindMap] Node clicked:', clickedNodeName); // Debug log
+                                            logger.info('[MindMap] Node clicked:', clickedNodeName); // Debug log
                                             if (clickedNodeName) {
                                                 setSelectedNode(clickedNodeName);
                                                 setNodeDetail(null);
@@ -297,26 +300,36 @@ export default function MindMapPane() {
                                 });
 
                                 setAllNodes(extractedNodes);
+
+                                // Color learned nodes green
+                                nodeElements.forEach((node) => {
+                                    const nodeName = (node as HTMLElement).getAttribute('data-node-name') || '';
+                                    if (nodeName && learnedNodes[nodeName]) {
+                                        const shape = node.querySelector('rect, circle, ellipse, polygon, path');
+                                        if (shape) {
+                                            (shape as SVGElement).setAttribute('fill', '#00B894');
+                                            (shape as SVGElement).setAttribute('opacity', '0.85');
+                                        }
+                                    }
+                                });
                             }
                         }
                     })
                     .catch((e) => {
-                        console.error("Mermaid Render Error:", e);
+                        logger.error("Mermaid Render Error:", e);
                         setError("Diagram render failed (syntax error).");
                     });
             } catch (e: any) {
-                console.error(e);
+                logger.error(e);
                 setError("Diagram render failed.");
             }
         }
-    }, [code]);
+    }, [code, learnedNodes]);
 
     // Fetch node detail from AI - accepts nodeName parameter to avoid stale closure
     const fetchNodeDetail = useCallback(async (action: 'explain' | 'example' | 'quiz', nodeName?: string) => {
         const targetNode = nodeName || selectedNode;
         if (!currentLessonId || !targetNode) return;
-
-        console.log('[MindMap] Fetching detail for:', targetNode, 'action:', action); // Debug log
 
         setNodeLoading(true);
         setActiveAction(action);
@@ -324,6 +337,34 @@ export default function MindMapPane() {
         setShowQuizResult(false);
 
         const res = await deepDiveApi.getNodeDetail(currentLessonId, targetNode, action);
+
+        setNodeLoading(false);
+
+        if (res.ok) {
+            setNodeDetail({
+                title: res.title || targetNode,
+                explanation: res.explanation,
+                keyPoints: res.keyPoints,
+                relatedConcepts: res.relatedConcepts,
+                example: res.example,
+                quiz: res.quiz
+            });
+        } else {
+            setNodeDetail({ title: targetNode, explanation: res.error || 'Failed to get details' });
+        }
+    }, [currentLessonId, selectedNode]);
+
+    // Batched fetch: get explain+example+quiz in a single API call (saves 2 calls)
+    const fetchAllNodeDetails = useCallback(async (nodeName?: string) => {
+        const targetNode = nodeName || selectedNode;
+        if (!currentLessonId || !targetNode) return;
+
+        setNodeLoading(true);
+        setActiveAction('explain');
+        setSelectedQuizAnswer(null);
+        setShowQuizResult(false);
+
+        const res = await deepDiveApi.getNodeDetailFull(currentLessonId, targetNode);
 
         setNodeLoading(false);
 
@@ -434,7 +475,7 @@ export default function MindMapPane() {
 
             img.src = svgBase64;
         } catch (e) {
-            console.error('PNG download error:', e);
+            logger.error('PNG download error:', e);
             alert('PNG indirme hatası');
         }
     }, []);
@@ -472,6 +513,12 @@ export default function MindMapPane() {
 
     return (
         <div className="lc-section" style={containerStyles} ref={wrapperRef}>
+            <PaneInfoBanner
+              id="mindmap"
+              title="Mind Map Nasil Kullanilir?"
+              description="Dersin kavram haritasi AI tarafindan olusturulur. Herhangi bir node'a tiklayarak detayli aciklama, ornek ve mini quiz alin. Yesil node'lar ogrenilmis kavramlari gosterir. Arama kutusuyla belirli bir kavrama hizla ulasin."
+              tips={["Node'a tikla = detay", "Yesil = ogrenildi", "Zoom ve tam ekran", "PNG/SVG/PDF export"]}
+            />
             {/* Header */}
             <div style={{
                 display: 'flex',
@@ -662,6 +709,62 @@ export default function MindMapPane() {
                 </div>
             </div>
 
+            {/* Node Search */}
+            {code && allNodes.length > 0 && (
+                <div style={{ marginBottom: 8, position: 'relative' }}>
+                    <input
+                        type="text"
+                        placeholder="Node ara..."
+                        value={nodeSearch}
+                        onChange={(e) => setNodeSearch(e.target.value)}
+                        style={{
+                            width: '100%', padding: '8px 12px', borderRadius: 8,
+                            border: '1px solid var(--border)', background: 'var(--input-bg)',
+                            color: 'var(--text)', fontSize: 13,
+                        }}
+                    />
+                    {nodeSearch.trim() && (
+                        <div style={{
+                            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
+                            background: 'var(--card)', border: '1px solid var(--border)',
+                            borderRadius: 8, maxHeight: 160, overflow: 'auto', marginTop: 2,
+                        }}>
+                            {allNodes.filter(n => n.toLowerCase().includes(nodeSearch.toLowerCase())).map(n => (
+                                <div
+                                    key={n}
+                                    style={{ padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--border)')}
+                                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                    onClick={() => {
+                                        setNodeSearch('');
+                                        setSelectedNode(n);
+                                        // Scroll to matching node in SVG
+                                        const el = svgContainerRef.current?.querySelector(`[data-node-name="${n}"]`);
+                                        if (el) {
+                                            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                            const shape = el.querySelector('rect, circle, ellipse, polygon, path');
+                                            if (shape) {
+                                                (shape as SVGElement).setAttribute('stroke', '#6366f1');
+                                                (shape as SVGElement).setAttribute('stroke-width', '4');
+                                                setTimeout(() => {
+                                                    (shape as SVGElement).removeAttribute('stroke');
+                                                    (shape as SVGElement).removeAttribute('stroke-width');
+                                                }, 2000);
+                                            }
+                                        }
+                                    }}
+                                >
+                                    {learnedNodes[n] ? '✅ ' : ''}{n}
+                                </div>
+                            ))}
+                            {allNodes.filter(n => n.toLowerCase().includes(nodeSearch.toLowerCase())).length === 0 && (
+                                <div style={{ padding: '8px 12px', color: 'var(--muted)', fontSize: 12 }}>Sonuç bulunamadı</div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Map Container */}
             <div
                 ref={containerRef}
@@ -704,10 +807,19 @@ export default function MindMapPane() {
                 )}
 
                 {error && (
-                    <div className="text-red-500 fw-600 text-center" style={{ padding: 40 }}>
-                        <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
-                        <p>{error}</p>
-                        <button className="btn btn-ghost mt-4" onClick={generate}>Try Again</button>
+                    <div style={{ padding: 40, textAlign: 'center' }}>
+                        <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.6 }}>&#9888;</div>
+                        <p style={{ fontWeight: 600, color: 'var(--danger)' }}>{error}</p>
+                        <button className="btn btn-primary mt-4" onClick={generate}>Tekrar Üret</button>
+                        {/* Outline fallback when mermaid fails but code exists */}
+                        {code && (
+                            <div style={{ marginTop: 20, textAlign: 'left', padding: 16, background: 'var(--input-bg)', borderRadius: 12, border: '1px solid var(--border)' }}>
+                                <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 14, color: 'var(--text)' }}>Outline View (fallback):</div>
+                                <pre style={{ fontSize: 12, whiteSpace: 'pre-wrap', color: 'var(--muted)', margin: 0, fontFamily: 'monospace' }}>
+                                    {code.split('\n').filter(l => l.trim() && !l.trim().startsWith('mindmap')).map(l => l.replace(/root\(\((.+?)\)\)/, '$1')).join('\n')}
+                                </pre>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -913,6 +1025,28 @@ export default function MindMapPane() {
                                 }}
                             >
                                 ❓ Quiz Me
+                            </button>
+                            <button
+                                onClick={() => fetchAllNodeDetails(selectedNode || undefined)}
+                                disabled={nodeLoading}
+                                style={{
+                                    width: '100%',
+                                    padding: '8px 12px',
+                                    borderRadius: 8,
+                                    border: '1px solid var(--accent-2)',
+                                    background: 'transparent',
+                                    color: 'var(--accent-2)',
+                                    cursor: nodeLoading ? 'wait' : 'pointer',
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 6,
+                                    opacity: nodeLoading ? 0.5 : 1
+                                }}
+                            >
+                                ⚡ Load All (Explain + Example + Quiz)
                             </button>
                         </div>
 

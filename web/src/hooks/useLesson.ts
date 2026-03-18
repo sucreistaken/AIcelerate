@@ -1,9 +1,11 @@
+import { logger } from "../utils/logger";
 // src/hooks/useLesson.ts
 import { useCallback } from 'react';
 import { useLessonStore } from '../stores/lessonStore';
 import { useUiStore } from '../stores/uiStore';
 import { API_BASE } from '../config';
 import { lessonsApi, planApi, loApi, cheatSheetApi, deviationApi, uploadApi } from '../services/api';
+import { invalidateLessonCache } from '../utils/cacheInvalidation';
 
 export function useLesson() {
     const store = useLessonStore();
@@ -83,6 +85,10 @@ export function useLesson() {
             store.setPlan(result.plan);
             if (result.plan?.seed_quiz?.length) {
                 store.setQuiz(result.plan.seed_quiz.slice(0, 12));
+            }
+            // Invalidate stale caches when plan is regenerated
+            if (result.lessonId) {
+                invalidateLessonCache(result.lessonId);
             }
             ui.setMode('alignment');
             return result.plan;
@@ -289,7 +295,7 @@ export function useLesson() {
                 store.setError(result.error || 'OCR process failed');
             }
         } catch (e: any) {
-            console.error(e);
+            logger.error(e);
             ui.setIsLoading(false);
             // Show detailed alert to user
             const msg = e.message?.replace(/^Error:\s*/, "") || "Upload failed.";

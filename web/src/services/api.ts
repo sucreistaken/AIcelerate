@@ -1,3 +1,4 @@
+import { logger } from "../utils/logger";
 // src/services/api.ts
 import { API_BASE } from '../config';
 import { Plan, CheatSheet, LoAlignment, LoStudyModule, WeaknessAnalysis, WeaknessSummary, Flashcard, FlashcardStats, SprintSettings, SprintSession, ConceptConnection, SharedBundle, StudyRoom, RoomWorkspace, Course, CourseKnowledgeIndex, CourseProgress, WeeklySchedule, CourseExport, StudyTask, DailyPlan, WeeklyOverview, StreakData, AppNotification } from '../types';
@@ -53,7 +54,7 @@ export const lessonsApi = {
             const json = await res.json();
             return Array.isArray(json) ? json : [];
         } catch (error) {
-            console.warn('Dersler yüklenemedi', error);
+            logger.warn('Dersler yüklenemedi', error);
             return [];
         }
     },
@@ -64,7 +65,7 @@ export const lessonsApi = {
             if (!res.ok) return null;
             return await res.json();
         } catch (error) {
-            console.warn('Ders yüklenemedi', error);
+            logger.warn('Ders yüklenemedi', error);
             return null;
         }
     },
@@ -82,7 +83,7 @@ export const lessonsApi = {
             }
             return null;
         } catch (error) {
-            console.error('Ders oluşturma hatası:', error);
+            logger.error('Ders oluşturma hatası:', error);
             return null;
         }
     },
@@ -94,7 +95,7 @@ export const lessonsApi = {
             });
             return await res.json();
         } catch (error) {
-            console.error('Ders silme hatası:', error);
+            logger.error('Ders silme hatası:', error);
             return { ok: false, error: 'Ders silinemedi' };
         }
     },
@@ -117,7 +118,7 @@ export const lessonsApi = {
             }
             return data;
         } catch (error: any) {
-            console.error('OCR upload failed:', error);
+            logger.error('OCR upload failed:', error);
             throw error; // Propagate the specific error message
         }
     },
@@ -183,9 +184,10 @@ export const quizApi = {
 
     async getAnswers(params: {
         questions: string[];
-        lectureText: string;
-        slidesText: string;
-        plan: Plan | null;
+        lectureText?: string;
+        slidesText?: string;
+        plan?: Plan | null;
+        lessonId?: string;
     }): Promise<{ ok: boolean; answers?: unknown[]; error?: string }> {
         const res = await fetch(`${API_BASE}/api/quiz-answers`, {
             method: 'POST',
@@ -264,6 +266,51 @@ export const deepDiveApi = {
         return await res.json();
     },
 
+    chatStream(
+        lessonId: string,
+        message: string,
+        history: any[],
+        onChunk: (text: string) => void,
+        onDone: (suggestions: string[]) => void,
+        onError: (error: string) => void,
+    ): AbortController {
+        const controller = new AbortController();
+        fetch(`${API_BASE}/api/lessons/${lessonId}/chat?stream=true`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message, history }),
+            signal: controller.signal,
+        }).then(async (res) => {
+            if (!res.ok || !res.body) {
+                onError('Stream connection failed');
+                return;
+            }
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            if (data.type === 'chunk') onChunk(data.text);
+                            else if (data.type === 'done') onDone(data.suggestions || []);
+                            else if (data.type === 'error') onError(data.error || 'Unknown error');
+                        } catch {}
+                    }
+                }
+            }
+        }).catch((err) => {
+            if (err.name !== 'AbortError') onError(err.message);
+        });
+        return controller;
+    },
+
     async generateMindMap(lessonId: string): Promise<{ ok: boolean; code?: string; error?: string }> {
         const res = await fetch(`${API_BASE}/api/lessons/${lessonId}/mindmap`, {
             method: 'POST',
@@ -303,6 +350,26 @@ export const deepDiveApi = {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ nodeName, action }),
+        });
+        return await res.json();
+    },
+
+    // Node Detail Full: Get explain+example+quiz in a single call (saves 2 API calls)
+    async getNodeDetailFull(lessonId: string, nodeName: string): Promise<{
+        ok: boolean;
+        action?: string;
+        title?: string;
+        explanation?: string;
+        keyPoints?: string[];
+        relatedConcepts?: string[];
+        example?: { scenario: string; explanation: string; takeaway: string };
+        quiz?: { question: string; options: string[]; correctAnswer: string; explanation: string };
+        error?: string;
+    }> {
+        const res = await fetch(`${API_BASE}/api/lessons/${lessonId}/mindmap/node-detail`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nodeName, action: 'all' }),
         });
         return await res.json();
     }
@@ -360,6 +427,15 @@ export const flashcardApi = {
     async getAll(lessonId?: string): Promise<{ ok: boolean; cards?: Flashcard[]; error?: string }> {
         const url = lessonId ? `${API_BASE}/api/flashcards?lessonId=${lessonId}` : `${API_BASE}/api/flashcards`;
         const res = await fetch(url);
+        return await res.json();
+    },
+
+    async update(cardId: string, front?: string, back?: string): Promise<{ ok: boolean; card?: Flashcard; error?: string }> {
+        const res = await fetch(`${API_BASE}/api/flashcards/${cardId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ front, back }),
+        });
         return await res.json();
     },
 
@@ -568,7 +644,7 @@ export const courseApi = {
             const res = await fetch(`${API_BASE}/api/courses`);
             return await res.json();
         } catch (error) {
-            console.warn('Courses could not be loaded', error);
+            logger.warn('Courses could not be loaded', error);
             return { ok: false, error: 'Failed to load courses' };
         }
     },

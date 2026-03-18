@@ -1,3 +1,4 @@
+import { logger } from "../utils/logger";
 import { Router } from "express";
 import path from "path";
 import os from "os";
@@ -19,6 +20,7 @@ import {
   rebuildKnowledgeIndex,
 } from "../controllers/courseController";
 import { getModel, stripCodeFences, tryParseJSON } from "../services/aiService";
+import { SCHEMAS } from "../prompts/schemas";
 import { LoLink, LoAlignedSegment, LoAlignment } from "../types";
 import { buildCheatSheetPrompt } from "../services/cheatSheetService";
 import {
@@ -29,8 +31,14 @@ import {
   generateLoAlignmentForLesson,
   generateAlignmentOnly,
 } from "../services/loModuleService";
+import { generateDigest, getDigestOrFallback } from "../services/lessonDigestService";
 
 const router = Router();
+
+// Token usage logger
+function logAI(label: string, inputLen: number, outputLen: number, maxTokens: number) {
+  logger.info(`[AI] ${label} | ~${Math.ceil(inputLen / 4)} in, ~${Math.ceil(outputLen / 4)} out | max=${maxTokens}`);
+}
 
 // ---- IEU LO helpers ----
 function normalizeCourseCode(raw: string): string {
@@ -126,6 +134,7 @@ router.post("/lessons/:id/cheat-sheet", async (req, res) => {
       generationConfig: { maxOutputTokens: 3000 },
     });
     const raw = (result.response.text() || "").trim();
+    logAI("CHEAT_SHEET", prompt.length, raw.length, 3000);
     const cleaned = stripCodeFences(raw);
     const j = tryParseJSON(cleaned);
     if (!j?.sections || !Array.isArray(j.sections)) {
@@ -142,7 +151,7 @@ router.post("/lessons/:id/cheat-sheet", async (req, res) => {
     const saved = upsertLesson({ id: lessonId, cheatSheet });
     return res.json({ ok: true, lessonId: saved.id, cheatSheet });
   } catch (e: any) {
-    console.error("[/api/lessons/:id/cheat-sheet ERROR]", e?.message || e);
+    logger.error("[/api/lessons/:id/cheat-sheet ERROR]", e?.message || e);
     return res.status(500).json({ ok: false, error: e?.message || "server error" });
   }
 });
@@ -176,7 +185,7 @@ router.post("/lessons/:id/lo-modules", async (req, res) => {
     const saved = upsertLesson({ id: lessonId, loModules });
     return res.json({ ok: true, modules: loModules.modules, lessonId: saved.id });
   } catch (e: any) {
-    console.error("[/api/lessons/:id/lo-modules ERROR]", e?.message || e);
+    logger.error("[/api/lessons/:id/lo-modules ERROR]", e?.message || e);
     return res.status(500).json({ ok: false, error: e?.message || "server error" });
   }
 });
@@ -204,7 +213,7 @@ router.post("/lessons/:id/lo-align", async (req, res) => {
     const saved = upsertLesson({ id: lessonId, transcript: lecture, slideText: slides, learningOutcomes: loList, loAlignment });
     return res.json({ ok: true, loAlignment, lessonId: saved.id });
   } catch (e: any) {
-    console.error("[/api/lessons/:id/lo-align ERROR]", e?.message || e);
+    logger.error("[/api/lessons/:id/lo-align ERROR]", e?.message || e);
     return res.status(500).json({ ok: false, error: e?.message || "server error" });
   }
 });
@@ -283,20 +292,39 @@ ${LEC}
 ${SLD}
 `.trim();
 
-    const result = await getModel().generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 8000 },
-    });
-    const rawText = result.response.text() || "";
-    const cleaned = stripCodeFences(rawText);
-    let plan = tryParseJSON(cleaned);
+    // Retry logic: up to 2 retries with exponential backoff
+    let plan: any = null;
+    let lastError = "";
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        if (attempt > 0) {
+          const delay = 2000 * Math.pow(2, attempt - 1);
+          await new Promise(r => setTimeout(r, delay));
+          logger.warn(`[PLAN] Retry attempt ${attempt + 1}...`);
+        }
+        const result = await getModel().generateContent({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 8000 },
+        });
+        const rawText = result.response.text() || "";
+        logAI("PLAN_FROM_TEXT", prompt.length, rawText.length, 8000);
+        const cleaned = stripCodeFences(rawText);
+        plan = tryParseJSON(cleaned);
+        if (plan) break;
+        lastError = cleaned.slice(0, 2000);
+        logger.error(`[Parse FAIL attempt ${attempt + 1}]:`, lastError.slice(0, 500));
+      } catch (retryErr: any) {
+        lastError = retryErr?.message || "AI call failed";
+        logger.error(`[PLAN attempt ${attempt + 1} error]:`, lastError);
+        if (attempt === 2) throw retryErr;
+      }
+    }
     if (!plan) {
-      console.error("[Parse FAIL]:", cleaned.slice(0, 2000));
-      return res.status(500).json({ ok: false, error: "LLM JSON parse error", llmText: cleaned.slice(0, 2000) });
+      return res.status(500).json({ ok: false, error: "LLM JSON parse error after retries", llmText: lastError });
     }
     if (!hasAlignment(plan)) {
       try { const alignment = await generateAlignmentOnly(lectureText, slidesText); plan = { ...plan, alignment }; }
-      catch (e) { console.warn("[Alignment fallback failed]:", (e as any)?.message || e); }
+      catch (e) { logger.warn("[Alignment fallback failed]:", (e as any)?.message || e); }
     }
     if (!hasAlignment(plan) && plan?.alignment?.items?.length) {
       const items = plan.alignment.items;
@@ -315,9 +343,14 @@ ${SLD}
     const lessonCourse = getCourseForLesson(saved.id);
     if (lessonCourse) rebuildKnowledgeIndex(lessonCourse.id);
 
+    // Generate digest asynchronously (don't block response)
+    generateDigest(saved.id, lectureText, slidesText, plan).catch((err) =>
+      logger.warn("[Digest] Background generation failed:", err?.message)
+    );
+
     return res.json({ ok: true, plan, lessonId: saved.id });
   } catch (e: any) {
-    console.error("[/api/plan-from-text ERROR]", e?.message || e);
+    logger.error("[/api/plan-from-text ERROR]", e?.message || e);
     return res.status(500).json({ ok: false, error: e?.message || "server error" });
   }
 });
@@ -332,13 +365,53 @@ router.post("/quiz-from-plan", async (req, res) => {
       const ctx = assembleCourseContext(quizLessonId, "quiz");
       if (ctx.crossLessonBlock) crossLessonHint = `\n\nRELATED LESSONS:\n${ctx.crossLessonBlock}`;
     }
-    const prompt = `Generate 10 short quiz questions based on the plan below.\nReturn only the question sentences, one per line.\n${crossLessonHint}\n\nPLAN:\n${JSON.stringify(plan).slice(0, 8000)}`.trim();
-    const result = await getModel().generateContent({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: 1500 } });
+    const prompt = `You are an expert academic quiz generator. Generate exactly 10 quiz questions based on the plan below.
+
+RULES:
+- Difficulty distribution: 3 Easy (factual recall), 4 Medium (understanding/application), 3 Hard (analysis/evaluation)
+- Question type variety: include at least 2 "Why/How" questions, 2 multiple-choice (with options A-D), 2 true/false, and the rest open-ended
+- Each question MUST cover a DIFFERENT concept from the plan — no duplicate or overlapping topics
+- Each question must be at least 15 words long and be self-contained (understandable without seeing the plan)
+- For multiple-choice questions, format as: "Question text? A) option1 B) option2 C) option3 D) option4"
+- For true/false questions, start with "[T/F]"
+
+FORMAT: Return one question per line, prefixed with difficulty tag:
+[Easy] question text
+[Medium] question text
+[Hard] question text
+${crossLessonHint}
+
+PLAN:
+${JSON.stringify(plan).slice(0, 8000)}`.trim();
+    const result = await getModel().generateContent({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: 2500 } });
     const text = (result.response.text() || "").replace(/```/g, "").trim();
-    const questions = text.split(/\n+/).map((s) => s.replace(/^\d+\.\s*/, "").trim()).filter(Boolean).slice(0, 10);
-    return res.json({ ok: true, questions });
+    logAI("QUIZ_FROM_PLAN", prompt.length, text.length, 2500);
+    let questions = text.split(/\n+/).map((s) => s.replace(/^\d+\.\s*/, "").trim()).filter(Boolean).slice(0, 12);
+
+    // Validate question quality
+    questions = questions.filter(q => {
+      const wordCount = q.split(/\s+/).length;
+      if (wordCount < 5) return false; // Too short to be meaningful
+      return true;
+    });
+
+    // Deduplicate: remove questions with high word overlap (Jaccard > 0.7)
+    const getWords = (s: string) => new Set(s.toLowerCase().replace(/[^\w\s]/g, "").split(/\s+/).filter(w => w.length > 2));
+    const deduplicated: string[] = [];
+    for (const q of questions) {
+      const qWords = getWords(q);
+      const isDuplicate = deduplicated.some(existing => {
+        const eWords = getWords(existing);
+        const intersection = new Set([...qWords].filter(w => eWords.has(w)));
+        const union = new Set([...qWords, ...eWords]);
+        return union.size > 0 && intersection.size / union.size > 0.7;
+      });
+      if (!isDuplicate) deduplicated.push(q);
+    }
+
+    return res.json({ ok: true, questions: deduplicated.slice(0, 10) });
   } catch (e: any) {
-    console.error("[/api/quiz-from-plan ERROR]", e?.message || e);
+    logger.error("[/api/quiz-from-plan ERROR]", e?.message || e);
     return res.status(500).json({ ok: false, error: e?.message || "server error" });
   }
 });
@@ -349,25 +422,44 @@ router.post("/quiz-answers", async (req, res) => {
     const { questions, lectureText, slidesText, plan, lessonId } = req.body as {
       questions?: string[]; lectureText?: string; slidesText?: string; plan?: any; lessonId?: string;
     };
-    if (!questions?.length || !lectureText || !slidesText) {
-      return res.status(400).json({ ok: false, error: "questions, lectureText, slidesText are required" });
+    if (!questions?.length) {
+      return res.status(400).json({ ok: false, error: "questions are required" });
     }
     const Q = questions.slice(0, 20);
-    let LEC: string; let SLD: string;
-    if (lessonId) {
-      const lesson = getLesson(lessonId);
-      if (lesson?.plan) { const condensed = buildCondensedContext(lesson); LEC = condensed.lecContext; SLD = condensed.sldContext; }
-      else { LEC = lectureText.slice(0, 18000); SLD = slidesText.slice(0, 18000); }
-    } else { LEC = lectureText.slice(0, 18000); SLD = slidesText.slice(0, 18000); }
 
-    const prompt = `Answer the questions with EVIDENCE. Return ONLY VALID JSON.\n\nSCHEMA:\n{\n  "answers": [{ "q": "string", "short_answer": "string", "explanation": "string", "evidence": { "lec": [{ "quote": "string" }], "slide": [{ "quote": "string" }] }, "confidence": number }]\n}\n\n[LEC]\n${LEC}\n\n[SLIDE]\n${SLD}\n\n[PLAN (optional)]\n${plan ? JSON.stringify(plan).slice(0, 6000) : "—"}\n\n[QUESTIONS]\n${Q.map((q, i) => `${i + 1}. ${q}`).join("\n")}`.trim();
-    const result = await getModel().generateContent({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: 4000 } });
-    const cleaned = (result.response.text() || "").replace(/```json?/gi, "").replace(/```/g, "").trim();
-    const j = (() => { try { return JSON.parse(cleaned); } catch { return null; } })();
+    // Use digest if available, fallback to condensed context or raw text
+    let contextBlock: string;
+    if (lessonId) {
+      const { context } = getDigestOrFallback(lessonId);
+      if (context) {
+        contextBlock = context;
+      } else {
+        const LEC = (lectureText || "").slice(0, 18000);
+        const SLD = (slidesText || "").slice(0, 18000);
+        contextBlock = `[LEC]\n${LEC}\n\n[SLIDE]\n${SLD}`;
+      }
+    } else if (lectureText && slidesText) {
+      contextBlock = `[LEC]\n${lectureText.slice(0, 18000)}\n\n[SLIDE]\n${slidesText.slice(0, 18000)}`;
+    } else {
+      return res.status(400).json({ ok: false, error: "lessonId or lectureText+slidesText required" });
+    }
+
+    const prompt = `Answer the questions with EVIDENCE from the lesson context.\n\n[LESSON CONTEXT]\n${contextBlock}\n\n[PLAN (optional)]\n${plan ? JSON.stringify(plan).slice(0, 6000) : "—"}\n\n[QUESTIONS]\n${Q.map((q, i) => `${i + 1}. ${q}`).join("\n")}`.trim();
+    const result = await getModel().generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        maxOutputTokens: 4000,
+        responseMimeType: "application/json",
+        responseSchema: SCHEMAS.QUIZ_ANSWERS,
+      } as any,
+    });
+    const rawResp = result.response.text() || "";
+    logAI("QUIZ_ANSWERS", prompt.length, rawResp.length, 4000);
+    const j = (() => { try { return JSON.parse(rawResp); } catch { return null; } })();
     if (!j?.answers) return res.status(500).json({ ok: false, error: "JSON parse/schema error" });
     return res.json({ ok: true, answers: j.answers });
   } catch (e: any) {
-    console.error("[/api/quiz-answers ERROR]", e?.message || e);
+    logger.error("[/api/quiz-answers ERROR]", e?.message || e);
     return res.status(500).json({ ok: false, error: e?.message || "server error" });
   }
 });
@@ -378,24 +470,58 @@ router.post("/quiz-eval", async (req, res) => {
     const { q, student_answer, lectureText, slidesText, lessonId } = req.body as {
       q?: string; student_answer?: string; lectureText?: string; slidesText?: string; lessonId?: string;
     };
-    if (!q || !student_answer || !lectureText || !slidesText) {
-      return res.status(400).json({ ok: false, error: "q, student_answer, lectureText, slidesText are required" });
+    if (!q || !student_answer) {
+      return res.status(400).json({ ok: false, error: "q and student_answer are required" });
     }
-    let LEC: string; let SLD: string;
-    if (lessonId) {
-      const lesson = getLesson(lessonId);
-      if (lesson?.plan) { const condensed = buildCondensedContext(lesson); LEC = condensed.lecContext; SLD = condensed.sldContext; }
-      else { LEC = lectureText.slice(0, 14000); SLD = slidesText.slice(0, 14000); }
-    } else { LEC = lectureText.slice(0, 14000); SLD = slidesText.slice(0, 14000); }
 
-    const prompt = `Act as an exam grader. Return ONLY VALID JSON.\n\nSCHEMA:\n{ "grade": "correct"|"partial"|"incorrect", "feedback": "string", "missing_points": string[], "evidence": { "lec": [{"quote":"string"}], "slide": [{"quote":"string"}] }, "confidence": number }\n\n[LEC]\n${LEC}\n\n[SLIDE]\n${SLD}\n\n[QUESTION]\n${q}\n\n[STUDENT_ANSWER]\n${student_answer}`.trim();
-    const result = await getModel().generateContent({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: 800 } });
-    const cleaned = (result.response.text() || "").replace(/```json?/gi, "").replace(/```/g, "").trim();
-    const j = (() => { try { return JSON.parse(cleaned); } catch { return null; } })();
+    // Use digest if available
+    let contextBlock: string;
+    if (lessonId) {
+      const { context } = getDigestOrFallback(lessonId);
+      contextBlock = context || `[LEC]\n${(lectureText || "").slice(0, 14000)}\n\n[SLIDE]\n${(slidesText || "").slice(0, 14000)}`;
+    } else if (lectureText && slidesText) {
+      contextBlock = `[LEC]\n${lectureText.slice(0, 14000)}\n\n[SLIDE]\n${slidesText.slice(0, 14000)}`;
+    } else {
+      return res.status(400).json({ ok: false, error: "lessonId or lectureText+slidesText required" });
+    }
+
+    const prompt = `Act as a strict but fair academic exam grader. Grade the student's answer based ONLY on the lesson context provided.
+
+GRADING RUBRIC:
+- "correct": All key concepts covered with accurate reasoning. Minor wording differences are acceptable.
+- "partial": Main idea is correct but missing important supporting details, or has minor inaccuracies.
+- "incorrect": Fundamentally wrong, irrelevant, or shows no understanding of the concept.
+
+INSTRUCTIONS:
+1. Compare the student's answer against the lesson context
+2. Identify which key concepts from the context are addressed vs missed
+3. Provide specific, actionable feedback explaining what was good and what was missed
+4. List the specific concepts/points the student failed to mention in missing_points
+5. Include direct quotes from lesson content as evidence
+
+[LESSON CONTEXT]
+${contextBlock}
+
+[QUESTION]
+${q}
+
+[STUDENT_ANSWER]
+${student_answer}`.trim();
+    const result = await getModel().generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        maxOutputTokens: 1000,
+        responseMimeType: "application/json",
+        responseSchema: SCHEMAS.QUIZ_EVAL,
+      } as any,
+    });
+    const evalRaw = result.response.text() || "";
+    logAI("QUIZ_EVAL", prompt.length, evalRaw.length, 800);
+    const j = (() => { try { return JSON.parse(evalRaw); } catch { return null; } })();
     if (!j?.grade) return res.status(500).json({ ok: false, error: "JSON parse/schema error" });
     return res.json({ ok: true, ...j });
   } catch (e: any) {
-    console.error("[/api/quiz-eval ERROR]", e?.message || e);
+    logger.error("[/api/quiz-eval ERROR]", e?.message || e);
     return res.status(500).json({ ok: false, error: e?.message || "server error" });
   }
 });
@@ -406,25 +532,51 @@ router.post("/quiz-eval-batch", async (req, res) => {
     const { items, lectureText, slidesText, lessonId } = req.body as {
       items?: Array<{ q: string; student_answer: string }>; lectureText?: string; slidesText?: string; lessonId?: string;
     };
-    if (!items?.length || !lectureText || !slidesText) {
-      return res.status(400).json({ ok: false, error: "items, lectureText, slidesText are required" });
+    if (!items?.length) {
+      return res.status(400).json({ ok: false, error: "items are required" });
     }
-    let LEC: string; let SLD: string;
+
+    // Use digest if available
+    let contextBlock: string;
     if (lessonId) {
-      const lesson = getLesson(lessonId);
-      if (lesson?.plan) { const condensed = buildCondensedContext(lesson); LEC = condensed.lecContext; SLD = condensed.sldContext; }
-      else { LEC = lectureText.slice(0, 14000); SLD = slidesText.slice(0, 14000); }
-    } else { LEC = lectureText.slice(0, 14000); SLD = slidesText.slice(0, 14000); }
+      const { context } = getDigestOrFallback(lessonId);
+      contextBlock = context || `[LEC]\n${(lectureText || "").slice(0, 14000)}\n\n[SLIDE]\n${(slidesText || "").slice(0, 14000)}`;
+    } else if (lectureText && slidesText) {
+      contextBlock = `[LEC]\n${lectureText.slice(0, 14000)}\n\n[SLIDE]\n${slidesText.slice(0, 14000)}`;
+    } else {
+      return res.status(400).json({ ok: false, error: "lessonId or lectureText+slidesText required" });
+    }
 
     const questionsBlock = items.slice(0, 20).map((item, i) => `Q${i + 1}: ${item.q}\nA${i + 1}: ${item.student_answer}`).join("\n\n");
-    const prompt = `Act as an exam grader. Grade ALL answers. Return ONLY VALID JSON.\n\nSCHEMA:\n{ "results": [{ "index": number, "grade": "correct"|"partial"|"incorrect", "feedback": "string", "missing_points": string[], "confidence": number }] }\n\n[LEC]\n${LEC}\n\n[SLIDE]\n${SLD}\n\n[STUDENT ANSWERS]\n${questionsBlock}`.trim();
-    const result = await getModel().generateContent({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: 4000 } });
-    const cleaned = (result.response.text() || "").replace(/```json?/gi, "").replace(/```/g, "").trim();
-    const j = (() => { try { return JSON.parse(cleaned); } catch { return null; } })();
+    const prompt = `Act as a strict but fair academic exam grader. Grade ALL student answers based ONLY on the lesson context.
+
+GRADING RUBRIC (apply to each answer):
+- "correct": All key concepts covered with accurate reasoning
+- "partial": Main idea correct but missing important details or has minor inaccuracies
+- "incorrect": Fundamentally wrong, irrelevant, or shows no understanding
+
+For each answer, provide specific feedback and list missed concepts in missing_points.
+
+[LESSON CONTEXT]
+${contextBlock}
+
+[STUDENT ANSWERS]
+${questionsBlock}`.trim();
+    const result = await getModel().generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        maxOutputTokens: 4000,
+        responseMimeType: "application/json",
+        responseSchema: SCHEMAS.QUIZ_EVAL_BATCH,
+      } as any,
+    });
+    const batchRaw = result.response.text() || "";
+    logAI("QUIZ_EVAL_BATCH", prompt.length, batchRaw.length, 4000);
+    const j = (() => { try { return JSON.parse(batchRaw); } catch { return null; } })();
     if (!j?.results || !Array.isArray(j.results)) return res.status(500).json({ ok: false, error: "JSON parse/schema error" });
     return res.json({ ok: true, results: j.results });
   } catch (e: any) {
-    console.error("[/api/quiz-eval-batch ERROR]", e?.message || e);
+    logger.error("[/api/quiz-eval-batch ERROR]", e?.message || e);
     return res.status(500).json({ ok: false, error: e?.message || "server error" });
   }
 });
@@ -489,7 +641,7 @@ router.get("/ieu/learning-outcomes", async (req, res) => {
     if (!learningOutcomes.length) return res.status(200).json({ ok: false, error: "Learning Outcomes section not found.", url });
     return res.json({ ok: true, code, url, learningOutcomes });
   } catch (err: any) {
-    console.error("[/api/ieu/learning-outcomes] Error:", err);
+    logger.error("[/api/ieu/learning-outcomes] Error:", err);
     return res.status(500).json({ ok: false, error: err?.message || "Unknown error" });
   }
 });
@@ -514,8 +666,22 @@ router.post("/lessons/:id/chat", async (req, res) => {
     const cheatSheetFormulas = cheatSheet?.formulas?.slice(0, 3)?.join('; ') || '';
     const loAlignment = (lesson as any).loAlignment;
     const loSummary = loAlignment?.segments?.slice(0, 3)?.flatMap((s: any) => s.lo_links?.map((l: any) => l.lo_title) || [])?.filter(Boolean)?.slice(0, 5)?.join(', ') || '';
-    const recentHistory = (history || []).slice(-6);
-    const historyContext = recentHistory.length > 2 ? `\n=== RECENT CONVERSATION ===\n${recentHistory.map((h: any) => `${h.role === 'user' ? 'Student' : 'Tutor'}: ${(h.content || '').slice(0, 200)}...`).join('\n')}\n` : '';
+    // Progressive context: first message gets full context, subsequent messages get digest
+    const isFirstMessage = !history || history.length === 0;
+    let lessonContentBlock: string;
+
+    if (isFirstMessage) {
+      // Full context for first message
+      lessonContentBlock = `=== TRANSCRIPT EXCERPT ===\n${(lesson.transcript || "").slice(0, 8000)}\n\n=== SLIDE CONTENT EXCERPT ===\n${(lesson.slideText || "").slice(0, 5000)}`;
+    } else {
+      // Digest for subsequent messages (saves ~7K tokens per message)
+      const { context: digestCtx, isDigest } = getDigestOrFallback(lessonId);
+      if (isDigest) {
+        lessonContentBlock = `=== LESSON DIGEST ===\n${digestCtx}`;
+      } else {
+        lessonContentBlock = `=== TRANSCRIPT EXCERPT ===\n${(lesson.transcript || "").slice(0, 4000)}\n\n=== SLIDE CONTENT EXCERPT ===\n${(lesson.slideText || "").slice(0, 2000)}`;
+      }
+    }
 
     const context = `
 ${courseCtx.courseBlock ? `=== COURSE OVERVIEW ===\n${courseCtx.courseBlock}\n` : ''}
@@ -534,14 +700,9 @@ ${loSummary ? `=== LEARNING OUTCOMES COVERED ===\n${loSummary}\n` : ''}
 ${cheatSheetHighlights ? `=== COMMON PITFALLS ===\n• ${cheatSheetHighlights}\n` : ''}
 ${cheatSheetFormulas ? `=== KEY FORMULAS ===\n${cheatSheetFormulas}\n` : ''}
 
-=== TRANSCRIPT EXCERPT ===
-${(lesson.transcript || "").slice(0, 8000)}
-
-=== SLIDE CONTENT EXCERPT ===
-${(lesson.slideText || "").slice(0, 5000)}
+${lessonContentBlock}
 ${courseCtx.crossLessonBlock ? `\n=== RELATED LESSONS ===\n${courseCtx.crossLessonBlock}\n` : ''}
-${courseCtx.progressBlock ? `\n=== STUDENT PROGRESS ===\n${courseCtx.progressBlock}\n` : ''}
-${historyContext}`;
+${courseCtx.progressBlock ? `\n=== STUDENT PROGRESS ===\n${courseCtx.progressBlock}\n` : ''}`;
 
     const chat = getModel().startChat({
       history: history?.map((h: any) => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.content }] })) || [],
@@ -578,7 +739,55 @@ ${context}
 ${message}
 `;
 
-    const result = await chat.sendMessage(prompt);
+    const timeoutMs = 30000;
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("AI_TIMEOUT")), timeoutMs)
+    );
+
+    // Check if streaming is requested
+    if (req.query.stream === 'true') {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.flushHeaders?.();
+
+      try {
+        const streamResult = await Promise.race([
+          getModel().generateContentStream({
+            contents: [
+              ...(history?.map((h: any) => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.content }] })) || []),
+              { role: 'user', parts: [{ text: prompt }] },
+            ],
+            generationConfig: { maxOutputTokens: 2500 },
+          }),
+          timeoutPromise,
+        ]);
+
+        let fullText = '';
+        for await (const chunk of streamResult.stream) {
+          const chunkText = chunk.text();
+          if (chunkText) {
+            fullText += chunkText;
+            res.write(`data: ${JSON.stringify({ type: 'chunk', text: chunkText })}\n\n`);
+          }
+        }
+
+        // Extract suggestions from full text
+        const suggestionsMatch = fullText.match(/💡\s*\*\*Suggested Questions:\*\*\s*([\s\S]*?)$/);
+        let suggestions: string[] = [];
+        if (suggestionsMatch) {
+          suggestions = suggestionsMatch[1].trim().split('\n').map(line => line.replace(/^\d+\.\s*/, '').trim()).filter(s => s.length > 5).slice(0, 3);
+        }
+        res.write(`data: ${JSON.stringify({ type: 'done', suggestions })}\n\n`);
+        return res.end();
+      } catch (streamErr: any) {
+        res.write(`data: ${JSON.stringify({ type: 'error', error: streamErr?.message === 'AI_TIMEOUT' ? 'AI yanıt süresi aşıldı.' : streamErr?.message })}\n\n`);
+        return res.end();
+      }
+    }
+
+    // Non-streaming fallback
+    const result = await Promise.race([chat.sendMessage(prompt), timeoutPromise]);
     let text = result.response.text();
     const suggestionsMatch = text.match(/💡\s*\*\*Suggested Questions:\*\*\s*([\s\S]*?)$/);
     let suggestions: string[] = [];
@@ -587,7 +796,10 @@ ${message}
     }
     return res.json({ ok: true, text, suggestions });
   } catch (e: any) {
-    console.error("Chat error:", e);
+    logger.error("Chat error:", e);
+    if (e?.message === "AI_TIMEOUT") {
+      return res.status(504).json({ ok: false, error: "AI yanıt süresi aşıldı. Lütfen tekrar deneyin." });
+    }
     return res.status(500).json({ ok: false, error: e.message });
   }
 });
@@ -623,7 +835,7 @@ You are a MASTER EDUCATOR creating a STUDY GUIDE mindmap.
 - Root: root((📚 Topic Name))
 - Use 2-space indentation
 - NO special chars: no [], (), {}, :, backticks, quotes
-- Labels: MAX 18 chars
+- Labels: MAX 35 chars
 
 === STRUCTURE (5 BRANCHES) ===
 📚 TOPIC (root)
@@ -680,7 +892,7 @@ Create a STUDY GUIDE mindmap for "${title}". OUTPUT ONLY mermaid code.
     upsertLesson({ id: lessonId, mindmapCache: { code, generatedAt: new Date().toISOString() } } as any);
     return res.json({ ok: true, code });
   } catch (e: any) {
-    console.error("Mindmap error:", e);
+    logger.error("Mindmap error:", e);
     return res.status(500).json({ ok: false, error: e.message });
   }
 });
@@ -701,7 +913,7 @@ router.get("/lessons/:id/modules", (req, res) => {
     const allModulesOption = { id: -1, title: "📚 Tüm Modüller (Genel Bakış)", topics: moduleList.slice(0, 4).map((m: any) => m.title) };
     return res.json({ ok: true, lessonTitle: lesson.title || "Lesson", modules: [allModulesOption, ...moduleList] });
   } catch (e: any) {
-    console.error("Modules list error:", e);
+    logger.error("Modules list error:", e);
     return res.status(500).json({ ok: false, error: e.message });
   }
 });
@@ -749,7 +961,7 @@ You are a MASTER EDUCATOR creating a STUDY GUIDE mindmap for a specific module.
 - Root: root((📚 Topic Name))
 - Use 2-space indentation
 - NO special chars
-- Labels: MAX 18 chars
+- Labels: MAX 35 chars
 
 === MODULE DATA ===
 Module Title: ${targetTitle}
@@ -791,7 +1003,7 @@ OUTPUT ONLY mermaid code for "${targetTitle}".
     upsertLesson({ id: lessonId, mindmapModuleCache: existingModuleCache } as any);
     return res.json({ ok: true, code, moduleTitle: targetTitle });
   } catch (e: any) {
-    console.error("Module mindmap error:", e);
+    logger.error("Module mindmap error:", e);
     return res.status(500).json({ ok: false, error: e.message });
   }
 });
@@ -800,7 +1012,7 @@ OUTPUT ONLY mermaid code for "${targetTitle}".
 router.post("/lessons/:id/mindmap/node-detail", async (req, res) => {
   try {
     const lessonId = req.params.id;
-    const { nodeName, action } = req.body as { nodeName: string; action: "explain" | "example" | "quiz" };
+    const { nodeName, action } = req.body as { nodeName: string; action: "explain" | "example" | "quiz" | "all" };
     if (!nodeName || !action) return res.status(400).json({ ok: false, error: "nodeName and action required" });
     const lesson = getLesson(lessonId);
     if (!lesson) return res.status(404).json({ ok: false, error: "Lesson not found" });
@@ -808,8 +1020,20 @@ router.post("/lessons/:id/mindmap/node-detail", async (req, res) => {
     const transcript = (lesson.transcript || "").substring(0, 3000);
     const lessonTitle = lesson.title || "Lesson";
     let prompt = "";
+    let maxTokens = 800;
 
-    if (action === "explain") {
+    // Schema selection for structured output
+    let schema: any = null;
+
+    if (action === "all") {
+      // Batched: explain + example + quiz in single call (saves 2 API calls)
+      prompt = `For the concept "${nodeName}" from "${lessonTitle}", provide an explanation, a real-world example, and a quiz question.
+
+Context:
+${transcript.substring(0, 1500)}`;
+      maxTokens = 1500;
+      schema = SCHEMAS.MINDMAP_NODE_ALL;
+    } else if (action === "explain") {
       prompt = `Explain "${nodeName}" VERY BRIEFLY.\n\nContext:\n${transcript.substring(0, 1000)}\n\nReturn ONLY JSON:\n{ "title": "${nodeName}", "explanation": "2-3 sentences", "keyPoints": ["point"], "relatedConcepts": ["concept"] }`;
     } else if (action === "example") {
       prompt = `Give ONE simple example for "${nodeName}".\n\nContext:\n${transcript.substring(0, 1000)}\n\nReturn ONLY JSON:\n{ "title": "${nodeName}", "example": { "scenario": "1 sentence", "explanation": "1 sentence", "takeaway": "5-8 words" } }`;
@@ -817,13 +1041,20 @@ router.post("/lessons/:id/mindmap/node-detail", async (req, res) => {
       prompt = `Create a quiz question about "${nodeName}" from "${lessonTitle}".\n\nContext:\n${transcript.substring(0, 1500)}\n\nReturn ONLY JSON:\n{ "title": "${nodeName}", "quiz": { "question": "?", "options": ["A)", "B)", "C)", "D)"], "correctAnswer": "A", "explanation": "why" } }`;
     }
 
-    const result = await getModel().generateContent({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: 800 } });
-    let responseText = result.response.text().replace(/```json?/gi, "").replace(/```/g, "").trim();
+    const genConfig: any = { maxOutputTokens: maxTokens };
+    if (schema) {
+      genConfig.responseMimeType = "application/json";
+      genConfig.responseSchema = schema;
+    }
+    const result = await getModel().generateContent({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: genConfig });
+    let responseText = result.response.text();
+    if (!schema) responseText = responseText.replace(/```json?/gi, "").replace(/```/g, "").trim();
+    logAI("MINDMAP_NODE_DETAIL", prompt.length, responseText.length, maxTokens);
     let parsed;
     try { parsed = JSON.parse(responseText); } catch { return res.status(500).json({ ok: false, error: "Failed to parse AI response" }); }
     return res.json({ ok: true, action, ...parsed });
   } catch (e: any) {
-    console.error("[Node Detail] Error:", e);
+    logger.error("[Node Detail] Error:", e);
     return res.status(500).json({ ok: false, error: e.message });
   }
 });

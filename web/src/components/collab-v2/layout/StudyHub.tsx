@@ -61,9 +61,28 @@ export default function StudyHub() {
 
     const socket = getCollabSocket();
 
-    const onDisconnect = () => setDisconnected(true);
+    let retryCount = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const onDisconnect = () => {
+      setDisconnected(true);
+      // Auto-retry with exponential backoff (3 attempts)
+      const attemptReconnect = () => {
+        if (retryCount >= 3) return;
+        retryCount++;
+        const delay = 2000 * Math.pow(2, retryCount - 1);
+        retryTimer = setTimeout(() => {
+          if (socket.disconnected) {
+            socket.connect();
+          }
+        }, delay);
+      };
+      attemptReconnect();
+    };
     const onConnect = () => {
       setDisconnected(false);
+      retryCount = 0;
+      if (retryTimer) clearTimeout(retryTimer);
       setupServerListeners();
       setupMessageListeners();
       setupToolListeners();
@@ -75,6 +94,7 @@ export default function StudyHub() {
     return () => {
       socket.off("disconnect", onDisconnect);
       socket.off("connect", onConnect);
+      if (retryTimer) clearTimeout(retryTimer);
     };
   }, [profile?.id]);
 

@@ -1,10 +1,22 @@
-import React, { useState, useRef } from "react";
+import { logger } from "../utils/logger";
+import React, { useState, useRef, useEffect } from "react";
 import { CheatSheet } from "../types";
 import { exportToPdf } from "../utils/pdfExport";
 import { Card, CardHeader, CardBody } from "./ui/Card";
 import { Button } from "./ui/Button";
 import { Select } from "./ui/Select";
 import { Badge } from "./ui/Badge";
+
+function timeAgo(dateStr: string, lang: 'tr' | 'en'): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return lang === 'tr' ? 'Az önce' : 'Just now';
+  if (mins < 60) return lang === 'tr' ? `${mins} dakika önce` : `${mins} min ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return lang === 'tr' ? `${hours} saat önce` : `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return lang === 'tr' ? `${days} gün önce` : `${days}d ago`;
+}
 
 export default function CheatSheetPane(props: {
   cheatSheet: CheatSheet | null;
@@ -15,7 +27,23 @@ export default function CheatSheetPane(props: {
   const { cheatSheet, loading, error, onGenerate } = props;
   const [language, setLanguage] = useState<'tr' | 'en'>('tr');
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [prevLang, setPrevLang] = useState<'tr' | 'en'>(language);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  // Auto-regenerate on language change
+  useEffect(() => {
+    if (language !== prevLang && cheatSheet) {
+      setPrevLang(language);
+      const confirmed = confirm(
+        language === 'tr'
+          ? 'Dil değişti. Cheat sheet yeniden oluşturulsun mu?'
+          : 'Language changed. Regenerate cheat sheet?'
+      );
+      if (confirmed) onGenerate(language);
+    } else {
+      setPrevLang(language);
+    }
+  }, [language]);
 
   const handleGenerate = () => {
     onGenerate(language);
@@ -28,7 +56,7 @@ export default function CheatSheetPane(props: {
     try {
       await exportToPdf(contentRef.current, cheatSheet.title || "CheatSheet");
     } catch (err) {
-      console.error("PDF export error:", err);
+      logger.error("PDF export error:", err);
     } finally {
       setPdfLoading(false);
     }
@@ -121,7 +149,7 @@ export default function CheatSheetPane(props: {
           <div ref={contentRef} className="u-mt-4 u-p-4 u-rounded-sm" style={{ backgroundColor: "var(--bg)" }}>
             <div className="u-font-extrabold u-text-md">{cheatSheet.title}</div>
             <div className="u-text-sm muted-block u-mt-1-5">
-              {t.lastUpdate} {new Date(cheatSheet.updatedAt).toLocaleString()}
+              {t.lastUpdate} {timeAgo(cheatSheet.updatedAt, language)}
             </div>
 
             <div className="u-grid u-gap-3 u-mt-3">

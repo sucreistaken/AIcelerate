@@ -1,10 +1,14 @@
+import { logger } from "../utils/logger";
 // src/components/NotesPane.tsx
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import toast from "react-hot-toast";
 import { useNotesStore, Note } from "../stores/notesStore";
 import { useRoomStore } from "../stores/roomStore";
 import { motion, AnimatePresence } from "framer-motion";
 import { exportToPdf } from "../utils/pdfExport";
 import TagInput from "./ui/TagInput";
+
+const NOTE_MAX_CHARS = 10000;
 
 export default function NotesPane() {
     const {
@@ -38,7 +42,7 @@ export default function NotesPane() {
         if (!notesContentRef.current) return;
         setPdfLoading(true);
         try { await exportToPdf(notesContentRef.current, "Notes"); }
-        catch (err) { console.error("PDF export error:", err); }
+        catch (err) { logger.error("PDF export error:", err); }
         finally { setPdfLoading(false); }
     };
 
@@ -64,11 +68,44 @@ export default function NotesPane() {
         setSelectedTags(selectedTags.includes(tag) ? selectedTags.filter(t => t !== tag) : [...selectedTags, tag]);
     };
 
-    const copyNote = (content: string, id: string) => {
-        navigator.clipboard.writeText(content);
-        setCopiedId(id);
-        setTimeout(() => setCopiedId(null), 2000);
+    const copyNote = async (content: string, id: string) => {
+        try {
+            await navigator.clipboard.writeText(content);
+            setCopiedId(id);
+            setTimeout(() => setCopiedId(null), 2000);
+        } catch {
+            toast.error("Panoya kopyalanamadı. Tarayıcı izni gerekebilir.");
+        }
     };
+
+    const [deletedNote, setDeletedNote] = useState<Note | null>(null);
+    const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const handleDeleteNote = useCallback((noteId: string) => {
+        const note = notes.find(n => n.id === noteId);
+        if (!note) return;
+        setDeletedNote(note);
+        removeNote(noteId);
+
+        if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
+        const toastId = toast((t) => (
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span>Not silindi.</span>
+                <button
+                    style={{ background: "var(--accent-2)", color: "#fff", border: "none", borderRadius: 6, padding: "4px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                    onClick={() => {
+                        toast.dismiss(t.id);
+                        if (note) addNote(note.content, note.source, note.lessonId, note.title, note.tags);
+                        setDeletedNote(null);
+                    }}
+                >
+                    Geri Al
+                </button>
+            </div>
+        ), { duration: 5000 });
+
+        deleteTimerRef.current = setTimeout(() => setDeletedNote(null), 5100);
+    }, [notes, removeNote, addNote]);
 
     const formatDate = (ts: number) => new Date(ts).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
@@ -175,9 +212,13 @@ export default function NotesPane() {
                                 className="nt-textarea"
                                 placeholder="Write your note here..."
                                 value={newContent}
-                                onChange={e => setNewContent(e.target.value)}
+                                onChange={e => { if (e.target.value.length <= NOTE_MAX_CHARS) setNewContent(e.target.value); }}
                                 rows={4}
+                                maxLength={NOTE_MAX_CHARS}
                             />
+                            <div style={{ textAlign: "right", fontSize: 11, color: newContent.length > NOTE_MAX_CHARS * 0.9 ? "#e17055" : "var(--muted)" }}>
+                                {newContent.length}/{NOTE_MAX_CHARS}
+                            </div>
                             <div className="nt-creator-tags">
                                 <span className="nt-label">Tags</span>
                                 <TagInput
@@ -226,6 +267,11 @@ export default function NotesPane() {
                         <button className="nt-tag-filter nt-tag-filter--clear" onClick={() => setSelectedTags([])}>
                             Clear
                         </button>
+                    )}
+                    {(selectedTags.length > 0 || searchInput.trim()) && (
+                        <span style={{ fontSize: 12, color: "var(--muted)", marginLeft: 4 }}>
+                            {filteredNotes.length} sonuç
+                        </span>
                     )}
                 </div>
             )}
@@ -296,7 +342,7 @@ export default function NotesPane() {
                                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                                             )}
                                         </button>
-                                        <button className="nt-card-action nt-card-action--delete" onClick={() => removeNote(note.id)} title="Delete">
+                                        <button className="nt-card-action nt-card-action--delete" onClick={() => handleDeleteNote(note.id)} title="Delete">
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                                         </button>
                                     </div>

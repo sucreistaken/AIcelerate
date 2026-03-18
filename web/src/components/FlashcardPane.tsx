@@ -1,16 +1,82 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import toast from "react-hot-toast";
 import { useFlashcardStore } from "../stores/flashcardStore";
 import { useLessonStore } from "../stores/lessonStore";
 import { useRoomStore } from "../stores/roomStore";
+import PaneInfoBanner from "./ui/PaneInfoBanner";
+
+function getDifficultyFromEF(ef: number): { label: string; color: string } {
+  if (ef >= 2.5) return { label: "Kolay", color: "#00b894" };
+  if (ef >= 1.8) return { label: "Orta", color: "#fdcb6e" };
+  return { label: "Zor", color: "#e17055" };
+}
 
 function ReviewMode() {
   const { dueCards, currentIndex, isFlipped, setFlipped, review, fetchDue } = useFlashcardStore();
   const card = dueCards[currentIndex];
+  const [sessionStart] = useState(() => Date.now());
+  const [reviewedQualities, setReviewedQualities] = useState<number[]>([]);
+  const [sessionDone, setSessionDone] = useState(false);
 
   useEffect(() => {
     fetchDue();
+    setSessionDone(false);
+    setReviewedQualities([]);
   }, []);
+
+  // Detect session completion
+  useEffect(() => {
+    if (dueCards.length > 0 && currentIndex >= dueCards.length && !sessionDone) {
+      setSessionDone(true);
+    }
+  }, [currentIndex, dueCards.length, sessionDone]);
+
+  const handleReview = useCallback((cardId: string, q: number) => {
+    setReviewedQualities(prev => [...prev, q]);
+    review(cardId, q);
+  }, [review]);
+
+  // Session summary
+  if (sessionDone && reviewedQualities.length > 0) {
+    const elapsed = Math.round((Date.now() - sessionStart) / 1000);
+    const mins = Math.floor(elapsed / 60);
+    const secs = elapsed % 60;
+    const avgQ = (reviewedQualities.reduce((a, b) => a + b, 0) / reviewedQualities.length).toFixed(1);
+    const needRepeat = reviewedQualities.filter(q => q <= 2).length;
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        style={{ textAlign: 'center', padding: 24 }}
+      >
+        <div style={{ fontSize: 48, marginBottom: 12 }}>&#10003;</div>
+        <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 16 }}>Oturum Tamamlandı!</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, maxWidth: 300, margin: '0 auto 20px' }}>
+          <div style={{ padding: 12, borderRadius: 8, background: 'var(--input-bg)' }}>
+            <div style={{ fontSize: 20, fontWeight: 800 }}>{reviewedQualities.length}</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>Kart</div>
+          </div>
+          <div style={{ padding: 12, borderRadius: 8, background: 'var(--input-bg)' }}>
+            <div style={{ fontSize: 20, fontWeight: 800 }}>{mins}:{String(secs).padStart(2, '0')}</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>Süre</div>
+          </div>
+          <div style={{ padding: 12, borderRadius: 8, background: 'var(--input-bg)' }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: Number(avgQ) >= 3 ? '#00b894' : '#fdcb6e' }}>{avgQ}</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>Ort. Kalite</div>
+          </div>
+          <div style={{ padding: 12, borderRadius: 8, background: 'var(--input-bg)' }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: needRepeat > 0 ? '#e17055' : '#00b894' }}>{needRepeat}</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>Tekrar Gerekli</div>
+          </div>
+        </div>
+        <button className="btn btn-primary" onClick={() => { setSessionDone(false); setReviewedQualities([]); fetchDue(); }}>
+          Yeni Oturum
+        </button>
+      </motion.div>
+    );
+  }
 
   if (!dueCards.length) {
     return (
@@ -53,8 +119,17 @@ function ReviewMode() {
         <span className="small" style={{ color: "var(--muted)" }}>
           Card {currentIndex + 1} of {dueCards.length}
         </span>
-        <span className="small" style={{ color: "var(--muted)" }}>
-          {card.topicName}
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span className="small" style={{ color: "var(--muted)" }}>
+            {card.topicName}
+          </span>
+          <span style={{
+            fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
+            background: getDifficultyFromEF(card.easeFactor).color + '22',
+            color: getDifficultyFromEF(card.easeFactor).color,
+          }}>
+            {getDifficultyFromEF(card.easeFactor).label}
+          </span>
         </span>
       </div>
       <div className="fc-progress-track">
@@ -115,7 +190,7 @@ function ReviewMode() {
                 whileTap={{ scale: 0.95, y: 0 }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  review(card.id, q);
+                  handleReview(card.id, q);
                 }}
               >
                 {label}
@@ -135,6 +210,51 @@ function BrowseMode() {
   const addFlashcard = useRoomStore((s) => s.addFlashcard);
   const [filter, setFilter] = useState<string>("all");
   const [sending, setSending] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [editingCard, setEditingCard] = useState<{ id: string; front: string; back: string } | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+
+  const saveCardEdit = useCallback(async () => {
+    if (!editingCard) return;
+    setEditSaving(true);
+    try {
+      const { flashcardApi } = await import('../services/api');
+      const res = await flashcardApi.update(editingCard.id, editingCard.front, editingCard.back);
+      if (res.ok) {
+        toast.success("Kart güncellendi");
+        setEditingCard(null);
+        fetchAll(currentLessonId || undefined);
+      } else {
+        toast.error(res.error || "Güncelleme başarısız");
+      }
+    } catch { toast.error("Güncelleme hatası"); }
+    setEditSaving(false);
+  }, [editingCard, fetchAll, currentLessonId]);
+
+  const handleDelete = useCallback((cardId: string) => {
+    setPendingDeleteId(cardId);
+    const toastId = toast((t) => (
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span>Kart silindi.</span>
+        <button
+          style={{ background: "var(--accent-2)", color: "#fff", border: "none", borderRadius: 6, padding: "4px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+          onClick={() => { toast.dismiss(t.id); setPendingDeleteId(null); }}
+        >
+          Geri Al
+        </button>
+      </div>
+    ), { duration: 5000 });
+
+    setTimeout(() => {
+      setPendingDeleteId((current) => {
+        if (current === cardId) {
+          deleteCard(cardId);
+          return null;
+        }
+        return current;
+      });
+    }, 5000);
+  }, [deleteCard]);
 
   useEffect(() => {
     fetchAll(currentLessonId || undefined);
@@ -220,16 +340,57 @@ function BrowseMode() {
                   <span className={`status-badge ${stateStyle[card.state] || "status-badge--muted"}`}>
                     {card.state}
                   </span>
-                  <button className="fc-delete-btn" onClick={() => deleteCard(card.id)}>
-                    Delete
-                  </button>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button className="fc-delete-btn" style={{ color: 'var(--accent-2)' }}
+                      onClick={() => setEditingCard({ id: card.id, front: card.front, back: card.back })}>
+                      Edit
+                    </button>
+                    <button className="fc-delete-btn" onClick={() => handleDelete(card.id)}
+                      disabled={pendingDeleteId === card.id}>
+                      {pendingDeleteId === card.id ? "Siliniyor..." : "Delete"}
+                    </button>
+                  </div>
                 </div>
-                <div className="fc-browse-front">{card.front}</div>
-                <div className="fc-browse-back">{card.back}</div>
+                {editingCard?.id === card.id ? (
+                  <div style={{ display: 'grid', gap: 8, padding: '8px 0' }}>
+                    <input
+                      style={{ padding: 8, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--input-bg)', color: 'var(--text)', fontSize: 13 }}
+                      value={editingCard.front}
+                      onChange={e => setEditingCard({ ...editingCard, front: e.target.value })}
+                      placeholder="Front"
+                    />
+                    <textarea
+                      style={{ padding: 8, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--input-bg)', color: 'var(--text)', fontSize: 13, resize: 'vertical' }}
+                      value={editingCard.back}
+                      onChange={e => setEditingCard({ ...editingCard, back: e.target.value })}
+                      rows={3}
+                      placeholder="Back"
+                    />
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button className="btn btn-primary" style={{ fontSize: 12, padding: '4px 12px' }} onClick={saveCardEdit} disabled={editSaving}>
+                        {editSaving ? '...' : 'Kaydet'}
+                      </button>
+                      <button className="btn btn-ghost" style={{ fontSize: 12, padding: '4px 12px' }} onClick={() => setEditingCard(null)}>
+                        İptal
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="fc-browse-front">{card.front}</div>
+                    <div className="fc-browse-back">{card.back}</div>
+                  </>
+                )}
                 <div className="fc-browse-meta">
                   <span>{card.topicName}</span>
                   <span className="fc-card__meta-sep" />
-                  <span>EF: {card.easeFactor.toFixed(2)}</span>
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 4,
+                    background: getDifficultyFromEF(card.easeFactor).color + '22',
+                    color: getDifficultyFromEF(card.easeFactor).color,
+                  }}>
+                    {getDifficultyFromEF(card.easeFactor).label}
+                  </span>
                   <span className="fc-card__meta-sep" />
                   <span>Interval: {card.interval}d</span>
                 </div>
@@ -264,6 +425,12 @@ export default function FlashcardPane() {
     >
       {/* Header */}
       <section className="lc-section">
+        <PaneInfoBanner
+          id="flashcards"
+          title="Flashcards Nasil Calisir?"
+          description="SM-2 algoritmasi ile tekrarli ogrenme kartlari. Review modunda kartlari cevirip kalite puani verin: Again (unutuldu), Hard (zor hatirlandi), Good (hatirladi), Easy (cok kolay). Sistem zorlandiginiz kartlari daha sik, kolaylari daha seyrek gosterir."
+          tips={["Again: Yarin tekrar", "Hard: 2-3 gun sonra", "Good: Normal aralik", "Easy: Uzun aralik"]}
+        />
         <div className="pane-header" style={{ marginBottom: 14 }}>
           <div className="pane-header__info">
             <div className="pane-header__title">Flashcards</div>

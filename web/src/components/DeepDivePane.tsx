@@ -192,26 +192,67 @@ export default function DeepDivePane() {
     return messages.filter(m => m.bookmarked);
   }, [messages, showStarredOnly]);
 
+  const streamControllerRef = useRef<AbortController | null>(null);
+
   const send = async (customMessage?: string) => {
     const text = customMessage || input;
     if (!text.trim() || !currentLessonId || !activeSessionId) return;
     setInput("");
     if (textareaRef.current) { textareaRef.current.style.height = 'auto'; }
 
-    setSessions(p => p.map(s => s.id === activeSessionId
+    const sessionId = activeSessionId;
+    setSessions(p => p.map(s => s.id === sessionId
       ? { ...s, messages: [...s.messages, { role: 'user' as const, content: text, timestamp: Date.now() }] }
       : s));
     setLoading(true);
 
+    // Add placeholder AI message for streaming
+    const placeholderMsg: Message = { role: 'model', content: '', timestamp: Date.now() };
+    setSessions(p => p.map(s => s.id === sessionId ? { ...s, messages: [...s.messages, placeholderMsg] } : s));
+
     const history = messages.slice(1).map(m => ({ role: m.role, content: m.content }));
-    const res = await deepDiveApi.chat(currentLessonId, text, history);
-    setLoading(false);
 
-    const aiMsg: Message = res.ok && res.text
-      ? { role: 'model', content: res.text, suggestions: res.suggestions || [], timestamp: Date.now() }
-      : { role: 'model', content: "Something went wrong. " + (res.error || ""), timestamp: Date.now() };
-
-    setSessions(p => p.map(s => s.id === activeSessionId ? { ...s, messages: [...s.messages, aiMsg] } : s));
+    streamControllerRef.current = deepDiveApi.chatStream(
+      currentLessonId,
+      text,
+      history,
+      (chunk) => {
+        // Append chunk to last message
+        setSessions(p => p.map(s => {
+          if (s.id !== sessionId) return s;
+          const msgs = [...s.messages];
+          const last = msgs[msgs.length - 1];
+          if (last?.role === 'model') {
+            msgs[msgs.length - 1] = { ...last, content: last.content + chunk };
+          }
+          return { ...s, messages: msgs };
+        }));
+      },
+      (suggestions) => {
+        setLoading(false);
+        setSessions(p => p.map(s => {
+          if (s.id !== sessionId) return s;
+          const msgs = [...s.messages];
+          const last = msgs[msgs.length - 1];
+          if (last?.role === 'model') {
+            msgs[msgs.length - 1] = { ...last, suggestions };
+          }
+          return { ...s, messages: msgs };
+        }));
+      },
+      (error) => {
+        setLoading(false);
+        setSessions(p => p.map(s => {
+          if (s.id !== sessionId) return s;
+          const msgs = [...s.messages];
+          const last = msgs[msgs.length - 1];
+          if (last?.role === 'model') {
+            msgs[msgs.length - 1] = { ...last, content: last.content || ("Something went wrong. " + error) };
+          }
+          return { ...s, messages: msgs };
+        }));
+      },
+    );
   };
 
   /* ---- Text formatting ---- */
@@ -372,7 +413,15 @@ export default function DeepDivePane() {
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.2, duration: 0.4 }}
             >
-              Ask me anything about this lesson
+              Ders notu, slayt ve plan verileri kullanilarak cevap verilir
+            </motion.p>
+            <motion.p
+              style={{ fontSize: 11, color: "var(--muted)", maxWidth: 380, textAlign: "center", lineHeight: 1.5, margin: "0 auto" }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+            >
+              Asagidaki hizli eylemleri kullanin veya kendi sorunuzu yazin. Yanitlar canli akis ile gelir. Onemli yanitlari kaydedip notlariniza ekleyebilirsiniz.
             </motion.p>
 
             <motion.div
@@ -426,6 +475,27 @@ export default function DeepDivePane() {
                 <div className="dd-msg-body">
                   <div className="dd-msg-role">{isUser ? 'You' : 'LearnCraft AI'}</div>
                   <div className="dd-msg-content">{formatMessage(m.content)}</div>
+
+                  {/* Context Source Badges */}
+                  {!isUser && m.content && actualIdx > 0 && (
+                    <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
+                      {useLessonStore.getState().lectureText && (
+                        <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(99,102,241,0.12)', color: '#6366f1', fontWeight: 600 }}>
+                          Ders notu
+                        </span>
+                      )}
+                      {useLessonStore.getState().slidesText && (
+                        <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(253,203,110,0.15)', color: '#e17055', fontWeight: 600 }}>
+                          Slayt
+                        </span>
+                      )}
+                      {useLessonStore.getState().plan && (
+                        <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,184,148,0.12)', color: '#00b894', fontWeight: 600 }}>
+                          Plan
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   {/* Suggestions */}
                   {!isUser && m.suggestions && m.suggestions.length > 0 && (

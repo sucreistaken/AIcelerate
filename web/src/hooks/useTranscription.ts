@@ -25,13 +25,23 @@ function formatTime(sec: number): string {
     return `${mm}:${ss}`;
 }
 
+const ALLOWED_FORMATS = ['audio/mpeg', 'audio/wav', 'audio/mp4', 'audio/x-m4a', 'audio/mp3', 'audio/webm', 'video/mp4'];
+const ALLOWED_EXTENSIONS = ['.mp3', '.wav', '.mp4', '.m4a', '.webm'];
+const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+
 export function useTranscription() {
     const store = useLessonStore();
     const ui = useUiStore();
     const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const eventSourceRef = useRef<EventSource | null>(null);
+    const segmentCountRef = useRef(0);
+    const transcriptionStartRef = useRef<number>(0);
 
     const showToast = useCallback((txt: string) => {
+        // Debounce: only show toast every 5 segments
+        segmentCountRef.current++;
+        if (segmentCountRef.current % 5 !== 1) return;
+
         ui.setSttProgress({ toast: txt });
         if (toastTimerRef.current) {
             clearTimeout(toastTimerRef.current);
@@ -49,6 +59,19 @@ export function useTranscription() {
             return;
         }
 
+        // File validation
+        const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+        if (!ALLOWED_FORMATS.includes(file.type) && !ALLOWED_EXTENSIONS.includes(ext)) {
+            store.setError(`Desteklenmeyen dosya formatı: ${ext || file.type}. Kabul edilen formatlar: MP3, WAV, MP4, M4A, WebM`);
+            return;
+        }
+        if (file.size > MAX_FILE_SIZE) {
+            store.setError(`Dosya çok büyük: ${(file.size / 1024 / 1024).toFixed(1)}MB. Maksimum: 100MB`);
+            return;
+        }
+
+        segmentCountRef.current = 0;
+        transcriptionStartRef.current = Date.now();
         store.setError(null);
         ui.setSttProgress({
             progress: 0,
@@ -99,10 +122,21 @@ export function useTranscription() {
                         const p = Math.round((msg.progress ?? 0) * 100);
 
                         if (typeof msg.start === 'number' && typeof msg.end === 'number') {
+                            // Calculate estimated remaining time
+                            let etaStr = '';
+                            if (p > 5 && transcriptionStartRef.current) {
+                                const elapsed = (Date.now() - transcriptionStartRef.current) / 1000;
+                                const remaining = (elapsed / (p / 100)) - elapsed;
+                                if (remaining > 60) {
+                                    etaStr = ` • ~${Math.ceil(remaining / 60)} dk kaldı`;
+                                } else if (remaining > 0) {
+                                    etaStr = ` • ~${Math.round(remaining)}s kaldı`;
+                                }
+                            }
                             ui.setSttProgress({
                                 progress: p,
                                 now: { start: msg.start, end: msg.end },
-                                status: `Transcribing ${fmtTime(msg.start)}–${fmtTime(msg.end)} (${p}%)`,
+                                status: `Transcribing ${fmtTime(msg.start)}–${fmtTime(msg.end)} (${p}%)${etaStr}`,
                             });
                             showToast(`${fmtTime(msg.start)}–${fmtTime(msg.end)}`);
                         }
