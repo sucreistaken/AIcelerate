@@ -18,4 +18,5 @@ export const env = {
   FRONTEND_URL: process.env.FRONTEND_URL || "http://localhost:5173",
   PYTHON_BIN: process.env.PYTHON_BIN || "python",
   NODE_ENV: process.env.NODE_ENV || "development",
+  USE_MONGODB: process.env.USE_MONGODB || "false",
 };

@@ -1,7 +1,8 @@
 import fs from "fs";
 import path from "path";
+import type { IRepository } from "./IRepository";
 
-export class BaseRepository<T extends { id: string }> {
+export class BaseRepository<T extends { id: string }> implements IRepository<T> {
   private filePath: string;
   private lockMap = new Map<string, Promise<void>>();
 
