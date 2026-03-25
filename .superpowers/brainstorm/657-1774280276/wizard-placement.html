@@ -1,0 +1,107 @@
+<h2>Ders Oluşturma Wizard'ı nerede açılsın?</h2>
+<p class="subtitle">Kullanıcı kurs dashboard'undayken "+Yeni Ders" butonuna tıkladığında</p>
+
+<div class="cards">
+  <!-- Option A: Inline in Dashboard -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#1a1a2e;border-radius:8px;padding:16px;font-family:monospace;font-size:11px;color:#e0e0e0;min-height:220px">
+        <div style="background:#16213e;padding:8px;border-radius:4px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+          <span style="color:#64b5f6">← CE 315 - Data Structures</span>
+          <span style="background:#4CAF50;color:white;padding:2px 8px;border-radius:12px;font-size:10px">+ Yeni Ders</span>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <span style="background:#2a2a4a;padding:4px 12px;border-radius:4px;color:#64b5f6;border-bottom:2px solid #64b5f6">Genel</span>
+          <span style="background:#2a2a4a;padding:4px 12px;border-radius:4px;color:#888">İlerleme</span>
+          <span style="background:#2a2a4a;padding:4px 12px;border-radius:4px;color:#888">Takvim</span>
+        </div>
+        <div style="background:#0d1b2a;border:2px dashed #4CAF50;border-radius:8px;padding:12px;margin-top:8px">
+          <div style="color:#4CAF50;font-weight:bold;margin-bottom:8px">📝 Yeni Ders - Adım 1/3</div>
+          <div style="background:#1a1a2e;padding:6px;border-radius:4px;margin-bottom:6px;color:#aaa">Ders Başlığı: <span style="color:white">Week 3 - Trees</span></div>
+          <div style="display:flex;gap:6px">
+            <div style="background:#1a2744;border:1px dashed #64b5f6;border-radius:4px;padding:8px;flex:1;text-align:center;color:#64b5f6;font-size:10px">📄 PDF Yükle<br/><span style="color:#aaa;font-size:9px">sürükle-bırak</span></div>
+            <div style="background:#1a2744;border:1px solid #333;border-radius:4px;padding:8px;flex:1;text-align:center;color:#888;font-size:10px">🎙️ Audio<br/><span style="font-size:9px">Adım 2'de</span></div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:8px">
+            <span style="color:#888;padding:4px 8px">İptal</span>
+            <span style="background:#4CAF50;color:white;padding:4px 12px;border-radius:4px">İleri →</span>
+          </div>
+        </div>
+        <div style="color:#666;font-size:9px;margin-top:8px">Hafta 1 - Intro ✓ &nbsp; Hafta 2 - Arrays ✓</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A) Dashboard İçi (Inline)</h3>
+      <p>Wizard doğrudan dashboard içinde açılır. Ders listesinin üstünde genişleyen bir panel. Sayfa değişmez, bağlam korunur.</p>
+    </div>
+  </div>
+
+  <!-- Option B: Full-page Wizard -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#1a1a2e;border-radius:8px;padding:16px;font-family:monospace;font-size:11px;color:#e0e0e0;min-height:220px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <span style="color:#64b5f6;font-size:10px">← CE 315'e Dön</span>
+        </div>
+        <div style="text-align:center;margin-bottom:12px">
+          <div style="color:white;font-size:14px;font-weight:bold">Yeni Ders Ekle</div>
+          <div style="color:#888;font-size:10px">CE 315 - Data Structures</div>
+        </div>
+        <!-- Stepper -->
+        <div style="display:flex;justify-content:center;gap:4px;margin-bottom:16px">
+          <div style="width:28px;height:28px;border-radius:50%;background:#4CAF50;color:white;display:flex;align-items:center;justify-content:center;font-size:10px">1</div>
+          <div style="width:40px;height:2px;background:#333;align-self:center"></div>
+          <div style="width:28px;height:28px;border-radius:50%;background:#333;color:#888;display:flex;align-items:center;justify-content:center;font-size:10px">2</div>
+          <div style="width:40px;height:2px;background:#333;align-self:center"></div>
+          <div style="width:28px;height:28px;border-radius:50%;background:#333;color:#888;display:flex;align-items:center;justify-content:center;font-size:10px">3</div>
+        </div>
+        <div style="background:#0d1b2a;border-radius:8px;padding:16px;max-width:320px;margin:0 auto">
+          <div style="color:#4CAF50;font-size:12px;margin-bottom:8px;font-weight:bold">Adım 1: Ders Bilgileri</div>
+          <div style="background:#1a1a2e;padding:8px;border-radius:4px;margin-bottom:8px;color:#aaa">Ders Başlığı</div>
+          <div style="background:#1a1a2e;padding:8px;border-radius:4px;margin-bottom:8px;color:#aaa">Hafta Numarası (opsiyonel)</div>
+          <div style="display:flex;justify-content:flex-end;margin-top:12px">
+            <span style="background:#4CAF50;color:white;padding:6px 16px;border-radius:4px">İleri →</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B) Tam Sayfa Wizard</h3>
+      <p>Wizard ayrı bir tam sayfa olarak açılır. Stepper ile adımlar net görünür. Daha geniş alan, daha az dikkat dağılması. Odaklanmış deneyim.</p>
+    </div>
+  </div>
+
+  <!-- Option C: Modal Wizard -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#1a1a2e;border-radius:8px;padding:16px;font-family:monospace;font-size:11px;color:#e0e0e0;min-height:220px;position:relative">
+        <!-- Background (dimmed) -->
+        <div style="opacity:0.3">
+          <div style="background:#16213e;padding:8px;border-radius:4px;margin-bottom:8px">CE 315 - Data Structures</div>
+          <div style="background:#2a2a4a;padding:4px 8px;border-radius:4px;margin-bottom:4px;color:#888">Hafta 1 - Intro</div>
+          <div style="background:#2a2a4a;padding:4px 8px;border-radius:4px;margin-bottom:4px;color:#888">Hafta 2 - Arrays</div>
+        </div>
+        <!-- Modal overlay -->
+        <div style="position:absolute;top:30px;left:20px;right:20px;background:#16213e;border:1px solid #4CAF50;border-radius:12px;padding:16px;box-shadow:0 8px 32px rgba(0,0,0,0.5)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span style="color:white;font-weight:bold">Yeni Ders</span>
+            <span style="color:#888">✕</span>
+          </div>
+          <div style="display:flex;gap:4px;margin-bottom:8px">
+            <span style="background:#4CAF50;color:white;padding:2px 6px;border-radius:8px;font-size:9px">1.Bilgi</span>
+            <span style="background:#333;color:#888;padding:2px 6px;border-radius:8px;font-size:9px">2.Slayt</span>
+            <span style="background:#333;color:#888;padding:2px 6px;border-radius:8px;font-size:9px">3.Audio</span>
+          </div>
+          <div style="background:#0d1b2a;padding:6px;border-radius:4px;margin-bottom:6px;color:#aaa;font-size:10px">Ders başlığı...</div>
+          <div style="text-align:right;margin-top:8px">
+            <span style="background:#4CAF50;color:white;padding:3px 10px;border-radius:4px;font-size:10px">İleri →</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C) Modal Wizard</h3>
+      <p>Dashboard üstünde büyük modal açılır. Arka plan koyulaşır. Stepper modal içinde. Dashboard bağlamı arka planda görünür kalır.</p>
+    </div>
+  </div>
+</div>

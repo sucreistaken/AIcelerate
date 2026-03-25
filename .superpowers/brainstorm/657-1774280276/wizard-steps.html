@@ -1,0 +1,124 @@
+<h2>Wizard Adımları — Hangi akış?</h2>
+<p class="subtitle">Kullanıcı kurs içinden "+Yeni Ders" dediğinde hangi adımlardan geçsin?</p>
+
+<div class="cards">
+  <!-- Option A: 3 Steps -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#1a1a2e;border-radius:8px;padding:20px;font-family:monospace;font-size:11px;color:#e0e0e0;min-height:280px">
+        <div style="text-align:center;color:white;font-size:13px;margin-bottom:16px;font-weight:bold">3 Adım — Hızlı</div>
+
+        <!-- Step 1 -->
+        <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:16px">
+          <div style="min-width:36px;height:36px;border-radius:50%;background:#4CAF50;color:white;display:flex;align-items:center;justify-content:center;font-weight:bold">1</div>
+          <div style="flex:1">
+            <div style="color:#4CAF50;font-weight:bold;margin-bottom:4px">Ders Bilgileri</div>
+            <div style="background:#0d1b2a;border-radius:6px;padding:8px">
+              <div style="color:#aaa;margin-bottom:4px">📝 Başlık: <span style="color:white">Week 3 - Trees</span></div>
+              <div style="color:#aaa;font-size:10px">📅 Tarih: otomatik &nbsp; 🔢 Hafta: otomatik</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:16px">
+          <div style="min-width:36px;height:36px;border-radius:50%;background:#2196F3;color:white;display:flex;align-items:center;justify-content:center;font-weight:bold">2</div>
+          <div style="flex:1">
+            <div style="color:#2196F3;font-weight:bold;margin-bottom:4px">Materyaller</div>
+            <div style="background:#0d1b2a;border-radius:6px;padding:8px">
+              <div style="display:flex;gap:6px">
+                <div style="border:1px dashed #2196F3;border-radius:4px;padding:6px;flex:1;text-align:center;font-size:10px">
+                  📄 PDF Slayt<br/><span style="color:#2196F3">sürükle veya seç</span>
+                </div>
+                <div style="border:1px dashed #FF9800;border-radius:4px;padding:6px;flex:1;text-align:center;font-size:10px">
+                  🎙️ Audio<br/><span style="color:#FF9800">sürükle veya seç</span>
+                </div>
+              </div>
+              <div style="color:#666;font-size:9px;margin-top:4px;text-align:center">veya text olarak yapıştır</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div style="display:flex;align-items:flex-start;gap:12px">
+          <div style="min-width:36px;height:36px;border-radius:50%;background:#9C27B0;color:white;display:flex;align-items:center;justify-content:center;font-weight:bold">3</div>
+          <div style="flex:1">
+            <div style="color:#9C27B0;font-weight:bold;margin-bottom:4px">Analiz & Oluştur</div>
+            <div style="background:#0d1b2a;border-radius:6px;padding:8px">
+              <div style="color:#aaa;font-size:10px">✨ AI plan, quiz, flashcard, mindmap üretecek</div>
+              <div style="background:#333;border-radius:4px;height:6px;margin-top:4px"><div style="background:linear-gradient(90deg,#4CAF50,#2196F3,#9C27B0);width:60%;height:100%;border-radius:4px"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A) 3 Adım — Hızlı Akış</h3>
+      <p><strong>1.</strong> Başlık gir → <strong>2.</strong> PDF + Audio yükle (tek sayfada) → <strong>3.</strong> AI analiz et. Minimum sürtünme, deneyimli kullanıcılar için ideal.</p>
+    </div>
+  </div>
+
+  <!-- Option B: 4 Steps -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#1a1a2e;border-radius:8px;padding:20px;font-family:monospace;font-size:11px;color:#e0e0e0;min-height:280px">
+        <div style="text-align:center;color:white;font-size:13px;margin-bottom:16px;font-weight:bold">4 Adım — Ayrıntılı</div>
+
+        <!-- Step 1 -->
+        <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px">
+          <div style="min-width:32px;height:32px;border-radius:50%;background:#4CAF50;color:white;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px">1</div>
+          <div style="flex:1">
+            <div style="color:#4CAF50;font-weight:bold;font-size:11px">Ders Bilgileri</div>
+            <div style="color:#aaa;font-size:10px">Başlık, hafta no (opsiyonel)</div>
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px">
+          <div style="min-width:32px;height:32px;border-radius:50%;background:#2196F3;color:white;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px">2</div>
+          <div style="flex:1">
+            <div style="color:#2196F3;font-weight:bold;font-size:11px">Slaytlar</div>
+            <div style="background:#0d1b2a;border-radius:4px;padding:6px;margin-top:4px">
+              <div style="border:1px dashed #2196F3;border-radius:4px;padding:8px;text-align:center;font-size:10px">
+                📄 PDF yükle veya yapıştır<br/>
+                <span style="color:#2196F3">Sürükle-bırak destekli</span>
+              </div>
+              <div style="color:#666;font-size:9px;margin-top:4px">💡 Slayt yüklenmezse audio'dan plan oluşturulur</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px">
+          <div style="min-width:32px;height:32px;border-radius:50%;background:#FF9800;color:white;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px">3</div>
+          <div style="flex:1">
+            <div style="color:#FF9800;font-weight:bold;font-size:11px">Ders Kaydı</div>
+            <div style="background:#0d1b2a;border-radius:4px;padding:6px;margin-top:4px">
+              <div style="border:1px dashed #FF9800;border-radius:4px;padding:8px;text-align:center;font-size:10px">
+                🎙️ Audio yükle veya yapıştır<br/>
+                <span style="color:#FF9800">Transkripsiyon otomatik</span>
+              </div>
+              <div style="color:#666;font-size:9px;margin-top:4px">⏱️ Transkripsiyon ilerleme çubuğu gösterilir</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <div style="min-width:32px;height:32px;border-radius:50%;background:#9C27B0;color:white;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px">4</div>
+          <div style="flex:1">
+            <div style="color:#9C27B0;font-weight:bold;font-size:11px">Özet & Analiz</div>
+            <div style="background:#0d1b2a;border-radius:4px;padding:6px;margin-top:4px">
+              <div style="color:#aaa;font-size:10px">📋 Yüklenen materyallerin özeti</div>
+              <div style="color:#aaa;font-size:10px">✨ "Analiz Et" butonu → AI işleme</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B) 4 Adım — Yönlendirmeli</h3>
+      <p><strong>1.</strong> Başlık → <strong>2.</strong> Slayt yükle → <strong>3.</strong> Audio yükle → <strong>4.</strong> Özet & analiz. Her adımda ipuçları ve açıklamalar. İlk kez kullananlar için ideal.</p>
+    </div>
+  </div>
+</div>
