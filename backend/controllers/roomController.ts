@@ -1,217 +1,156 @@
-// controllers/roomController.ts
-import path from "path";
-import { readJSON, writeJSON, ensureDataFiles } from "../utils/file-Handler";
+import { Request, Response, NextFunction } from "express";
+import { roomService, getRoomTemplates } from "../services/roomService";
 
-// ====== Types ======
+export const roomController = {
+  async create(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { name, description, ownerId, iconColor, tags, university, isPublic, templateId } = req.body;
+      const room = await roomService.create(name, description, ownerId, iconColor, {
+        tags, university, isPublic, templateId,
+      });
+      res.status(201).json(room);
+    } catch (err) { next(err); }
+  },
 
-export interface StudyUser {
-  id: string;
-  nickname: string;
-  avatar: string;
-  joinedAt: string;
-}
+  async createSolo(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { name, ownerId, topic, templateId, tags } = req.body;
+      const room = await roomService.createSolo(name, ownerId, { topic, templateId, tags });
+      res.status(201).json(room);
+    } catch (err) { next(err); }
+  },
 
-export interface RoomMember {
-  userId: string;
-  nickname: string;
-  avatar: string;
-  joinedAt: string;
-  lastSeenAt: string;
-  contributionCount: number;
-}
+  async discover(req: Request, res: Response, next: NextFunction) {
+    try {
+      const search = req.query.search as string | undefined;
+      const tag = req.query.tag as string | undefined;
+      const tags = tag ? tag.split(",").map((t) => t.trim()).filter(Boolean) : undefined;
+      const rooms = await roomService.discoverServers(search, tags);
+      res.json(rooms);
+    } catch (err) { next(err); }
+  },
 
-export interface RoomSettings {
-  maxParticipants: number;
-  allowChat: boolean;
-  lessonId?: string;
-  courseCode?: string;
-}
+  getTemplates(_req: Request, res: Response) {
+    res.json(getRoomTemplates());
+  },
 
-export interface Room {
-  id: string;
-  name: string;
-  code: string;
-  hostId: string;
-  settings: RoomSettings;
-  participants: StudyUser[];
-  members: RoomMember[];
-  lessonId: string;
-  lessonTitle: string;
-  activity: any | null;
-  createdAt: string;
-  // No expiresAt - rooms are permanent
-}
+  async get(req: Request, res: Response, next: NextFunction) {
+    try {
+      const room = await roomService.getById(req.params.id);
+      res.json(room);
+    } catch (err) { next(err); }
+  },
 
-// ====== Paths ======
+  async getByInviteCode(req: Request, res: Response, next: NextFunction) {
+    try {
+      const room = await roomService.getByInviteCode(req.params.code);
+      res.json(room);
+    } catch (err) { next(err); }
+  },
 
-const DATA_DIR = path.join(process.cwd(), "backend", "data");
-const ROOMS_PATH = path.join(DATA_DIR, "rooms.json");
+  async getUserRooms(req: Request, res: Response, next: NextFunction) {
+    try {
+      const rooms = await roomService.getUserServers(req.params.userId);
+      res.json(rooms);
+    } catch (err) { next(err); }
+  },
 
-ensureDataFiles([{ path: ROOMS_PATH, initial: [] }]);
+  async update(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { userId, ...updates } = req.body;
+      const room = await roomService.update(req.params.id, userId, updates);
+      res.json(room);
+    } catch (err) { next(err); }
+  },
 
-// ====== Helpers ======
+  async updateTopic(req: Request, res: Response, next: NextFunction) {
+    try {
+      const room = await roomService.updateTopic(req.params.id, req.body.userId, req.body.topic);
+      res.json(room);
+    } catch (err) { next(err); }
+  },
 
-function loadRooms(): Room[] {
-  return readJSON<Room[]>(ROOMS_PATH) || [];
-}
+  async join(req: Request, res: Response, next: NextFunction) {
+    try {
+      const room = await roomService.join(req.params.id, req.body.userId);
+      res.json(room);
+    } catch (err) { next(err); }
+  },
 
-function saveRooms(data: Room[]) {
-  writeJSON(ROOMS_PATH, data);
-}
+  async joinByInvite(req: Request, res: Response, next: NextFunction) {
+    try {
+      const room = await roomService.joinByInvite(req.body.inviteCode, req.body.userId);
+      res.json(room);
+    } catch (err) { next(err); }
+  },
 
-/** Generate a 6-char alphanumeric room code like "MATH42" */
-function generateCode(): string {
-  const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-  const digits = "0123456789";
-  let code = "";
-  for (let i = 0; i < 4; i++) code += letters[Math.floor(Math.random() * letters.length)];
-  for (let i = 0; i < 2; i++) code += digits[Math.floor(Math.random() * digits.length)];
-  return code;
-}
+  async leave(req: Request, res: Response, next: NextFunction) {
+    try {
+      await roomService.leave(req.params.id, req.body.userId);
+      res.json({ success: true });
+    } catch (err) { next(err); }
+  },
 
-import { generateId as _genId } from "../utils/idGenerator";
-const generateId = () => _genId("room");
+  async kick(req: Request, res: Response, next: NextFunction) {
+    try {
+      await roomService.kick(req.params.id, req.body.requesterId, req.body.targetId);
+      res.json({ success: true });
+    } catch (err) { next(err); }
+  },
 
-// ====== CRUD ======
+  async delete(req: Request, res: Response, next: NextFunction) {
+    try {
+      await roomService.delete(req.params.id, req.body.userId);
+      res.json({ success: true });
+    } catch (err) { next(err); }
+  },
 
-export function createRoom(
-  name: string,
-  hostId: string,
-  settings: Partial<RoomSettings> = {},
-  lessonId: string = "",
-  lessonTitle: string = ""
-): Room {
-  let rooms = loadRooms();
+  async archive(req: Request, res: Response, next: NextFunction) {
+    try {
+      const room = await roomService.archive(req.params.id, req.body.userId);
+      res.json(room);
+    } catch (err) { next(err); }
+  },
 
-  // Ensure unique code
-  let code = generateCode();
-  while (rooms.some((r) => r.code === code)) {
-    code = generateCode();
-  }
+  async unarchive(req: Request, res: Response, next: NextFunction) {
+    try {
+      const room = await roomService.unarchive(req.params.id, req.body.userId);
+      res.json(room);
+    } catch (err) { next(err); }
+  },
 
-  const room: Room = {
-    id: generateId(),
-    name,
-    code,
-    hostId,
-    settings: {
-      maxParticipants: settings.maxParticipants ?? 10,
-      allowChat: settings.allowChat ?? true,
-      lessonId: lessonId || settings.lessonId,
-      courseCode: settings.courseCode,
-    },
-    participants: [],
-    members: [],
-    lessonId: lessonId || settings.lessonId || "",
-    lessonTitle: lessonTitle || "",
-    activity: null,
-    createdAt: new Date().toISOString(),
-  };
+  async transferOwnership(req: Request, res: Response, next: NextFunction) {
+    try {
+      const room = await roomService.transferOwnership(req.params.id, req.body.currentOwnerId, req.body.newOwnerId);
+      res.json(room);
+    } catch (err) { next(err); }
+  },
 
-  rooms.unshift(room);
-  saveRooms(rooms);
-  return room;
-}
+  async setMaterial(req: Request, res: Response, next: NextFunction) {
+    try {
+      const room = await roomService.setMaterial(req.params.id, req.body.userId, req.body.materialId);
+      res.json(room);
+    } catch (err) { next(err); }
+  },
 
-export function getRoom(id: string): Room | null {
-  const rooms = loadRooms();
-  return rooms.find((r) => r.id === id) || null;
-}
+  async addCategory(req: Request, res: Response, next: NextFunction) {
+    try {
+      const room = await roomService.addCategory(req.params.id, req.body.userId, req.body.name);
+      res.json(room);
+    } catch (err) { next(err); }
+  },
 
-export function getRoomByCode(code: string): Room | null {
-  const rooms = loadRooms();
-  return rooms.find((r) => r.code === code.toUpperCase()) || null;
-}
+  async regenerateInvite(req: Request, res: Response, next: NextFunction) {
+    try {
+      const code = await roomService.regenerateInvite(req.params.id, req.body.userId);
+      res.json({ inviteCode: code });
+    } catch (err) { next(err); }
+  },
 
-export function joinRoom(roomId: string, user: StudyUser): Room | null {
-  const rooms = loadRooms();
-  const room = rooms.find((r) => r.id === roomId);
-  if (!room) return null;
-
-  // Don't add duplicate participants
-  if (!room.participants.some((p) => p.id === user.id)) {
-    if (room.participants.length >= room.settings.maxParticipants) return null;
-    room.participants.push(user);
-  }
-
-  // Track as member (all-time)
-  const existingMember = room.members.find((m) => m.userId === user.id);
-  if (existingMember) {
-    existingMember.lastSeenAt = new Date().toISOString();
-    existingMember.nickname = user.nickname;
-    existingMember.avatar = user.avatar;
-  } else {
-    room.members.push({
-      userId: user.id,
-      nickname: user.nickname,
-      avatar: user.avatar,
-      joinedAt: new Date().toISOString(),
-      lastSeenAt: new Date().toISOString(),
-      contributionCount: 0,
-    });
-  }
-
-  saveRooms(rooms);
-  return room;
-}
-
-export function leaveRoom(roomId: string, userId: string): Room | null {
-  const rooms = loadRooms();
-  const room = rooms.find((r) => r.id === roomId);
-  if (!room) return null;
-
-  room.participants = room.participants.filter((p) => p.id !== userId);
-
-  // Update member lastSeenAt
-  const member = room.members.find((m) => m.userId === userId);
-  if (member) {
-    member.lastSeenAt = new Date().toISOString();
-  }
-
-  saveRooms(rooms);
-  return room;
-}
-
-export function updateRoomActivity(roomId: string, activity: any | null): Room | null {
-  const rooms = loadRooms();
-  const room = rooms.find((r) => r.id === roomId);
-  if (!room) return null;
-
-  room.activity = activity;
-  saveRooms(rooms);
-  return room;
-}
-
-export function incrementMemberContribution(roomId: string, userId: string): void {
-  const rooms = loadRooms();
-  const room = rooms.find((r) => r.id === roomId);
-  if (!room) return;
-
-  const member = room.members.find((m) => m.userId === userId);
-  if (member) {
-    member.contributionCount++;
-    saveRooms(rooms);
-  }
-}
-
-export function listActiveRooms(): Room[] {
-  return loadRooms();
-}
-
-export function getRoomsByUserId(userId: string): Room[] {
-  const rooms = loadRooms();
-  return rooms.filter((r) => r.members.some((m) => m.userId === userId));
-}
-
-export function deleteRoom(roomId: string, requesterId?: string): boolean {
-  const rooms = loadRooms();
-  const idx = rooms.findIndex((r) => r.id === roomId);
-  if (idx < 0) return false;
-
-  // If requesterId provided, only host can delete
-  if (requesterId && rooms[idx].hostId !== requesterId) return false;
-
-  rooms.splice(idx, 1);
-  saveRooms(rooms);
-  return true;
-}
+  async getMembers(req: Request, res: Response, next: NextFunction) {
+    try {
+      const members = await roomService.getMemberProfiles(req.params.id);
+      res.json(members);
+    } catch (err) { next(err); }
+  },
+};

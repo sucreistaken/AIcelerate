@@ -11,10 +11,14 @@ export class BaseRepository<T extends { id: string }> {
   }
 
   private ensureFile(): void {
-    const dir = path.dirname(this.filePath);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    if (!fs.existsSync(this.filePath)) {
-      fs.writeFileSync(this.filePath, JSON.stringify(this.defaultData, null, 2), "utf-8");
+    try {
+      const dir = path.dirname(this.filePath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      if (!fs.existsSync(this.filePath)) {
+        fs.writeFileSync(this.filePath, JSON.stringify(this.defaultData, null, 2), "utf-8");
+      }
+    } catch (err) {
+      console.error(`[BaseRepository] Failed to ensure file ${this.filePath}:`, err);
     }
   }
 
@@ -38,7 +42,8 @@ export class BaseRepository<T extends { id: string }> {
       if (!fs.existsSync(this.filePath)) return [];
       const data = fs.readFileSync(this.filePath, "utf-8");
       return JSON.parse(data) as T[];
-    } catch {
+    } catch (err) {
+      console.error(`[BaseRepository] Failed to read ${this.filePath}:`, err);
       return [];
     }
   }

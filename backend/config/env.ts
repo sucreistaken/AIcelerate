@@ -1,4 +1,5 @@
 import { logger } from "../utils/logger";
+
 function requireEnv(name: string): string {
   const val = process.env[name];
   if (!val) {
@@ -14,4 +15,7 @@ export const env = {
   JWT_SECRET: process.env.JWT_SECRET || "dev-secret-change-in-production",
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || "7d",
   PORT: Number(process.env.PORT || 4000),
+  FRONTEND_URL: process.env.FRONTEND_URL || "http://localhost:5173",
+  PYTHON_BIN: process.env.PYTHON_BIN || "python",
+  NODE_ENV: process.env.NODE_ENV || "development",
 };

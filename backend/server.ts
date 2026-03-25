@@ -6,25 +6,18 @@ import cors from "cors";
 import http from "http";
 import { Server as SocketServer } from "socket.io";
 
+import { env } from "./config/env";
 import routes from "./routes/index";
-// DISABLED: import { setupSocketHandler } from "./socketHandler";
-import { setupCollabNamespace } from "./socketHandler-v2";
+
+import { setupCollabNamespace } from "./socketHandler";
 import { errorHandler } from "./middleware/errorHandler";
 import { startJobProcessor } from "./queues/jobProcessor";
 import { connectDB } from "./config/database";
-
-// ---- ENV check
-const API_KEY = process.env.GEMINI_API_KEY;
-if (!API_KEY) {
-  console.error("GEMINI_API_KEY is missing. Please add it to backend/.env.");
-  process.exit(1);
-}
+import { migrateOrphanLessons } from "./controllers/courseController";
 
 // ---- Express app
 const app = express();
-const ALLOWED_ORIGINS = (process.env.FRONTEND_URL || "http://localhost:5173")
-  .split(",")
-  .map((o) => o.trim());
+const ALLOWED_ORIGINS = env.FRONTEND_URL.split(",").map((o) => o.trim());
 app.use(
   cors({
     origin: (origin, cb) => {
@@ -43,7 +36,6 @@ app.use(routes);
 app.use(errorHandler);
 
 // ---- HTTP server + Socket.IO
-const PORT = Number(process.env.PORT || 4000);
 const httpServer = http.createServer(app);
 const io = new SocketServer(httpServer, {
   cors: { origin: ALLOWED_ORIGINS, credentials: true },
@@ -51,20 +43,54 @@ const io = new SocketServer(httpServer, {
 
 app.set("io", io);
 
-// DISABLED: Socket.IO legacy rooms (v1)
-// setupSocketHandler(io);
-
-// ---- Socket.IO V2: /collab namespace
-setupCollabNamespace(io);
+// ---- Socket.IO: /collab namespace
+try {
+  setupCollabNamespace(io);
+} catch (err) {
+  console.error("Failed to setup collab namespace:", err);
+}
 
 // ---- Start job processor
-startJobProcessor();
+try {
+  startJobProcessor();
+} catch (err) {
+  console.error("Failed to start job processor:", err);
+}
+
+// ---- Run orphan lesson migration
+try {
+  migrateOrphanLessons();
+} catch (err) {
+  console.error("Failed to migrate orphan lessons:", err);
+}
 
 // ---- Connect to MongoDB (optional) then start server
-connectDB().finally(() => {
-  httpServer.listen(PORT, "0.0.0.0", () => {
-    console.log(`Backend running at http://localhost:${PORT}`);
+connectDB()
+  .catch((err) => console.warn("MongoDB connection failed (continuing without DB):", err.message))
+  .finally(() => {
+    httpServer.listen(env.PORT, "0.0.0.0", () => {
+      console.log(`Backend running at http://localhost:${env.PORT}`);
+    });
   });
+
+// ---- HTTP server error handler
+httpServer.on("error", (err: NodeJS.ErrnoException) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(`Port ${env.PORT} is already in use. Kill the other process or change PORT in .env`);
+  } else {
+    console.error("HTTP server error:", err);
+  }
+  process.exit(1);
+});
+
+// ---- Global error handlers
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled Rejection:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err);
+  process.exit(1);
 });
 
 // ---- Graceful shutdown

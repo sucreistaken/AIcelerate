@@ -1,5 +1,8 @@
+import { logger } from "../utils/logger";
 import { getModel, stripCodeFences, tryParseJSON } from "./aiService";
 import { LoLink, LoAlignedSegment, LoAlignment } from "../types";
+import { getLesson, upsertLesson } from "../controllers/lessonControllers";
+import { notFound, badRequest, AppError } from "../middleware/errorHandler";
 
 export function buildCondensedContext(lesson: any): { lecContext: string; sldContext: string } {
   const plan = lesson.plan;
@@ -177,6 +180,41 @@ ${SLD || "—"}
     index: seg.index, text: seg.text, lo_links: linksByIndex.get(seg.index) || [],
   }));
   return { segments };
+}
+
+export async function generateLoModules(
+  lessonId: string,
+  forceRegen: boolean = false
+): Promise<{ modules: any[]; cached: boolean }> {
+  const lesson = getLesson(lessonId);
+  if (!lesson) throw notFound("Lesson not found");
+
+  if (!forceRegen && lesson.loModules?.modules?.length) {
+    return { modules: lesson.loModules.modules, cached: true };
+  }
+  if (!lesson.transcript || !lesson.learningOutcomes?.length) {
+    throw badRequest("Transcript and Learning Outcomes are required.");
+  }
+
+  const prompt = buildLoModulesPrompt({
+    transcript: lesson.transcript, slideText: lesson.slideText || "",
+    learningOutcomes: lesson.learningOutcomes!, loAlignment: lesson.loAlignment, plan: lesson.plan,
+  });
+  const result = await getModel().generateContent({
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    generationConfig: { maxOutputTokens: 6000 },
+  });
+  const raw = result.response.text() || "";
+  const cleaned = stripCodeFences(raw);
+  const j = tryParseJSON(cleaned);
+  if (!j?.modules || !Array.isArray(j.modules)) {
+    throw new AppError(500, "LO modules JSON/schema error", "LLM_PARSE_ERROR");
+  }
+
+  const loModules = { lessonId, modules: j.modules };
+  upsertLesson({ id: lessonId, loModules });
+  logger.info(`[AI] LO_MODULES | lessonId=${lessonId}`);
+  return { modules: loModules.modules, cached: false };
 }
 
 export async function generateAlignmentOnly(lectureText: string, slidesText: string) {

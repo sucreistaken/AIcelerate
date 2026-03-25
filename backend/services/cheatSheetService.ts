@@ -1,6 +1,14 @@
+import { logger } from "../utils/logger";
+import { getModel, stripCodeFences, tryParseJSON } from "./aiService";
+import { getLesson, upsertLesson } from "../controllers/lessonControllers";
+import { assembleCourseContext } from "../controllers/contextAssembler";
+import { buildCondensedContext } from "./loModuleService";
+import { notFound, badRequest, AppError } from "../middleware/errorHandler";
+import type { PlanEmphasis, CheatSheet } from "../types";
+
 export function buildCheatSheetPrompt(input: {
   title: string; transcript: string; slideText: string;
-  learningOutcomes?: string[]; emphases?: any[]; language?: 'tr' | 'en';
+  learningOutcomes?: string[]; emphases?: PlanEmphasis[]; language?: 'tr' | 'en';
 }): string {
   const LEC = (input.transcript || "").slice(0, 18000);
   const SLD = (input.slideText || "").slice(0, 12000);
@@ -57,4 +65,57 @@ ${LEC}
 [SLIDES]
 ${SLD}
 `.trim();
+}
+
+export async function generateCheatSheet(
+  lessonId: string,
+  language: 'tr' | 'en' = 'tr',
+  courseWide: boolean = false,
+  forceRegen: boolean = false
+): Promise<{ cheatSheet: CheatSheet; cached: boolean }> {
+  const lesson = getLesson(lessonId);
+  if (!lesson) throw notFound("Lesson not found");
+
+  if (!forceRegen && !courseWide && lesson.cheatSheet?.sections?.length && lesson.cheatSheet.language === language) {
+    return { cheatSheet: lesson.cheatSheet, cached: true };
+  }
+
+  const title = lesson.title || "Lesson";
+  if (!lesson.transcript?.trim() && !lesson.slideText) {
+    throw badRequest("Transcript or slideText is required.");
+  }
+
+  const courseCtx = assembleCourseContext(lessonId, "cheat-sheet");
+  const { lecContext, sldContext } = buildCondensedContext(lesson);
+  let enrichedLecContext = lecContext;
+  if (courseCtx.crossLessonBlock) enrichedLecContext += `\n\n--- Related Lessons ---\n${courseCtx.crossLessonBlock}`;
+
+  const prompt = buildCheatSheetPrompt({
+    title: courseCtx.courseName ? `${courseCtx.courseName} - ${title}` : title,
+    transcript: enrichedLecContext, slideText: sldContext,
+    learningOutcomes: lesson.learningOutcomes || [],
+    emphases: lesson.plan?.emphases || lesson.professorEmphases || [], language,
+  });
+
+  const result = await getModel().generateContent({
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    generationConfig: { maxOutputTokens: 3000 },
+  });
+  const raw = (result.response.text() || "").trim();
+  const cleaned = stripCodeFences(raw);
+  const j = tryParseJSON(cleaned);
+  if (!j?.sections || !Array.isArray(j.sections)) {
+    throw new AppError(500, "Cheat sheet JSON/schema error", "LLM_PARSE_ERROR");
+  }
+
+  const cheatSheet = {
+    title: j.title || title, updatedAt: new Date().toISOString(),
+    sections: j.sections, formulas: Array.isArray(j.formulas) ? j.formulas : [],
+    pitfalls: Array.isArray(j.pitfalls) ? j.pitfalls : [],
+    quickQuiz: Array.isArray(j.quickQuiz) ? j.quickQuiz : [], language,
+  };
+
+  upsertLesson({ id: lessonId, cheatSheet });
+  logger.info(`[AI] CHEAT_SHEET | lessonId=${lessonId} | lang=${language}`);
+  return { cheatSheet, cached: false };
 }

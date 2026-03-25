@@ -1,9 +1,13 @@
 // controllers/courseController.ts
 import path from "path";
-import { readJSON, writeJSON, ensureDataFiles } from "../utils/file-Handler";
+import { ensureDataFiles } from "../utils/file-Handler";
+import { courseRepo } from "../repositories/courseRepo";
 import { listLessons, getLesson } from "./lessonControllers";
+import type { Lesson } from "./lessonControllers";
+import type { PlanEmphasis } from "../types";
 import { getConnections } from "./connectionsController";
 import { getFlashcards, getDueCards } from "./flashcardController";
+import type { Flashcard } from "./flashcardController";
 import { getGlobalWeaknessSummary, getWeaknessForLesson } from "./weaknessController";
 
 // ---- Types ----
@@ -64,11 +68,11 @@ ensureDataFiles([{ path: COURSES_PATH, initial: [] }]);
 
 // ---- Helpers ----
 function loadCourses(): Course[] {
-  return readJSON<Course[]>(COURSES_PATH) || [];
+  return courseRepo.findAllSync();
 }
 
 function saveCourses(courses: Course[]) {
-  writeJSON(COURSES_PATH, courses);
+  courseRepo.saveAllSync(courses);
 }
 
 // ---- CRUD ----
@@ -146,12 +150,12 @@ export function removeLessonFromCourse(courseId: string, lessonId: string): Cour
   return courses[idx];
 }
 
-export function getCourseLessons(courseId: string): any[] {
+export function getCourseLessons(courseId: string): Lesson[] {
   const course = getCourse(courseId);
   if (!course) return [];
   return course.lessonIds
     .map((id) => getLesson(id))
-    .filter(Boolean);
+    .filter((l): l is Lesson => l !== null);
 }
 
 export function getCourseForLesson(lessonId: string): Course | null {
@@ -166,12 +170,12 @@ export function rebuildKnowledgeIndex(courseId: string): CourseKnowledgeIndex | 
 
   const lessons = course.lessonIds
     .map((id) => getLesson(id))
-    .filter(Boolean) as any[];
+    .filter((l): l is Lesson => l !== null);
 
   // 1. Build lesson digests
   const lessonDigests = lessons.map((lesson, i) => {
     const plan = lesson.plan || {};
-    const emphases = lesson.professorEmphases || plan.emphases || [];
+    const emphases: PlanEmphasis[] = lesson.professorEmphases || plan.emphases || [];
 
     // Extract LO coverage from loAlignment
     const coveredLOIds: string[] = [];
@@ -190,7 +194,7 @@ export function rebuildKnowledgeIndex(courseId: string): CourseKnowledgeIndex | 
       title: lesson.title || "Untitled",
       weekNumber: i + 1,
       keyTopics: (plan.key_concepts || []).slice(0, 5),
-      emphasisHighlights: emphases.slice(0, 3).map((e: any) => e.statement || String(e)),
+      emphasisHighlights: emphases.slice(0, 3).map((e: PlanEmphasis) => e.statement || String(e)),
       coveredLOIds,
     };
   });
@@ -286,7 +290,7 @@ export function rebuildKnowledgeIndex(courseId: string): CourseKnowledgeIndex | 
   // Count due flashcards for course lessons
   const dueCards = getDueCards();
   const courseLessonIds = new Set(course.lessonIds);
-  const flashcardsDue = dueCards.filter((c: any) => courseLessonIds.has(c.lessonId)).length;
+  const flashcardsDue = dueCards.filter(c => courseLessonIds.has(c.lessonId)).length;
 
   const completedLessons = lessons.filter((l) => l.plan && l.transcript).length;
 
@@ -326,22 +330,22 @@ export function getCourseProgress(courseId: string) {
 
   const lessons = course.lessonIds
     .map((id) => getLesson(id))
-    .filter(Boolean) as any[];
+    .filter((l): l is Lesson => l !== null);
 
   const lessonStatuses = lessons.map((lesson) => {
     const packs = lesson.quizPacks || [];
     const quizScores = packs
-      .filter((p: any) => typeof p.lastScore === 'number')
-      .map((p: any) => p.lastScore);
+      .filter(p => typeof p.lastScore === 'number')
+      .map(p => p.lastScore as number);
 
     // Get flashcard stats for this lesson
     const allCards = getFlashcards(lesson.id);
     const fcStats = {
       total: allCards.length,
-      new: allCards.filter((c: any) => c.state === 'new').length,
-      learning: allCards.filter((c: any) => c.state === 'learning').length,
-      review: allCards.filter((c: any) => c.state === 'review').length,
-      graduated: allCards.filter((c: any) => c.state === 'graduated').length,
+      new: allCards.filter(c => c.state === 'new').length,
+      learning: allCards.filter(c => c.state === 'learning').length,
+      review: allCards.filter(c => c.state === 'review').length,
+      graduated: allCards.filter(c => c.state === 'graduated').length,
     };
 
     return {
@@ -368,7 +372,7 @@ export function getCourseProgress(courseId: string) {
     learning: allFcStats.reduce((a, s) => a + s.learning, 0),
     review: allFcStats.reduce((a, s) => a + s.review, 0),
     graduated: allFcStats.reduce((a, s) => a + s.graduated, 0),
-    due: getDueCards().filter((c: any) => course.lessonIds.includes(c.lessonId)).length,
+    due: getDueCards().filter(c => course.lessonIds.includes(c.lessonId)).length,
   };
 
   // Weak/strong topics from weakness data
@@ -408,7 +412,7 @@ export function exportCourseData(courseId: string) {
 
   const lessons = course.lessonIds
     .map((id) => getLesson(id))
-    .filter(Boolean) as any[];
+    .filter((l): l is Lesson => l !== null);
 
   const lessonExports = lessons.map((l) => ({
     id: l.id,
@@ -418,7 +422,7 @@ export function exportCourseData(courseId: string) {
   }));
 
   // All flashcards for course lessons
-  const allFlashcards: any[] = [];
+  const allFlashcards: Flashcard[] = [];
   for (const lid of course.lessonIds) {
     const cards = getFlashcards(lid);
     allFlashcards.push(...cards);
@@ -444,4 +448,50 @@ export function exportCourseData(courseId: string) {
     flashcards: allFlashcards,
     weakTopics,
   };
+}
+
+// ---- Orphan Lesson Migration ----
+const GENERAL_COURSE_CODE = "GENEL";
+
+export function migrateOrphanLessons(): void {
+  const courses = loadCourses();
+  const lessons = listLessons();
+
+  // Collect all lesson IDs that are already assigned to any course
+  const assignedIds = new Set<string>();
+  for (const c of courses) {
+    for (const lid of c.lessonIds) assignedIds.add(lid);
+  }
+
+  // Find orphan lessons (not assigned to any course)
+  const orphanIds = lessons.filter((l) => !assignedIds.has(l.id)).map((l) => l.id);
+  if (orphanIds.length === 0) return;
+
+  // Find or create "Genel" course
+  let general = courses.find((c) => c.code === GENERAL_COURSE_CODE);
+  if (!general) {
+    general = {
+      id: "course-general",
+      code: GENERAL_COURSE_CODE,
+      name: "Genel",
+      description: "Kursa atanmamış dersler",
+      lessonIds: [],
+      learningOutcomes: [],
+      settings: { language: "tr" },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    courses.push(general);
+  }
+
+  // Assign orphans to general course
+  for (const oid of orphanIds) {
+    if (!general.lessonIds.includes(oid)) {
+      general.lessonIds.push(oid);
+    }
+  }
+  general.updatedAt = new Date().toISOString();
+  saveCourses(courses);
+
+  console.log(`[Migration] ${orphanIds.length} orphan lesson(s) assigned to "${GENERAL_COURSE_CODE}" course.`);
 }

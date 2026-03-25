@@ -1,1062 +1,262 @@
-import { logger } from "../utils/logger";
 import { Router } from "express";
-import path from "path";
-import os from "os";
-import fs from "fs";
-import { spawn } from "child_process";
+import { asyncHandler } from "../utils/asyncHandler";
+import { validate } from "../middleware/validate";
 import {
-  listLessons,
-  getLesson,
-  upsertLesson,
-  updateProgress,
-  deleteLesson,
-  getMemory,
+  listLessons, getLesson, upsertLesson, updateProgress, deleteLesson, getMemory,
 } from "../controllers/lessonControllers";
+import { getCourseForLesson, removeLessonFromCourse, rebuildKnowledgeIndex } from "../controllers/courseController";
+import { assembleCourseContext } from "../controllers/contextAssembler";
+import { hasAlignment, generateAlignmentOnly, generateLoAlignmentForLesson, generateLoModules } from "../services/loModuleService";
+import { generateCheatSheet } from "../services/cheatSheetService";
+import { generateDigest } from "../services/lessonDigestService";
+import { analyzeDeviation } from "../services/deviationService";
+import { fetchIeuLearningOutcomes } from "../services/ieuService";
 import {
-  assembleCourseContext,
-} from "../controllers/contextAssembler";
+  generatePlan, generateQuizFromPlan, generateQuizAnswers,
+  evaluateQuizAnswer, evaluateQuizBatch,
+  buildChatContextForLesson, generateChatResponseStream, generateChatResponseSync,
+  generateMindmap, generateMindmapModule, generateMindmapNodeDetail,
+} from "../services/lessonAiService";
+import { notFound, badRequest } from "../middleware/errorHandler";
 import {
-  getCourseForLesson,
-  rebuildKnowledgeIndex,
-} from "../controllers/courseController";
-import { getModel, stripCodeFences, tryParseJSON } from "../services/aiService";
-import { SCHEMAS } from "../prompts/schemas";
-import { LoLink, LoAlignedSegment, LoAlignment } from "../types";
-import { buildCheatSheetPrompt } from "../services/cheatSheetService";
+  upsertLessonSchema, progressSchema, planFromTextSchema,
+  cheatSheetSchema, loAlignSchema, chatSchema,
+  mindmapModuleSchema, mindmapNodeDetailSchema,
+} from "../validators/lessonSchemas";
 import {
-  buildCondensedContext,
-  segmentTranscript,
-  hasAlignment,
-  buildLoModulesPrompt,
-  generateLoAlignmentForLesson,
-  generateAlignmentOnly,
-} from "../services/loModuleService";
-import { generateDigest, getDigestOrFallback } from "../services/lessonDigestService";
+  quizFromPlanSchema, quizAnswersSchema, quizEvalSchema, quizEvalBatchSchema,
+} from "../validators/quizSchemas";
+import type { PlanModule, AlignmentItem } from "../types";
 
 const router = Router();
 
-// Token usage logger
-function logAI(label: string, inputLen: number, outputLen: number, maxTokens: number) {
-  logger.info(`[AI] ${label} | ~${Math.ceil(inputLen / 4)} in, ~${Math.ceil(outputLen / 4)} out | max=${maxTokens}`);
-}
-
-// ---- IEU LO helpers ----
-function normalizeCourseCode(raw: string): string {
-  return raw.trim().toUpperCase().replace(/\s+/g, "+");
-}
-
-function cleanHtmlText(raw: string): string {
-  return raw.replace(/<br\s*\/?>/gi, " ").replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
-}
-
-function extractLearningOutcomes(html: string): string[] {
-  const out: string[] = [];
-  const idx = html.indexOf("Learning Outcomes");
-  if (idx === -1) return out;
-  const slice = html.slice(idx, idx + 8000);
-  const ulMatch = slice.match(/<ul[^>]*>([\s\S]*?)<\/ul>/i);
-  if (ulMatch) {
-    const liMatches = Array.from(ulMatch[1].matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi));
-    for (const m of liMatches) { const text = cleanHtmlText(m[1]); if (text) out.push(text); }
-  }
-  if (!out.length) {
-    const rowMatches = Array.from(slice.matchAll(/<tr[^>]*>[\s\S]*?<td[^>]*>\s*LO\d+\s*<\/td>[\s\S]*?<td[^>]*>([\s\S]*?)<\/td>/gi));
-    for (const rm of rowMatches) { const text = cleanHtmlText(rm[1]); if (text) out.push(text); }
-  }
-  return out;
-}
-
-declare const fetch: any;
-
-// =============== ROUTES ===============
-
 // ---- Lesson CRUD ----
 router.get("/lessons", (_req, res) => res.json(listLessons()));
+
 router.get("/lessons/:id", (req, res) => {
   const l = getLesson(req.params.id);
-  if (!l) return res.status(404).json({ error: "Not found" });
+  if (!l) throw notFound("Lesson not found");
   res.json(l);
 });
-router.post("/lessons", (req, res) => {
-  const l = upsertLesson(req.body);
-  res.json(l);
+
+router.post("/lessons", validate(upsertLessonSchema), (req, res) => {
+  res.json(upsertLesson(req.body));
 });
-router.patch("/lessons/:id/progress", (req, res) => {
+
+router.patch("/lessons/:id/progress", validate(progressSchema), (req, res) => {
   const l = updateProgress(req.params.id, req.body);
-  if (!l) return res.status(404).json({ error: "Not found" });
+  if (!l) throw notFound("Lesson not found");
   res.json(l);
 });
+
 router.delete("/lessons/:id", (req, res) => {
-  const id = req.params.id;
-  const success = deleteLesson(id);
-  if (!success) return res.status(404).json({ ok: false, error: "Not found" });
-  return res.json({ ok: true, deleted: id });
+  const lessonId = req.params.id;
+  // Silmeden önce ilişkili kurstan çıkar
+  const course = getCourseForLesson(lessonId);
+  if (course) {
+    removeLessonFromCourse(course.id, lessonId);
+    rebuildKnowledgeIndex(course.id);
+  }
+  if (!deleteLesson(lessonId)) throw notFound("Lesson not found");
+  res.json({ ok: true, deleted: lessonId });
 });
+
 router.get("/memory", (_req, res) => res.json(getMemory()));
 
 // ---- Cheat Sheet ----
-router.post("/lessons/:id/cheat-sheet", async (req, res) => {
-  try {
-    const lessonId = req.params.id;
-    const { language = 'tr', courseWide = false } = req.body as { language?: 'tr' | 'en'; courseWide?: boolean };
-    const lesson = getLesson(lessonId);
-    if (!lesson) return res.status(404).json({ ok: false, error: "Lesson not found" });
-
-    const forceRegen = req.query.force === 'true';
-    if (!forceRegen && !courseWide && lesson.cheatSheet?.sections?.length && (lesson.cheatSheet as any).language === language) {
-      return res.json({ ok: true, lessonId, cheatSheet: lesson.cheatSheet, cached: true });
-    }
-
-    const title = lesson.title || "Lesson";
-    const transcript = (lesson.transcript || "").trim();
-    const slideText = lesson.slideText || "";
-    if (!transcript && !slideText) {
-      return res.status(400).json({ ok: false, error: "Transcript or slideText is required." });
-    }
-
-    const courseCtx = assembleCourseContext(lessonId, "cheat-sheet");
-    const { lecContext, sldContext } = buildCondensedContext(lesson);
-    let enrichedLecContext = lecContext;
-    if (courseCtx.crossLessonBlock) {
-      enrichedLecContext += `\n\n--- Related Lessons ---\n${courseCtx.crossLessonBlock}`;
-    }
-
-    const prompt = buildCheatSheetPrompt({
-      title: courseCtx.courseName ? `${courseCtx.courseName} - ${title}` : title,
-      transcript: enrichedLecContext, slideText: sldContext,
-      learningOutcomes: lesson.learningOutcomes || [],
-      emphases: lesson.plan?.emphases || lesson.professorEmphases || [],
-      language,
-    });
-
-    const result = await getModel().generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 3000 },
-    });
-    const raw = (result.response.text() || "").trim();
-    logAI("CHEAT_SHEET", prompt.length, raw.length, 3000);
-    const cleaned = stripCodeFences(raw);
-    const j = tryParseJSON(cleaned);
-    if (!j?.sections || !Array.isArray(j.sections)) {
-      return res.status(500).json({ ok: false, error: "Cheat sheet JSON/schema error" });
-    }
-
-    const cheatSheet = {
-      title: j.title || title, updatedAt: new Date().toISOString(),
-      sections: j.sections, formulas: Array.isArray(j.formulas) ? j.formulas : [],
-      pitfalls: Array.isArray(j.pitfalls) ? j.pitfalls : [],
-      quickQuiz: Array.isArray(j.quickQuiz) ? j.quickQuiz : [],
-      language,
-    };
-    const saved = upsertLesson({ id: lessonId, cheatSheet });
-    return res.json({ ok: true, lessonId: saved.id, cheatSheet });
-  } catch (e: any) {
-    logger.error("[/api/lessons/:id/cheat-sheet ERROR]", e?.message || e);
-    return res.status(500).json({ ok: false, error: e?.message || "server error" });
-  }
-});
+router.post("/lessons/:id/cheat-sheet", validate(cheatSheetSchema), asyncHandler(async (req, res) => {
+  const { language, courseWide } = req.body;
+  const { cheatSheet, cached } = await generateCheatSheet(
+    req.params.id, language, courseWide, req.query.force === 'true'
+  );
+  res.json({ ok: true, lessonId: req.params.id, cheatSheet, cached });
+}));
 
 // ---- LO Modules ----
-router.post("/lessons/:id/lo-modules", async (req, res) => {
-  try {
-    const lessonId = req.params.id;
-    const lesson = getLesson(lessonId);
-    if (!lesson) return res.status(404).json({ ok: false, error: "Lesson not found" });
-    const forceRegen = req.query.force === 'true';
-    if (!forceRegen && lesson.loModules?.modules?.length) {
-      return res.json({ ok: true, modules: lesson.loModules.modules, lessonId, cached: true });
-    }
-    const { transcript, slideText, learningOutcomes, loAlignment, plan } = lesson;
-    if (!transcript || !learningOutcomes?.length) {
-      return res.status(400).json({ ok: false, error: "Transcript and Learning Outcomes are required." });
-    }
-    const prompt = buildLoModulesPrompt({ transcript, slideText: slideText || "", learningOutcomes, loAlignment, plan });
-    const result = await getModel().generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 6000 },
-    });
-    const raw = result.response.text() || "";
-    const cleaned = stripCodeFences(raw);
-    const j = tryParseJSON(cleaned);
-    if (!j?.modules || !Array.isArray(j.modules)) {
-      return res.status(500).json({ ok: false, error: "LO modules JSON/schema error" });
-    }
-    const loModules = { lessonId, modules: j.modules };
-    const saved = upsertLesson({ id: lessonId, loModules });
-    return res.json({ ok: true, modules: loModules.modules, lessonId: saved.id });
-  } catch (e: any) {
-    logger.error("[/api/lessons/:id/lo-modules ERROR]", e?.message || e);
-    return res.status(500).json({ ok: false, error: e?.message || "server error" });
-  }
-});
+router.post("/lessons/:id/lo-modules", asyncHandler(async (req, res) => {
+  const { modules, cached } = await generateLoModules(req.params.id, req.query.force === 'true');
+  res.json({ ok: true, modules, lessonId: req.params.id, cached });
+}));
 
 // ---- LO Align ----
-router.post("/lessons/:id/lo-align", async (req, res) => {
-  try {
-    const lessonId = req.params.id;
-    const existing = getLesson(lessonId);
-    if (!existing) return res.status(404).json({ ok: false, error: "Lesson not found" });
-    const forceRegen = req.query.force === 'true';
-    if (!forceRegen && existing.loAlignment?.segments?.length) {
-      return res.json({ ok: true, loAlignment: existing.loAlignment, lessonId, cached: true });
-    }
-    const { transcript, slidesText, learningOutcomes } = req.body as {
-      transcript?: string; slidesText?: string; learningOutcomes?: string[];
-    };
-    const lecture = (transcript ?? existing.transcript ?? "").trim();
-    const slides = slidesText ?? existing.slideText ?? "";
-    const loList = (learningOutcomes?.length ? learningOutcomes : existing.learningOutcomes) || [];
-    if (!lecture) return res.status(400).json({ ok: false, error: "Transcript is required" });
-    if (!loList.length) return res.status(400).json({ ok: false, error: "Learning Outcomes list is required" });
+router.post("/lessons/:id/lo-align", validate(loAlignSchema), asyncHandler(async (req, res) => {
+  const lessonId = req.params.id;
+  const existing = getLesson(lessonId);
+  if (!existing) throw notFound("Lesson not found");
 
-    const loAlignment = await generateLoAlignmentForLesson(lecture, slides, loList);
-    const saved = upsertLesson({ id: lessonId, transcript: lecture, slideText: slides, learningOutcomes: loList, loAlignment });
-    return res.json({ ok: true, loAlignment, lessonId: saved.id });
-  } catch (e: any) {
-    logger.error("[/api/lessons/:id/lo-align ERROR]", e?.message || e);
-    return res.status(500).json({ ok: false, error: e?.message || "server error" });
+  if (req.query.force !== 'true' && existing.loAlignment?.segments?.length) {
+    return res.json({ ok: true, loAlignment: existing.loAlignment, lessonId, cached: true });
   }
-});
+
+  const lecture = (req.body.transcript ?? existing.transcript ?? "").trim();
+  const slides = req.body.slidesText ?? existing.slideText ?? "";
+  const loList = (req.body.learningOutcomes?.length ? req.body.learningOutcomes : existing.learningOutcomes) || [];
+  if (!lecture) throw badRequest("Transcript is required");
+  if (!loList.length) throw badRequest("Learning Outcomes list is required");
+
+  const loAlignment = await generateLoAlignmentForLesson(lecture, slides, loList);
+  const saved = upsertLesson({ id: lessonId, transcript: lecture, slideText: slides, learningOutcomes: loList, loAlignment });
+  res.json({ ok: true, loAlignment, lessonId: saved.id });
+}));
 
 // ---- Plan from Text ----
-router.post("/plan-from-text", async (req, res) => {
-  try {
-    const { lectureText, slidesText, alignOnly, prevPlan, lessonId, title, courseCode, learningOutcomes } = req.body as {
-      lectureText?: string; slidesText?: string; alignOnly?: boolean; prevPlan?: any;
-      lessonId?: string; title?: string; courseCode?: string; learningOutcomes?: string[];
-    };
-    if (!lectureText || !slidesText) {
-      return res.status(400).json({ ok: false, error: "lectureText and slidesText are required" });
-    }
+router.post("/plan-from-text", validate(planFromTextSchema), asyncHandler(async (req, res) => {
+  const { lectureText, slidesText, alignOnly, prevPlan, lessonId, title, courseCode, learningOutcomes } = req.body;
 
-    const LO_BLOCK = Array.isArray(learningOutcomes) && learningOutcomes.length
-      ? learningOutcomes.map((lo, i) => `${i + 1}. ${String(lo || "").trim()}`).join("\n")
-      : "—";
-
-    if (alignOnly) {
-      if (!prevPlan) return res.status(400).json({ ok: false, error: "prevPlan is required when alignOnly = true" });
-      const alignment = await generateAlignmentOnly(lectureText, slidesText);
-      const plan = { ...prevPlan, alignment };
-      const saved = upsertLesson({
-        id: lessonId, title: title || prevPlan?.topic || "Lecture",
-        transcript: lectureText, slideText: slidesText, plan,
-        summary: plan?.summary, highlights: plan?.key_concepts || [],
-        professorEmphases: plan?.emphases || [], courseCode, learningOutcomes,
-      });
-      return res.json({ ok: true, plan, lessonId: saved.id });
-    }
-
-    const LEC = lectureText.slice(0, 18000);
-    const SLD = slidesText.slice(0, 18000);
-
-    const prompt = `
-You are an instructional designer. Analyze the following teacher speech transcript (LEC) and slide text (SLIDE) together.
-
-PRIORITY:
-- First, build a clear, practical learning plan (modules + lessons) that a student can follow.
-- Then, extract teacher emphases from the lecture, and compare lecture vs slides (alignment).
-
-IF OFFICIAL "LEARNING OUTCOMES" ARE PROVIDED:
-- Align your plan with these learning outcomes.
-
-[COURSE CODE]
-${courseCode || "—"}
-
-[OFFICIAL LEARNING OUTCOMES]
-${LO_BLOCK}
-
-GOALS:
-1) LEARNING PLAN ("modules"): 2–6 modules, each with 1–6 lessons.
-2) TEACHER EMPHASES ("emphases"): From transcript repetition, explanations, examples.
-3) ALIGNMENT ("alignment"): Topics in both LEC and SLIDE.
-
-OUTPUT: ONLY VALID JSON.
-SCHEMA:
-{
-  "topic": "string", "key_concepts": string[], "duration_weeks": number,
-  "modules": [{ "title": "string", "goal": "string", "lessons": [{ "title": "string", "objective": "string", "study_time_min": number, "activities": [{ "type": "read|watch|practice|quiz|project", "prompt": "string", "expected_outcome": "string" }], "mini_quiz": string[] }] }],
-  "resources": string[],
-  "emphases": [{ "statement": "string", "why": "string", "in_slides": boolean, "evidence": "string", "source": "lecture"|"slides"|"both", "from_transcript_quote": "string", "from_slide_quote": "string|null", "related_lo_ids": string[] }],
-  "seed_quiz": string[],
-  "alignment": { "summary_chatty": "string", "average_duration_min": number, "items": [{ "topic": "string", "concepts": string[], "in_both": boolean, "emphasis_level": "high"|"medium"|"low", "lecture_quotes": string[], "slide_refs": string[], "duration_min": number, "confidence": number }] }
-}
-
-RULES:
-- At least 5 emphases and 5 alignment items.
-- Output ONLY JSON.
-
-[LEC]
-${LEC}
-
-[SLIDE]
-${SLD}
-`.trim();
-
-    // Retry logic: up to 2 retries with exponential backoff
-    let plan: any = null;
-    let lastError = "";
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        if (attempt > 0) {
-          const delay = 2000 * Math.pow(2, attempt - 1);
-          await new Promise(r => setTimeout(r, delay));
-          logger.warn(`[PLAN] Retry attempt ${attempt + 1}...`);
-        }
-        const result = await getModel().generateContent({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 8000 },
-        });
-        const rawText = result.response.text() || "";
-        logAI("PLAN_FROM_TEXT", prompt.length, rawText.length, 8000);
-        const cleaned = stripCodeFences(rawText);
-        plan = tryParseJSON(cleaned);
-        if (plan) break;
-        lastError = cleaned.slice(0, 2000);
-        logger.error(`[Parse FAIL attempt ${attempt + 1}]:`, lastError.slice(0, 500));
-      } catch (retryErr: any) {
-        lastError = retryErr?.message || "AI call failed";
-        logger.error(`[PLAN attempt ${attempt + 1} error]:`, lastError);
-        if (attempt === 2) throw retryErr;
-      }
-    }
-    if (!plan) {
-      return res.status(500).json({ ok: false, error: "LLM JSON parse error after retries", llmText: lastError });
-    }
-    if (!hasAlignment(plan)) {
-      try { const alignment = await generateAlignmentOnly(lectureText, slidesText); plan = { ...plan, alignment }; }
-      catch (e) { logger.warn("[Alignment fallback failed]:", (e as any)?.message || e); }
-    }
-    if (!hasAlignment(plan) && plan?.alignment?.items?.length) {
-      const items = plan.alignment.items;
-      const valid = items.filter((x: any) => Number.isFinite(x?.duration_min));
-      const avg = valid.reduce((a: number, b: any) => a + b.duration_min, 0) / Math.max(1, valid.length);
-      plan.alignment.average_duration_min = Number.isFinite(avg) ? +avg.toFixed(1) : undefined;
-    }
-
-    const inferredTitle = title || plan?.topic || (plan?.modules?.[0]?.title ? `Lecture – ${plan.modules[0].title}` : "Lecture");
+  if (alignOnly) {
+    if (!prevPlan) throw badRequest("prevPlan is required when alignOnly = true");
+    const alignment = await generateAlignmentOnly(lectureText, slidesText);
+    const plan = { ...prevPlan, alignment };
     const saved = upsertLesson({
-      id: lessonId, title: inferredTitle, transcript: lectureText, slideText: slidesText,
-      plan, summary: plan?.summary, highlights: plan?.key_concepts || [],
+      id: lessonId, title: title || prevPlan?.topic || "Lecture",
+      transcript: lectureText, slideText: slidesText, plan,
+      summary: plan?.summary, highlights: plan?.key_concepts || [],
       professorEmphases: plan?.emphases || [], courseCode, learningOutcomes,
     });
-
-    const lessonCourse = getCourseForLesson(saved.id);
-    if (lessonCourse) rebuildKnowledgeIndex(lessonCourse.id);
-
-    // Generate digest asynchronously (don't block response)
-    generateDigest(saved.id, lectureText, slidesText, plan).catch((err) =>
-      logger.warn("[Digest] Background generation failed:", err?.message)
-    );
-
     return res.json({ ok: true, plan, lessonId: saved.id });
-  } catch (e: any) {
-    logger.error("[/api/plan-from-text ERROR]", e?.message || e);
-    return res.status(500).json({ ok: false, error: e?.message || "server error" });
   }
-});
 
-// ---- Quiz from Plan ----
-router.post("/quiz-from-plan", async (req, res) => {
-  try {
-    const { plan, lessonId: quizLessonId } = req.body as { plan?: any; lessonId?: string; courseId?: string };
-    if (!plan) return res.status(400).json({ ok: false, error: "plan is required" });
-    let crossLessonHint = "";
-    if (quizLessonId) {
-      const ctx = assembleCourseContext(quizLessonId, "quiz");
-      if (ctx.crossLessonBlock) crossLessonHint = `\n\nRELATED LESSONS:\n${ctx.crossLessonBlock}`;
-    }
-    const prompt = `You are an expert academic quiz generator. Generate exactly 10 quiz questions based on the plan below.
-
-RULES:
-- Difficulty distribution: 3 Easy (factual recall), 4 Medium (understanding/application), 3 Hard (analysis/evaluation)
-- Question type variety: include at least 2 "Why/How" questions, 2 multiple-choice (with options A-D), 2 true/false, and the rest open-ended
-- Each question MUST cover a DIFFERENT concept from the plan — no duplicate or overlapping topics
-- Each question must be at least 15 words long and be self-contained (understandable without seeing the plan)
-- For multiple-choice questions, format as: "Question text? A) option1 B) option2 C) option3 D) option4"
-- For true/false questions, start with "[T/F]"
-
-FORMAT: Return one question per line, prefixed with difficulty tag:
-[Easy] question text
-[Medium] question text
-[Hard] question text
-${crossLessonHint}
-
-PLAN:
-${JSON.stringify(plan).slice(0, 8000)}`.trim();
-    const result = await getModel().generateContent({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: 2500 } });
-    const text = (result.response.text() || "").replace(/```/g, "").trim();
-    logAI("QUIZ_FROM_PLAN", prompt.length, text.length, 2500);
-    let questions = text.split(/\n+/).map((s) => s.replace(/^\d+\.\s*/, "").trim()).filter(Boolean).slice(0, 12);
-
-    // Validate question quality
-    questions = questions.filter(q => {
-      const wordCount = q.split(/\s+/).length;
-      if (wordCount < 5) return false; // Too short to be meaningful
-      return true;
-    });
-
-    // Deduplicate: remove questions with high word overlap (Jaccard > 0.7)
-    const getWords = (s: string) => new Set(s.toLowerCase().replace(/[^\w\s]/g, "").split(/\s+/).filter(w => w.length > 2));
-    const deduplicated: string[] = [];
-    for (const q of questions) {
-      const qWords = getWords(q);
-      const isDuplicate = deduplicated.some(existing => {
-        const eWords = getWords(existing);
-        const intersection = new Set([...qWords].filter(w => eWords.has(w)));
-        const union = new Set([...qWords, ...eWords]);
-        return union.size > 0 && intersection.size / union.size > 0.7;
-      });
-      if (!isDuplicate) deduplicated.push(q);
-    }
-
-    return res.json({ ok: true, questions: deduplicated.slice(0, 10) });
-  } catch (e: any) {
-    logger.error("[/api/quiz-from-plan ERROR]", e?.message || e);
-    return res.status(500).json({ ok: false, error: e?.message || "server error" });
+  let plan = await generatePlan(lectureText, slidesText, courseCode, learningOutcomes);
+  if (!hasAlignment(plan)) {
+    try { const alignment = await generateAlignmentOnly(lectureText, slidesText); plan = { ...plan, alignment }; }
+    catch { /* alignment fallback failed, continue without */ }
   }
-});
-
-// ---- Quiz Answers ----
-router.post("/quiz-answers", async (req, res) => {
-  try {
-    const { questions, lectureText, slidesText, plan, lessonId } = req.body as {
-      questions?: string[]; lectureText?: string; slidesText?: string; plan?: any; lessonId?: string;
-    };
-    if (!questions?.length) {
-      return res.status(400).json({ ok: false, error: "questions are required" });
-    }
-    const Q = questions.slice(0, 20);
-
-    // Use digest if available, fallback to condensed context or raw text
-    let contextBlock: string;
-    if (lessonId) {
-      const { context } = getDigestOrFallback(lessonId);
-      if (context) {
-        contextBlock = context;
-      } else {
-        const LEC = (lectureText || "").slice(0, 18000);
-        const SLD = (slidesText || "").slice(0, 18000);
-        contextBlock = `[LEC]\n${LEC}\n\n[SLIDE]\n${SLD}`;
-      }
-    } else if (lectureText && slidesText) {
-      contextBlock = `[LEC]\n${lectureText.slice(0, 18000)}\n\n[SLIDE]\n${slidesText.slice(0, 18000)}`;
-    } else {
-      return res.status(400).json({ ok: false, error: "lessonId or lectureText+slidesText required" });
-    }
-
-    const prompt = `Answer the questions with EVIDENCE from the lesson context.\n\n[LESSON CONTEXT]\n${contextBlock}\n\n[PLAN (optional)]\n${plan ? JSON.stringify(plan).slice(0, 6000) : "—"}\n\n[QUESTIONS]\n${Q.map((q, i) => `${i + 1}. ${q}`).join("\n")}`.trim();
-    const result = await getModel().generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: {
-        maxOutputTokens: 4000,
-        responseMimeType: "application/json",
-        responseSchema: SCHEMAS.QUIZ_ANSWERS,
-      } as any,
-    });
-    const rawResp = result.response.text() || "";
-    logAI("QUIZ_ANSWERS", prompt.length, rawResp.length, 4000);
-    const j = (() => { try { return JSON.parse(rawResp); } catch { return null; } })();
-    if (!j?.answers) return res.status(500).json({ ok: false, error: "JSON parse/schema error" });
-    return res.json({ ok: true, answers: j.answers });
-  } catch (e: any) {
-    logger.error("[/api/quiz-answers ERROR]", e?.message || e);
-    return res.status(500).json({ ok: false, error: e?.message || "server error" });
+  if (!hasAlignment(plan) && plan?.alignment?.items?.length) {
+    const items = plan.alignment.items;
+    const valid = items.filter((x: AlignmentItem) => Number.isFinite(x.duration_min));
+    const avg = valid.reduce((a: number, b: AlignmentItem) => a + b.duration_min, 0) / Math.max(1, valid.length);
+    plan.alignment.average_duration_min = Number.isFinite(avg) ? +avg.toFixed(1) : undefined;
   }
-});
 
-// ---- Quiz Eval ----
-router.post("/quiz-eval", async (req, res) => {
-  try {
-    const { q, student_answer, lectureText, slidesText, lessonId } = req.body as {
-      q?: string; student_answer?: string; lectureText?: string; slidesText?: string; lessonId?: string;
-    };
-    if (!q || !student_answer) {
-      return res.status(400).json({ ok: false, error: "q and student_answer are required" });
-    }
+  const inferredTitle = title || plan?.topic || (plan?.modules?.[0]?.title ? `Lecture – ${plan.modules[0].title}` : "Lecture");
+  const saved = upsertLesson({
+    id: lessonId, title: inferredTitle, transcript: lectureText, slideText: slidesText,
+    plan, summary: plan?.summary, highlights: plan?.key_concepts || [],
+    professorEmphases: plan?.emphases || [], courseCode, learningOutcomes,
+  });
 
-    // Use digest if available
-    let contextBlock: string;
-    if (lessonId) {
-      const { context } = getDigestOrFallback(lessonId);
-      contextBlock = context || `[LEC]\n${(lectureText || "").slice(0, 14000)}\n\n[SLIDE]\n${(slidesText || "").slice(0, 14000)}`;
-    } else if (lectureText && slidesText) {
-      contextBlock = `[LEC]\n${lectureText.slice(0, 14000)}\n\n[SLIDE]\n${slidesText.slice(0, 14000)}`;
-    } else {
-      return res.status(400).json({ ok: false, error: "lessonId or lectureText+slidesText required" });
-    }
+  const lessonCourse = getCourseForLesson(saved.id);
+  if (lessonCourse) rebuildKnowledgeIndex(lessonCourse.id);
+  generateDigest(saved.id, lectureText, slidesText, plan).catch(() => {});
 
-    const prompt = `Act as a strict but fair academic exam grader. Grade the student's answer based ONLY on the lesson context provided.
+  res.json({ ok: true, plan, lessonId: saved.id });
+}));
 
-GRADING RUBRIC:
-- "correct": All key concepts covered with accurate reasoning. Minor wording differences are acceptable.
-- "partial": Main idea is correct but missing important supporting details, or has minor inaccuracies.
-- "incorrect": Fundamentally wrong, irrelevant, or shows no understanding of the concept.
+// ---- Quiz ----
+router.post("/quiz-from-plan", validate(quizFromPlanSchema), asyncHandler(async (req, res) => {
+  const questions = await generateQuizFromPlan(req.body.plan, req.body.lessonId);
+  res.json({ ok: true, questions });
+}));
 
-INSTRUCTIONS:
-1. Compare the student's answer against the lesson context
-2. Identify which key concepts from the context are addressed vs missed
-3. Provide specific, actionable feedback explaining what was good and what was missed
-4. List the specific concepts/points the student failed to mention in missing_points
-5. Include direct quotes from lesson content as evidence
+router.post("/quiz-answers", validate(quizAnswersSchema), asyncHandler(async (req, res) => {
+  const { questions, lectureText, slidesText, plan, lessonId } = req.body;
+  const answers = await generateQuizAnswers(questions, lectureText, slidesText, plan, lessonId);
+  res.json({ ok: true, answers });
+}));
 
-[LESSON CONTEXT]
-${contextBlock}
+router.post("/quiz-eval", validate(quizEvalSchema), asyncHandler(async (req, res) => {
+  const { q, student_answer, lectureText, slidesText, lessonId } = req.body;
+  const evalResult = await evaluateQuizAnswer(q, student_answer, lectureText, slidesText, lessonId);
+  res.json({ ok: true, ...evalResult });
+}));
 
-[QUESTION]
-${q}
-
-[STUDENT_ANSWER]
-${student_answer}`.trim();
-    const result = await getModel().generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: {
-        maxOutputTokens: 1000,
-        responseMimeType: "application/json",
-        responseSchema: SCHEMAS.QUIZ_EVAL,
-      } as any,
-    });
-    const evalRaw = result.response.text() || "";
-    logAI("QUIZ_EVAL", prompt.length, evalRaw.length, 800);
-    const j = (() => { try { return JSON.parse(evalRaw); } catch { return null; } })();
-    if (!j?.grade) return res.status(500).json({ ok: false, error: "JSON parse/schema error" });
-    return res.json({ ok: true, ...j });
-  } catch (e: any) {
-    logger.error("[/api/quiz-eval ERROR]", e?.message || e);
-    return res.status(500).json({ ok: false, error: e?.message || "server error" });
-  }
-});
-
-// ---- Quiz Eval Batch ----
-router.post("/quiz-eval-batch", async (req, res) => {
-  try {
-    const { items, lectureText, slidesText, lessonId } = req.body as {
-      items?: Array<{ q: string; student_answer: string }>; lectureText?: string; slidesText?: string; lessonId?: string;
-    };
-    if (!items?.length) {
-      return res.status(400).json({ ok: false, error: "items are required" });
-    }
-
-    // Use digest if available
-    let contextBlock: string;
-    if (lessonId) {
-      const { context } = getDigestOrFallback(lessonId);
-      contextBlock = context || `[LEC]\n${(lectureText || "").slice(0, 14000)}\n\n[SLIDE]\n${(slidesText || "").slice(0, 14000)}`;
-    } else if (lectureText && slidesText) {
-      contextBlock = `[LEC]\n${lectureText.slice(0, 14000)}\n\n[SLIDE]\n${slidesText.slice(0, 14000)}`;
-    } else {
-      return res.status(400).json({ ok: false, error: "lessonId or lectureText+slidesText required" });
-    }
-
-    const questionsBlock = items.slice(0, 20).map((item, i) => `Q${i + 1}: ${item.q}\nA${i + 1}: ${item.student_answer}`).join("\n\n");
-    const prompt = `Act as a strict but fair academic exam grader. Grade ALL student answers based ONLY on the lesson context.
-
-GRADING RUBRIC (apply to each answer):
-- "correct": All key concepts covered with accurate reasoning
-- "partial": Main idea correct but missing important details or has minor inaccuracies
-- "incorrect": Fundamentally wrong, irrelevant, or shows no understanding
-
-For each answer, provide specific feedback and list missed concepts in missing_points.
-
-[LESSON CONTEXT]
-${contextBlock}
-
-[STUDENT ANSWERS]
-${questionsBlock}`.trim();
-    const result = await getModel().generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: {
-        maxOutputTokens: 4000,
-        responseMimeType: "application/json",
-        responseSchema: SCHEMAS.QUIZ_EVAL_BATCH,
-      } as any,
-    });
-    const batchRaw = result.response.text() || "";
-    logAI("QUIZ_EVAL_BATCH", prompt.length, batchRaw.length, 4000);
-    const j = (() => { try { return JSON.parse(batchRaw); } catch { return null; } })();
-    if (!j?.results || !Array.isArray(j.results)) return res.status(500).json({ ok: false, error: "JSON parse/schema error" });
-    return res.json({ ok: true, results: j.results });
-  } catch (e: any) {
-    logger.error("[/api/quiz-eval-batch ERROR]", e?.message || e);
-    return res.status(500).json({ ok: false, error: e?.message || "server error" });
-  }
-});
+router.post("/quiz-eval-batch", validate(quizEvalBatchSchema), asyncHandler(async (req, res) => {
+  const { items, lectureText, slidesText, lessonId } = req.body;
+  const results = await evaluateQuizBatch(items, lectureText, slidesText, lessonId);
+  res.json({ ok: true, results });
+}));
 
 // ---- Deviation ----
-router.post("/lessons/:id/deviation", async (req, res) => {
-  try {
-    const lessonId = req.params.id;
-    const lesson = getLesson(lessonId);
-    if (!lesson) return res.status(404).json({ ok: false, error: "Lesson not found" });
-    const transcript = String(lesson.transcript || "").trim();
-    const slideText = String(lesson.slideText || "").trim();
-    if (!transcript || !slideText) {
-      return res.status(400).json({ ok: false, error: "Transcript and slideText are required." });
-    }
-    const forceReanalyze = req.query.force === 'true';
-    if (!forceReanalyze && (lesson as any).deviation?.segments?.length) {
-      return res.json({ ok: true, deviation: (lesson as any).deviation, cached: true });
-    }
-
-    const tmpDir = path.join(os.tmpdir(), "learncraft_deviation");
-    fs.mkdirSync(tmpDir, { recursive: true });
-    const trPath = path.join(tmpDir, `${lessonId}.transcript.txt`);
-    const slPath = path.join(tmpDir, `${lessonId}.slides.txt`);
-    fs.writeFileSync(trPath, transcript, "utf-8");
-    fs.writeFileSync(slPath, slideText, "utf-8");
-
-    let pyPath = path.join(process.cwd(), "backend", "transcribe", "deviation.py");
-    if (!fs.existsSync(pyPath)) pyPath = path.join(process.cwd(), "transcribe", "deviation.py");
-    const pythonBin = process.env.PYTHON_BIN || "python";
-
-    const proc = spawn(pythonBin, [pyPath, "--transcript", trPath, "--slides", slPath, "--title", lesson.title || "Untitled Lesson"], { stdio: ["ignore", "pipe", "pipe"] });
-    let out = ""; let err = "";
-    proc.stdout.on("data", (data) => (out += data.toString()));
-    proc.stderr.on("data", (data) => (err += data.toString()));
-    proc.on("close", (code) => {
-      try { fs.unlinkSync(trPath); } catch { }
-      try { fs.unlinkSync(slPath); } catch { }
-      if (code !== 0) return res.status(500).json({ ok: false, error: `Deviation script failed: ${(err || out || "Unknown error").slice(0, 500)}` });
-      let result: any;
-      try { result = JSON.parse(out); } catch { return res.status(500).json({ ok: false, error: "Failed to parse script output" }); }
-      if (!result?.ok) return res.status(500).json({ ok: false, error: result?.error || "Script returned error" });
-      const saved = upsertLesson({ id: lessonId, deviation: result } as any);
-      return res.json({ ok: true, lessonId: saved.id, deviation: result });
-    });
-  } catch (e: any) {
-    return res.status(500).json({ ok: false, error: e?.message || "server error" });
-  }
-});
+router.post("/lessons/:id/deviation", asyncHandler(async (req, res) => {
+  const { deviation, cached } = await analyzeDeviation(req.params.id, req.query.force === 'true');
+  res.json({ ok: true, lessonId: req.params.id, deviation, cached });
+}));
 
 // ---- IEU Learning Outcomes ----
-router.get("/ieu/learning-outcomes", async (req, res) => {
-  try {
-    const rawCode = String(req.query.code || "").trim();
-    if (!rawCode) return res.status(400).json({ ok: false, error: "code param is required" });
-    const code = normalizeCourseCode(rawCode);
-    const url = `https://se.ieu.edu.tr/en/syllabus_v2/type/read/id/${encodeURIComponent(code)}`;
-    const r = await fetch(url);
-    if (!r.ok) return res.status(404).json({ ok: false, error: `Syllabus not found for ${code}`, status: r.status });
-    const html = await r.text();
-    const learningOutcomes = extractLearningOutcomes(html);
-    if (!learningOutcomes.length) return res.status(200).json({ ok: false, error: "Learning Outcomes section not found.", url });
-    return res.json({ ok: true, code, url, learningOutcomes });
-  } catch (err: any) {
-    logger.error("[/api/ieu/learning-outcomes] Error:", err);
-    return res.status(500).json({ ok: false, error: err?.message || "Unknown error" });
+router.get("/ieu/learning-outcomes", asyncHandler(async (req, res) => {
+  const result = await fetchIeuLearningOutcomes(String(req.query.code || ""));
+  if (!result.learningOutcomes.length) {
+    return res.json({ ok: false, error: "Learning Outcomes section not found.", url: result.url });
   }
-});
+  res.json({ ok: true, ...result });
+}));
 
 // ---- Chat (Deep Dive Solo) ----
-router.post("/lessons/:id/chat", async (req, res) => {
-  try {
-    const lessonId = req.params.id;
-    const { message, history } = req.body;
-    const lesson = getLesson(lessonId);
-    if (!lesson) return res.status(404).json({ error: "Lesson not found" });
+router.post("/lessons/:id/chat", validate(chatSchema), asyncHandler(async (req, res) => {
+  const lessonId = req.params.id;
+  const { message, history } = req.body;
+  const lesson = getLesson(lessonId);
+  if (!lesson) throw notFound("Lesson not found");
 
-    const plan = lesson.plan as any;
-    const modules = plan?.modules || [];
-    const emphases = lesson.professorEmphases || plan?.emphases || [];
-    const courseCtx = assembleCourseContext(lessonId, "chat", { userQuery: message });
+  const { prompt, history: chatHistory } = buildChatContextForLesson(lesson, lessonId, message, history);
 
-    const deviationData = (lesson as any).deviation;
-    const deviationSummary = deviationData?.segments?.filter((s: any) => s.deviation_type !== 'on_topic')?.slice(0, 4)?.map((s: any) => `• [${s.deviation_type}] ${s.summary || s.topic || 'N/A'}`)?.join('\n') || '';
-    const cheatSheet = (lesson as any).cheatSheet;
-    const cheatSheetHighlights = cheatSheet?.pitfalls?.slice(0, 4)?.join('\n• ') || '';
-    const cheatSheetFormulas = cheatSheet?.formulas?.slice(0, 3)?.join('; ') || '';
-    const loAlignment = (lesson as any).loAlignment;
-    const loSummary = loAlignment?.segments?.slice(0, 3)?.flatMap((s: any) => s.lo_links?.map((l: any) => l.lo_title) || [])?.filter(Boolean)?.slice(0, 5)?.join(', ') || '';
-    // Progressive context: first message gets full context, subsequent messages get digest
-    const isFirstMessage = !history || history.length === 0;
-    let lessonContentBlock: string;
-
-    if (isFirstMessage) {
-      // Full context for first message
-      lessonContentBlock = `=== TRANSCRIPT EXCERPT ===\n${(lesson.transcript || "").slice(0, 8000)}\n\n=== SLIDE CONTENT EXCERPT ===\n${(lesson.slideText || "").slice(0, 5000)}`;
-    } else {
-      // Digest for subsequent messages (saves ~7K tokens per message)
-      const { context: digestCtx, isDigest } = getDigestOrFallback(lessonId);
-      if (isDigest) {
-        lessonContentBlock = `=== LESSON DIGEST ===\n${digestCtx}`;
-      } else {
-        lessonContentBlock = `=== TRANSCRIPT EXCERPT ===\n${(lesson.transcript || "").slice(0, 4000)}\n\n=== SLIDE CONTENT EXCERPT ===\n${(lesson.slideText || "").slice(0, 2000)}`;
-      }
-    }
-
-    const context = `
-${courseCtx.courseBlock ? `=== COURSE OVERVIEW ===\n${courseCtx.courseBlock}\n` : ''}
-=== LESSON INFORMATION ===
-Title: ${lesson.title || "Untitled Lesson"}
-Course: ${courseCtx.courseName || (lesson as any).courseCode || 'N/A'}
-
-=== KEY TOPICS (Modules) ===
-${modules.slice(0, 6).map((m: any, i: number) => `${i + 1}. ${m.title || m.name || 'Topic'}: ${m.goal || ''}`).join('\n') || 'Not available'}
-
-=== PROFESSOR EMPHASES ===
-${emphases.slice(0, 6).map((e: any) => `• ${e.statement || e}${e.why ? ` → ${e.why}` : ''}`).join('\n') || 'None recorded'}
-
-${deviationSummary ? `=== LECTURE DEVIATIONS ===\n${deviationSummary}\n` : ''}
-${loSummary ? `=== LEARNING OUTCOMES COVERED ===\n${loSummary}\n` : ''}
-${cheatSheetHighlights ? `=== COMMON PITFALLS ===\n• ${cheatSheetHighlights}\n` : ''}
-${cheatSheetFormulas ? `=== KEY FORMULAS ===\n${cheatSheetFormulas}\n` : ''}
-
-${lessonContentBlock}
-${courseCtx.crossLessonBlock ? `\n=== RELATED LESSONS ===\n${courseCtx.crossLessonBlock}\n` : ''}
-${courseCtx.progressBlock ? `\n=== STUDENT PROGRESS ===\n${courseCtx.progressBlock}\n` : ''}`;
-
-    const chat = getModel().startChat({
-      history: history?.map((h: any) => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.content }] })) || [],
-      generationConfig: { maxOutputTokens: 2500 },
-    });
-
-    const prompt = `
-=== CRITICAL RULES ===
-1. INSTRUCTION FOLLOWING: Do exactly what the user asks.
-2. LANGUAGE: Always respond in English.
-3. CONTEXT-BASED ANSWERS: Base answers on the LESSON CONTEXT.
-4. ACCURACY: If info is not available, say so.
-
-=== YOUR ROLE ===
-You are an EXPERT AI TUTOR for this lesson.${courseCtx.courseId ? ` Full course knowledge available.` : ''}
-
-=== LESSON CONTEXT ===
-${context}
-
-=== FORMATTING ===
-- **bold** for key terms, bullet points, short paragraphs
-
-=== RESPONSE STRUCTURE ===
-1. Answer directly
-2. Reference lesson content
-3. End with:
----
-💡 **Suggested Questions:**
-1. [Follow-up]
-2. [Deeper]
-3. [Application]
-
-=== STUDENT MESSAGE ===
-${message}
-`;
-
-    const timeoutMs = 30000;
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("AI_TIMEOUT")), timeoutMs)
-    );
-
-    // Check if streaming is requested
-    if (req.query.stream === 'true') {
-      res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Connection', 'keep-alive');
-      res.flushHeaders?.();
-
-      try {
-        const streamResult = await Promise.race([
-          getModel().generateContentStream({
-            contents: [
-              ...(history?.map((h: any) => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.content }] })) || []),
-              { role: 'user', parts: [{ text: prompt }] },
-            ],
-            generationConfig: { maxOutputTokens: 2500 },
-          }),
-          timeoutPromise,
-        ]);
-
-        let fullText = '';
-        for await (const chunk of streamResult.stream) {
-          const chunkText = chunk.text();
-          if (chunkText) {
-            fullText += chunkText;
-            res.write(`data: ${JSON.stringify({ type: 'chunk', text: chunkText })}\n\n`);
-          }
-        }
-
-        // Extract suggestions from full text
-        const suggestionsMatch = fullText.match(/💡\s*\*\*Suggested Questions:\*\*\s*([\s\S]*?)$/);
-        let suggestions: string[] = [];
-        if (suggestionsMatch) {
-          suggestions = suggestionsMatch[1].trim().split('\n').map(line => line.replace(/^\d+\.\s*/, '').trim()).filter(s => s.length > 5).slice(0, 3);
-        }
-        res.write(`data: ${JSON.stringify({ type: 'done', suggestions })}\n\n`);
-        return res.end();
-      } catch (streamErr: any) {
-        res.write(`data: ${JSON.stringify({ type: 'error', error: streamErr?.message === 'AI_TIMEOUT' ? 'AI yanıt süresi aşıldı.' : streamErr?.message })}\n\n`);
-        return res.end();
-      }
-    }
-
-    // Non-streaming fallback
-    const result = await Promise.race([chat.sendMessage(prompt), timeoutPromise]);
-    let text = result.response.text();
-    const suggestionsMatch = text.match(/💡\s*\*\*Suggested Questions:\*\*\s*([\s\S]*?)$/);
-    let suggestions: string[] = [];
-    if (suggestionsMatch) {
-      suggestions = suggestionsMatch[1].trim().split('\n').map(line => line.replace(/^\d+\.\s*/, '').trim()).filter(s => s.length > 5).slice(0, 3);
-    }
-    return res.json({ ok: true, text, suggestions });
-  } catch (e: any) {
-    logger.error("Chat error:", e);
-    if (e?.message === "AI_TIMEOUT") {
-      return res.status(504).json({ ok: false, error: "AI yanıt süresi aşıldı. Lütfen tekrar deneyin." });
-    }
-    return res.status(500).json({ ok: false, error: e.message });
+  if (req.query.stream === 'true') {
+    await generateChatResponseStream(prompt, chatHistory, res);
+    return;
   }
-});
+
+  const { text, suggestions } = await generateChatResponseSync(prompt, chatHistory);
+  res.json({ ok: true, text, suggestions });
+}));
 
 // ---- Mindmap ----
-router.post("/lessons/:id/mindmap", async (req, res) => {
-  try {
-    const lessonId = req.params.id;
-    const lesson = getLesson(lessonId);
-    if (!lesson || !lesson.plan) return res.status(404).json({ error: "Plan not found" });
-    const forceRegen = req.query.force === 'true';
-    if (!forceRegen && lesson.mindmapCache?.code) {
-      return res.json({ ok: true, code: lesson.mindmapCache.code, cached: true });
-    }
+router.post("/lessons/:id/mindmap", asyncHandler(async (req, res) => {
+  const lessonId = req.params.id;
+  const lesson = getLesson(lessonId);
+  if (!lesson || !lesson.plan) throw notFound("Plan not found");
 
-    const plan = lesson.plan as any;
-    const title = lesson.title || plan.title || "Lesson Topic";
-    const modules = plan.modules || [];
-    const emphases = lesson.professorEmphases || plan.emphases || [];
-    const highlights = lesson.highlights || [];
-    const transcript = (lesson.transcript || "").substring(0, 2000);
-    const slides = (lesson.slideText || "").substring(0, 1500);
-    const mindmapCourseCtx = assembleCourseContext(lessonId, "mindmap");
-    const moduleNames = modules.slice(0, 4).map((m: any) => m.title || m.name || "Module");
-    const keyPoints = emphases.slice(0, 6).map((e: any) => e.statement || e).filter(Boolean);
-    const concepts = highlights.slice(0, 8);
-
-    const prompt = `
-You are a MASTER EDUCATOR creating a STUDY GUIDE mindmap.
-
-=== MERMAID SYNTAX (STRICT) ===
-- Start with: mindmap
-- Root: root((📚 Topic Name))
-- Use 2-space indentation
-- NO special chars: no [], (), {}, :, backticks, quotes
-- Labels: MAX 35 chars
-
-=== STRUCTURE (5 BRANCHES) ===
-📚 TOPIC (root)
-├── ❓ What - Definition
-├── 🎯 Why - Purpose
-├── ⚡ How - Steps
-├── 💡 Practice - Examples
-└── 📝 Remember - Key points
-
-=== LESSON DATA ===
-Topic: ${title}
-Sections: ${moduleNames.join(", ") || "Introduction, Main Content, Practice"}
-Key points: ${keyPoints.slice(0, 4).join(" | ") || "Important concepts"}
-Terms: ${concepts.slice(0, 6).join(", ") || "vocabulary"}
-
-=== LECTURE CONTENT ===
-${transcript.substring(0, 1000) || "No transcript"}
-
-=== SLIDE CONTENT ===
-${slides.substring(0, 800) || "No slides"}
-
-${mindmapCourseCtx.crossLessonBlock ? `=== CONNECTIONS ===\n${mindmapCourseCtx.crossLessonBlock}\n` : ''}
-Create a STUDY GUIDE mindmap for "${title}". OUTPUT ONLY mermaid code.
-`;
-
-    const result = await getModel().generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 1500 },
-    });
-    let code = result.response.text().replace(/```mermaid/gi, "").replace(/```/g, "").replace(/\r\n/g, "\n").trim();
-    const lines = code.split("\n");
-    const cleanLines: string[] = [];
-    for (const line of lines) {
-      let processedLine = line;
-      const trimmed = line.trim();
-      if (!trimmed && cleanLines.length < 2) continue;
-      if (trimmed.includes('```')) continue;
-      if (/^[:\-\[\]\(\)\{\}]+$/.test(trimmed)) continue;
-      if (!trimmed.startsWith('mindmap') && !trimmed.startsWith('root((')) {
-        processedLine = processedLine.replace(/[:\[\]\{\}`"]/g, "");
-        if (!processedLine.includes('root((')) processedLine = processedLine.replace(/\(/g, "").replace(/\)/g, "");
-        if (processedLine.trim().length > 50) {
-          const indent = processedLine.match(/^\s*/)?.[0] || "";
-          processedLine = indent + processedLine.trim().substring(0, 50);
-        }
-      }
-      if (processedLine.trim()) cleanLines.push(processedLine);
-    }
-    if (!cleanLines[0]?.trim().startsWith('mindmap')) cleanLines.unshift('mindmap');
-    const hasRoot = cleanLines.some(l => l.includes('root(('));
-    if (!hasRoot && cleanLines.length > 1) cleanLines.splice(1, 0, '  root((📚 ' + (title || 'Topic').substring(0, 15) + '))');
-    code = cleanLines.join("\n");
-
-    upsertLesson({ id: lessonId, mindmapCache: { code, generatedAt: new Date().toISOString() } } as any);
-    return res.json({ ok: true, code });
-  } catch (e: any) {
-    logger.error("Mindmap error:", e);
-    return res.status(500).json({ ok: false, error: e.message });
+  if (req.query.force !== 'true' && lesson.mindmapCache?.code) {
+    return res.json({ ok: true, code: lesson.mindmapCache.code, cached: true });
   }
-});
+
+  const code = await generateMindmap(lesson, lessonId);
+  upsertLesson({ id: lessonId, mindmapCache: { code, generatedAt: new Date().toISOString() } });
+  res.json({ ok: true, code });
+}));
 
 // ---- Modules list ----
 router.get("/lessons/:id/modules", (req, res) => {
-  try {
-    const lessonId = req.params.id;
-    const lesson = getLesson(lessonId);
-    if (!lesson || !lesson.plan) return res.status(404).json({ error: "Lesson not found" });
-    const plan = lesson.plan as any;
-    const modules = plan.modules || [];
-    const moduleList = modules.map((m: any, index: number) => ({
-      id: index,
-      title: m.title || m.name || `Module ${index + 1}`,
-      topics: (m.topics || m.content || []).slice(0, 5).map((t: any) => typeof t === 'string' ? t : (t.title || t.name || 'Topic'))
-    }));
-    const allModulesOption = { id: -1, title: "📚 Tüm Modüller (Genel Bakış)", topics: moduleList.slice(0, 4).map((m: any) => m.title) };
-    return res.json({ ok: true, lessonTitle: lesson.title || "Lesson", modules: [allModulesOption, ...moduleList] });
-  } catch (e: any) {
-    logger.error("Modules list error:", e);
-    return res.status(500).json({ ok: false, error: e.message });
-  }
+  const lesson = getLesson(req.params.id);
+  if (!lesson || !lesson.plan) throw notFound("Lesson not found");
+
+  const plan = lesson.plan!;
+  const modules = (plan.modules || []).map((m: PlanModule, index: number) => ({
+    id: index,
+    title: m.title || m.name || `Module ${index + 1}`,
+    topics: (m.topics || m.content || []).slice(0, 5).map(t => typeof t === 'string' ? t : (t.title || t.name || 'Topic')),
+  }));
+
+  const allModulesOption = { id: -1, title: "Tüm Modüller (Genel Bakış)", topics: modules.slice(0, 4).map(m => m.title) };
+  res.json({ ok: true, lessonTitle: lesson.title || "Lesson", modules: [allModulesOption, ...modules] });
 });
 
 // ---- Mindmap Module ----
-router.post("/lessons/:id/mindmap/module", async (req, res) => {
-  try {
-    const lessonId = req.params.id;
-    const moduleIndex = req.body.moduleIndex ?? -1;
-    const lesson = getLesson(lessonId);
-    if (!lesson || !lesson.plan) return res.status(404).json({ error: "Plan not found" });
+router.post("/lessons/:id/mindmap/module", validate(mindmapModuleSchema), asyncHandler(async (req, res) => {
+  const lessonId = req.params.id;
+  const moduleIndex = req.body.moduleIndex ?? -1;
+  const lesson = getLesson(lessonId);
+  if (!lesson || !lesson.plan) throw notFound("Plan not found");
 
-    const forceRegen = req.query.force === 'true';
-    const cacheKey = String(moduleIndex);
-    const cached = lesson.mindmapModuleCache?.[cacheKey];
-    if (!forceRegen && cached?.code) {
-      return res.json({ ok: true, code: cached.code, moduleTitle: (cached as any).moduleTitle || "", cached: true });
-    }
-
-    const plan = lesson.plan as any;
-    const modules = plan.modules || [];
-    const lessonTitle = lesson.title || plan.title || "Lesson Topic";
-    let targetTitle: string; let targetContent: string;
-
-    if (moduleIndex === -1) {
-      targetTitle = lessonTitle;
-      targetContent = modules.slice(0, 4).map((m: any) => {
-        const title = m.title || m.name || "Module";
-        const topics = (m.topics || m.content || []).slice(0, 3).map((t: any) => typeof t === 'string' ? t : (t.title || '')).join(", ");
-        return `${title}: ${topics}`;
-      }).join("\n");
-    } else {
-      const targetModule = modules[moduleIndex];
-      if (!targetModule) return res.status(404).json({ error: "Module not found" });
-      targetTitle = targetModule.title || targetModule.name || `Module ${moduleIndex + 1}`;
-      const topics = targetModule.topics || targetModule.content || [];
-      targetContent = topics.map((t: any) => typeof t === 'string' ? t : (t.title || t.name || t.description || '')).join("\n");
-    }
-
-    const prompt = `
-You are a MASTER EDUCATOR creating a STUDY GUIDE mindmap for a specific module.
-
-=== MERMAID SYNTAX (STRICT) ===
-- Start with: mindmap
-- Root: root((📚 Topic Name))
-- Use 2-space indentation
-- NO special chars
-- Labels: MAX 35 chars
-
-=== MODULE DATA ===
-Module Title: ${targetTitle}
-Module Content: ${targetContent.substring(0, 1000)}
-
-OUTPUT ONLY mermaid code for "${targetTitle}".
-`;
-
-    const result = await getModel().generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 1200 },
-    });
-    let code = result.response.text().replace(/```mermaid/gi, "").replace(/```/g, "").replace(/\r\n/g, "\n").trim();
-    const mLines = code.split("\n");
-    const cleanMLines: string[] = [];
-    for (const line of mLines) {
-      let processedLine = line;
-      const trimmed = line.trim();
-      if (!trimmed && cleanMLines.length < 2) continue;
-      if (trimmed.includes('```')) continue;
-      if (/^[:\-\[\]\(\)\{\}]+$/.test(trimmed)) continue;
-      if (!trimmed.startsWith('mindmap') && !trimmed.startsWith('root((')) {
-        processedLine = processedLine.replace(/[:\[\]\{\}`"]/g, "");
-        if (!processedLine.includes('root((')) processedLine = processedLine.replace(/\(/g, "").replace(/\)/g, "");
-        if (processedLine.trim().length > 50) {
-          const indent = processedLine.match(/^\s*/)?.[0] || "";
-          processedLine = indent + processedLine.trim().substring(0, 50);
-        }
-      }
-      if (processedLine.trim()) cleanMLines.push(processedLine);
-    }
-    if (!cleanMLines[0]?.trim().startsWith('mindmap')) cleanMLines.unshift('mindmap');
-    const hasRoot2 = cleanMLines.some(l => l.includes('root(('));
-    if (!hasRoot2) cleanMLines.splice(1, 0, '  root((📚 ' + targetTitle.substring(0, 15) + '))');
-    code = cleanMLines.join("\n");
-
-    const existingModuleCache = lesson.mindmapModuleCache || {};
-    existingModuleCache[cacheKey] = { code, generatedAt: new Date().toISOString(), moduleTitle: targetTitle } as any;
-    upsertLesson({ id: lessonId, mindmapModuleCache: existingModuleCache } as any);
-    return res.json({ ok: true, code, moduleTitle: targetTitle });
-  } catch (e: any) {
-    logger.error("Module mindmap error:", e);
-    return res.status(500).json({ ok: false, error: e.message });
+  const cacheKey = String(moduleIndex);
+  const cached = lesson.mindmapModuleCache?.[cacheKey];
+  if (req.query.force !== 'true' && cached?.code) {
+    return res.json({ ok: true, code: cached.code, moduleTitle: cached.moduleTitle || "", cached: true });
   }
-});
+
+  const { code, moduleTitle } = await generateMindmapModule(lesson, moduleIndex);
+  const existingModuleCache = lesson.mindmapModuleCache || {};
+  existingModuleCache[cacheKey] = { code, generatedAt: new Date().toISOString(), moduleTitle };
+  upsertLesson({ id: lessonId, mindmapModuleCache: existingModuleCache });
+  res.json({ ok: true, code, moduleTitle });
+}));
 
 // ---- Mindmap Node Detail ----
-router.post("/lessons/:id/mindmap/node-detail", async (req, res) => {
-  try {
-    const lessonId = req.params.id;
-    const { nodeName, action } = req.body as { nodeName: string; action: "explain" | "example" | "quiz" | "all" };
-    if (!nodeName || !action) return res.status(400).json({ ok: false, error: "nodeName and action required" });
-    const lesson = getLesson(lessonId);
-    if (!lesson) return res.status(404).json({ ok: false, error: "Lesson not found" });
+router.post("/lessons/:id/mindmap/node-detail", validate(mindmapNodeDetailSchema), asyncHandler(async (req, res) => {
+  const lesson = getLesson(req.params.id);
+  if (!lesson) throw notFound("Lesson not found");
 
-    const transcript = (lesson.transcript || "").substring(0, 3000);
-    const lessonTitle = lesson.title || "Lesson";
-    let prompt = "";
-    let maxTokens = 800;
-
-    // Schema selection for structured output
-    let schema: any = null;
-
-    if (action === "all") {
-      // Batched: explain + example + quiz in single call (saves 2 API calls)
-      prompt = `For the concept "${nodeName}" from "${lessonTitle}", provide an explanation, a real-world example, and a quiz question.
-
-Context:
-${transcript.substring(0, 1500)}`;
-      maxTokens = 1500;
-      schema = SCHEMAS.MINDMAP_NODE_ALL;
-    } else if (action === "explain") {
-      prompt = `Explain "${nodeName}" VERY BRIEFLY.\n\nContext:\n${transcript.substring(0, 1000)}\n\nReturn ONLY JSON:\n{ "title": "${nodeName}", "explanation": "2-3 sentences", "keyPoints": ["point"], "relatedConcepts": ["concept"] }`;
-    } else if (action === "example") {
-      prompt = `Give ONE simple example for "${nodeName}".\n\nContext:\n${transcript.substring(0, 1000)}\n\nReturn ONLY JSON:\n{ "title": "${nodeName}", "example": { "scenario": "1 sentence", "explanation": "1 sentence", "takeaway": "5-8 words" } }`;
-    } else if (action === "quiz") {
-      prompt = `Create a quiz question about "${nodeName}" from "${lessonTitle}".\n\nContext:\n${transcript.substring(0, 1500)}\n\nReturn ONLY JSON:\n{ "title": "${nodeName}", "quiz": { "question": "?", "options": ["A)", "B)", "C)", "D)"], "correctAnswer": "A", "explanation": "why" } }`;
-    }
-
-    const genConfig: any = { maxOutputTokens: maxTokens };
-    if (schema) {
-      genConfig.responseMimeType = "application/json";
-      genConfig.responseSchema = schema;
-    }
-    const result = await getModel().generateContent({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: genConfig });
-    let responseText = result.response.text();
-    if (!schema) responseText = responseText.replace(/```json?/gi, "").replace(/```/g, "").trim();
-    logAI("MINDMAP_NODE_DETAIL", prompt.length, responseText.length, maxTokens);
-    let parsed;
-    try { parsed = JSON.parse(responseText); } catch { return res.status(500).json({ ok: false, error: "Failed to parse AI response" }); }
-    return res.json({ ok: true, action, ...parsed });
-  } catch (e: any) {
-    logger.error("[Node Detail] Error:", e);
-    return res.status(500).json({ ok: false, error: e.message });
-  }
-});
+  const result = await generateMindmapNodeDetail(lesson, req.body.nodeName, req.body.action);
+  res.json({ ok: true, ...result });
+}));
 
 export default router;

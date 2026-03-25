@@ -1,14 +1,15 @@
-import { logger } from "../utils/logger";
 import { Router } from "express";
+import { asyncHandler } from "../utils/asyncHandler";
+import { validate } from "../middleware/validate";
 import {
   listCourses, getCourse, createCourse, updateCourse, deleteCourse,
   addLessonToCourse, removeLessonFromCourse, getCourseLessons,
   rebuildKnowledgeIndex, getCourseProgress, exportCourseData,
 } from "../controllers/courseController";
-import { assembleCourseWideContext } from "../controllers/contextAssembler";
 import { upsertLesson } from "../controllers/lessonControllers";
-import { getModel } from "../services/aiService";
-import { SCHEMAS } from "../prompts/schemas";
+import { generateCourseChatResponse, generateStudySchedule } from "../services/courseAiService";
+import { notFound } from "../middleware/errorHandler";
+import { createCourseSchema, updateCourseSchema, courseChatSchema, studyScheduleSchema } from "../validators/courseSchemas";
 
 const router = Router();
 
@@ -18,148 +19,79 @@ router.get("/courses", (_req, res) => {
 
 router.get("/courses/:id", (req, res) => {
   const course = getCourse(req.params.id);
-  if (!course) return res.status(404).json({ ok: false, error: "Course not found" });
+  if (!course) throw notFound("Course not found");
   res.json({ ok: true, course });
 });
 
-router.post("/courses", (req, res) => {
-  const { code, name, description, learningOutcomes, settings } = req.body;
-  if (!code || !name) return res.status(400).json({ ok: false, error: "code and name required" });
-  const course = createCourse({ code, name, description, learningOutcomes, settings });
+router.post("/courses", validate(createCourseSchema), (req, res) => {
+  const course = createCourse(req.body);
   res.json({ ok: true, course });
 });
 
-router.patch("/courses/:id", (req, res) => {
+router.patch("/courses/:id", validate(updateCourseSchema), (req, res) => {
   const course = updateCourse(req.params.id, req.body);
-  if (!course) return res.status(404).json({ ok: false, error: "Course not found" });
+  if (!course) throw notFound("Course not found");
   res.json({ ok: true, course });
 });
 
 router.delete("/courses/:id", (req, res) => {
-  const ok = deleteCourse(req.params.id);
-  if (!ok) return res.status(404).json({ ok: false, error: "Course not found" });
+  if (!deleteCourse(req.params.id)) throw notFound("Course not found");
   res.json({ ok: true });
 });
 
 router.post("/courses/:id/lessons/:lessonId", (req, res) => {
   const course = addLessonToCourse(req.params.id, req.params.lessonId);
-  if (!course) return res.status(404).json({ ok: false, error: "Course not found" });
-  upsertLesson({ id: req.params.lessonId, courseId: req.params.id } as any);
+  if (!course) throw notFound("Course not found");
+  upsertLesson({ id: req.params.lessonId, courseId: req.params.id });
   rebuildKnowledgeIndex(req.params.id);
-  res.json({ ok: true, course });
+  const updatedCourse = getCourse(req.params.id);
+  res.json({ ok: true, course: updatedCourse });
 });
 
 router.delete("/courses/:id/lessons/:lessonId", (req, res) => {
   const course = removeLessonFromCourse(req.params.id, req.params.lessonId);
-  if (!course) return res.status(404).json({ ok: false, error: "Course not found" });
-  upsertLesson({ id: req.params.lessonId, courseId: undefined } as any);
+  if (!course) throw notFound("Course not found");
+  upsertLesson({ id: req.params.lessonId, courseId: undefined });
   rebuildKnowledgeIndex(req.params.id);
-  res.json({ ok: true, course });
+  const updatedCourse = getCourse(req.params.id);
+  res.json({ ok: true, course: updatedCourse });
 });
 
 router.get("/courses/:id/lessons", (req, res) => {
-  const lessons = getCourseLessons(req.params.id);
-  res.json({ ok: true, lessons });
+  res.json({ ok: true, lessons: getCourseLessons(req.params.id) });
 });
 
 router.post("/courses/:id/rebuild-index", (req, res) => {
   const index = rebuildKnowledgeIndex(req.params.id);
-  if (!index) return res.status(404).json({ ok: false, error: "Course not found" });
+  if (!index) throw notFound("Course not found");
   res.json({ ok: true, knowledgeIndex: index });
 });
 
 router.get("/courses/:id/knowledge-index", (req, res) => {
   const course = getCourse(req.params.id);
-  if (!course) return res.status(404).json({ ok: false, error: "Course not found" });
+  if (!course) throw notFound("Course not found");
   res.json({ ok: true, knowledgeIndex: course.knowledgeIndex || null });
 });
 
-router.post("/courses/:id/chat", async (req, res) => {
-  try {
-    const courseId = req.params.id;
-    const { message, history } = req.body;
-    const course = getCourse(courseId);
-    if (!course) return res.status(404).json({ ok: false, error: "Course not found" });
-    const courseCtx = assembleCourseWideContext(courseId);
-    const chat = getModel().startChat({
-      history: history?.map((h: any) => ({ role: h.role === 'user' ? 'user' : 'model', parts: [{ text: h.content }] })) || [],
-      generationConfig: { maxOutputTokens: 2500 },
-    });
-
-    const prompt = `
-=== YOUR ROLE ===
-You are an EXPERT AI TUTOR for: ${course.code} - ${course.name}.
-
-=== COURSE CONTEXT ===
-${courseCtx.fullContext}
-
-=== STUDENT MESSAGE ===
-${message}
-
-Answer directly, reference specific lessons, end with 3 suggested follow-up questions.
-`;
-    const result = await chat.sendMessage(prompt);
-    let text = result.response.text();
-    const suggestionsMatch = text.match(/\*\*Suggested Questions:\*\*\s*([\s\S]*?)$/);
-    let suggestions: string[] = [];
-    if (suggestionsMatch) {
-      suggestions = suggestionsMatch[1].trim().split('\n').map(line => line.replace(/^\d+\.\s*/, '').trim()).filter(s => s.length > 5).slice(0, 3);
-    }
-    return res.json({ ok: true, text, suggestions });
-  } catch (e: any) {
-    logger.error("Course chat error:", e);
-    return res.status(500).json({ ok: false, error: e.message });
-  }
-});
+router.post("/courses/:id/chat", validate(courseChatSchema), asyncHandler(async (req, res) => {
+  const { text, suggestions } = await generateCourseChatResponse(req.params.id, req.body.message, req.body.history);
+  res.json({ ok: true, text, suggestions });
+}));
 
 router.get("/courses/:id/progress", (req, res) => {
   const progress = getCourseProgress(req.params.id);
-  if (!progress) return res.status(404).json({ ok: false, error: "Course not found" });
+  if (!progress) throw notFound("Course not found");
   res.json({ ok: true, progress });
 });
 
-router.post("/courses/:id/study-schedule", async (req, res) => {
-  try {
-    const courseId = req.params.id;
-    const { examDate } = req.body;
-    const course = getCourse(courseId);
-    if (!course) return res.status(404).json({ ok: false, error: "Course not found" });
-    const progress = getCourseProgress(courseId);
-    const ki = course.knowledgeIndex;
-    const effectiveExamDate = examDate || course.settings?.examDate || "Not specified";
-
-    const prompt = `Generate a personalized weekly study schedule in JSON format.
-Course: ${course.code} - ${course.name}
-Total Lessons: ${progress?.totalLessons || 0}, Completed: ${progress?.completedLessons || 0}
-Quiz Average: ${progress?.overallQuizAvg ? Math.round(progress.overallQuizAvg * 100) + '%' : 'N/A'}
-Weak Topics: ${progress?.weakTopics?.join(', ') || 'None'}
-Exam Date: ${effectiveExamDate}
-${ki ? `Themes: ${ki.overview.courseThemes.join(', ')}` : ''}
-
-Return JSON: { "days": [{ "day": "Monday", "slots": [{ "time": "Morning", "activity": "..." }] }], "tips": ["..."] }`;
-
-    const result = await getModel().generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: {
-        maxOutputTokens: 2000,
-        responseMimeType: "application/json",
-        responseSchema: SCHEMAS.STUDY_SCHEDULE,
-      } as any,
-    });
-    const text = result.response.text();
-    logger.info(`[AI] STUDY_SCHEDULE | ~${Math.ceil(prompt.length / 4)} in, ~${Math.ceil(text.length / 4)} out | max=2000`);
-    const parsed = JSON.parse(text);
-    const schedule = { courseId, generatedAt: new Date().toISOString(), examDate: effectiveExamDate !== "Not specified" ? effectiveExamDate : undefined, days: parsed.days || [], tips: parsed.tips || [] };
-    return res.json({ ok: true, schedule });
-  } catch (e: any) {
-    logger.error("Schedule generation error:", e);
-    return res.status(500).json({ ok: false, error: e.message });
-  }
-});
+router.post("/courses/:id/study-schedule", validate(studyScheduleSchema), asyncHandler(async (req, res) => {
+  const schedule = await generateStudySchedule(req.params.id, req.body.examDate);
+  res.json({ ok: true, schedule });
+}));
 
 router.get("/courses/:id/export", (req, res) => {
   const data = exportCourseData(req.params.id);
-  if (!data) return res.status(404).json({ ok: false, error: "Course not found" });
+  if (!data) throw notFound("Course not found");
   res.json({ ok: true, export: data });
 });
 

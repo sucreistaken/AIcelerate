@@ -1,512 +1,410 @@
-import { logger } from "./utils/logger";
-// backend/socketHandler.ts
-import { Server as SocketServer, Socket } from "socket.io";
-import {
-  createRoom,
-  getRoom,
-  getRoomByCode,
-  joinRoom,
-  leaveRoom,
-  incrementMemberContribution,
-  StudyUser,
-} from "./controllers/roomController";
-import { getUnreadCount } from "./controllers/notificationController";
+import { Server, Socket } from "socket.io";
+import { profileService } from "./services/profileService";
+import { messageService } from "./services/messageService";
+import { serverService } from "./services/serverService";
+import { channelService } from "./services/channelService";
+import { checkSocketRateLimit } from "./middleware/rateLimiter";
 
-import {
-  loadWorkspace,
-  addDeepDiveMessage,
-  addDeepDiveReaction,
-  saveInsight,
-  addFlashcard,
-  updateFlashcard,
-  deleteFlashcard as deleteFlashcardWs,
-  voteFlashcard,
-  addBulkFlashcards,
-  addMindMapAnnotation,
-  addAnnotationReply,
-  addNote,
-  updateNote,
-  deleteNote as deleteNoteWs,
-  toggleNotePin,
-  SharedChatMessage,
-  SharedFlashcard,
-} from "./controllers/workspaceController";
+// Track online users: userId -> Set<socketId>
+const onlineUsers = new Map<string, Set<string>>();
+// Track which channel each socket is viewing: socketId -> channelId
+const activeChannels = new Map<string, string>();
+// Track typing: channelId -> Map<userId, timeout>
+const typingUsers = new Map<string, Map<string, ReturnType<typeof setTimeout>>>();
 
-// In-memory state for active rooms (faster than JSON reads for real-time)
-interface RoomState {
-  participants: Map<string, { user: StudyUser; socketId: string; activeTool?: string }>;
-  chat: Array<{ id: string; type: string; author: string; authorId: string; text: string; time: string }>;
-}
+export function setupCollabNamespace(io: Server) {
+  const collab = io.of("/collab");
 
-const activeRooms = new Map<string, RoomState>();
-const roomLastActivity = new Map<string, number>();
+  collab.on("connection", (socket: Socket) => {
+    let userId: string | null = null;
 
-// Cleanup inactive rooms every 30 minutes
-const ROOM_INACTIVITY_MS = 24 * 60 * 60 * 1000; // 24 hours
-setInterval(() => {
-  const now = Date.now();
-  for (const [roomId, lastActive] of roomLastActivity) {
-    const state = activeRooms.get(roomId);
-    if (state && state.participants.size === 0 && now - lastActive > ROOM_INACTIVITY_MS) {
-      activeRooms.delete(roomId);
-      roomLastActivity.delete(roomId);
-    }
-  }
-}, 30 * 60 * 1000);
+    // ===== AUTH =====
+    socket.on("auth", async (data: { userId: string }, cb) => {
+      try {
+        const profile = await profileService.getByIdOptional(data.userId);
+        if (!profile) {
+          cb?.({ ok: false, error: "Profile not found" });
+          return;
+        }
 
-function touchRoom(roomId: string) {
-  roomLastActivity.set(roomId, Date.now());
-}
+        userId = data.userId;
 
-function getRoomState(roomId: string): RoomState {
-  if (!activeRooms.has(roomId)) {
-    activeRooms.set(roomId, {
-      participants: new Map(),
-      chat: [],
-    });
-  }
-  touchRoom(roomId);
-  return activeRooms.get(roomId)!;
-}
+        // Track online
+        if (!onlineUsers.has(userId)) onlineUsers.set(userId, new Set());
+        onlineUsers.get(userId)!.add(socket.id);
 
-function broadcastPresence(io: SocketServer, roomId: string) {
-  const state = activeRooms.get(roomId);
-  if (!state) return;
-  const users = Array.from(state.participants.values()).map((p) => ({
-    ...p.user,
-    activeTool: p.activeTool,
-  }));
-  io.to(roomId).emit("room:presence", users);
-}
+        // Join personal room
+        socket.join(`user:${userId}`);
 
-function broadcastMemberUpdate(io: SocketServer, roomId: string) {
-  const room = getRoom(roomId);
-  if (!room) return;
-  io.to(roomId).emit("room:member:update", room.members);
-}
+        // Join all server rooms
+        for (const serverId of profile.serverIds) {
+          socket.join(`server:${serverId}`);
+        }
 
-function broadcastChat(io: SocketServer, roomId: string, msg: any) {
-  io.to(roomId).emit("room:chat", msg);
-}
+        // Set online status
+        await profileService.setStatus(userId, "online");
+        broadcastPresence(collab, userId, "online", profile.serverIds);
 
-import { generateId, uid as msgId } from "./utils/idGenerator";
+        // Auto-join global lobby room
+        socket.join("channel:global-lobby");
 
-export function setupSocketHandler(io: SocketServer) {
-  io.on("connection", (socket: Socket) => {
-    logger.info(`[Socket] Connected: ${socket.id}`);
-
-    // ========== ROOM LIFECYCLE ==========
-
-    socket.on("room:create", (data: { name: string; user: StudyUser; settings?: any; lessonId?: string; lessonTitle?: string }, callback) => {
-      const room = createRoom(data.name, data.user.id, data.settings, data.lessonId || "", data.lessonTitle || "");
-      const state = getRoomState(room.id);
-
-      socket.join(room.id);
-      state.participants.set(data.user.id, { user: data.user, socketId: socket.id });
-      socket.data.roomId = room.id;
-      socket.data.userId = data.user.id;
-
-      // Persist join
-      joinRoom(room.id, data.user);
-
-      // Load workspace
-      const workspace = loadWorkspace(room.id);
-
-      // System message
-      const sysMsg = {
-        id: msgId(),
-        type: "system" as const,
-        author: "System",
-        authorId: "system",
-        text: `${data.user.nickname} created the room`,
-        time: new Date().toISOString(),
-      };
-      state.chat.push(sysMsg);
-
-      if (callback) callback({ ok: true, room, workspace });
-      broadcastPresence(io, room.id);
-      broadcastChat(io, room.id, sysMsg);
-      logger.info(`[Socket] ${data.user.nickname} created room ${room.code}`);
-    });
-
-    socket.on("room:join", (data: { roomId: string; user: StudyUser }, callback) => {
-      const room = getRoom(data.roomId);
-      if (!room) {
-        if (callback) callback({ ok: false, error: "Room not found" });
-        return;
-      }
-
-      const state = getRoomState(room.id);
-      if (room.settings.maxParticipants && state.participants.size >= room.settings.maxParticipants) {
-        if (callback) callback({ ok: false, error: "Room is full" });
-        return;
-      }
-
-      socket.join(room.id);
-      state.participants.set(data.user.id, { user: data.user, socketId: socket.id });
-      socket.data.roomId = room.id;
-      socket.data.userId = data.user.id;
-
-      joinRoom(room.id, data.user);
-
-      // Load workspace for the joining user
-      const workspace = loadWorkspace(room.id);
-
-      const sysMsg = {
-        id: msgId(),
-        type: "system" as const,
-        author: "System",
-        authorId: "system",
-        text: `${data.user.nickname} joined the room`,
-        time: new Date().toISOString(),
-      };
-      state.chat.push(sysMsg);
-
-      if (callback) callback({ ok: true, room, chat: state.chat, workspace });
-      broadcastPresence(io, room.id);
-      broadcastMemberUpdate(io, room.id);
-      broadcastChat(io, room.id, sysMsg);
-      logger.info(`[Socket] ${data.user.nickname} joined room ${room.code}`);
-    });
-
-    socket.on("room:leave", () => {
-      handleLeave(io, socket);
-    });
-
-    socket.on("room:chat", (data: { text: string }) => {
-      const { roomId, userId } = socket.data;
-      if (!roomId || !userId) return;
-
-      const state = activeRooms.get(roomId);
-      if (!state) return;
-
-      const participant = state.participants.get(userId);
-      if (!participant) return;
-
-      const msg = {
-        id: msgId(),
-        type: "text" as const,
-        author: participant.user.nickname,
-        authorId: userId,
-        text: data.text,
-        time: new Date().toISOString(),
-      };
-      state.chat.push(msg);
-      if (state.chat.length > 200) state.chat = state.chat.slice(-200);
-      touchRoom(roomId);
-      broadcastChat(io, roomId, msg);
-    });
-
-    // ========== TOOL PRESENCE ==========
-
-    socket.on("room:cursor:tool", (data: { tool: string }) => {
-      const { roomId, userId } = socket.data;
-      if (!roomId || !userId) return;
-
-      const state = activeRooms.get(roomId);
-      if (!state) return;
-
-      const participant = state.participants.get(userId);
-      if (participant) {
-        participant.activeTool = data.tool;
-        broadcastPresence(io, roomId);
+        cb?.({ ok: true, profile });
+      } catch (err: any) {
+        cb?.({ ok: false, error: err.message });
       }
     });
 
-    // ========== DEEP DIVE EVENTS ==========
+    // ===== SERVER EVENTS =====
+    socket.on("server:join", async (data: { serverId: string }, cb) => {
+      if (!userId) return cb?.({ ok: false, error: "Not authenticated" });
+      try {
+        const server = await serverService.join(data.serverId, userId);
+        socket.join(`server:${server.id}`);
 
-    socket.on("deepdive:ask", (data: { text: string, authorNickname: string, authorAvatar: string }) => {
-      const { roomId, userId } = socket.data;
-      if (!roomId || !userId) return;
+        const profile = await profileService.getById(userId);
+        collab.to(`server:${server.id}`).emit("server:member:joined", {
+          serverId: server.id,
+          member: { id: profile.id, nickname: profile.nickname, avatar: profile.avatar, status: profile.status },
+        });
 
-      // Create and save user message
-      const userMsg: SharedChatMessage = {
-        id: generateId("ddmsg"),
-        role: "user",
-        text: data.text,
-        authorId: userId,
-        authorNickname: data.authorNickname,
-        authorAvatar: data.authorAvatar,
-        timestamp: new Date().toISOString(),
-        reactions: [],
-        savedAsInsight: false,
-      };
+        // Send system message to general channel
+        const channels = await channelService.getByServer(server.id);
+        const general = channels.find((c) => c.name === "genel" && c.type === "text");
+        if (general) {
+          const sysMsg = await messageService.sendSystem(general.id, server.id, `${profile.nickname} sunucuya katıldı!`);
+          collab.to(`channel:${general.id}`).emit("msg:new", sysMsg);
+        }
 
-      addDeepDiveMessage(roomId, userMsg);
-      incrementMemberContribution(roomId, userId);
-
-      // Broadcast user question to all
-      io.to(roomId).emit("deepdive:message", { message: userMsg });
-
-      // AI response will be handled via REST endpoint and then broadcast
-    });
-
-    socket.on("deepdive:ai-response", (data: { message: SharedChatMessage }) => {
-      const { roomId } = socket.data;
-      if (!roomId) return;
-
-      addDeepDiveMessage(roomId, data.message);
-      io.to(roomId).emit("deepdive:response", { message: data.message });
-    });
-
-    socket.on("deepdive:react", (data: { messageId: string }) => {
-      const { roomId, userId } = socket.data;
-      if (!roomId || !userId) return;
-
-      const reactions = addDeepDiveReaction(roomId, data.messageId, userId);
-      io.to(roomId).emit("deepdive:reacted", { messageId: data.messageId, reactions });
-    });
-
-    socket.on("deepdive:save-insight", (data: { messageId: string; tags: string[] }) => {
-      const { roomId, userId } = socket.data;
-      if (!roomId || !userId) return;
-
-      const state = activeRooms.get(roomId);
-      const participant = state?.participants.get(userId);
-      const nickname = participant?.user.nickname || "Unknown";
-
-      const insight = saveInsight(roomId, data.messageId, userId, nickname, data.tags);
-      if (insight) {
-        incrementMemberContribution(roomId, userId);
-        io.to(roomId).emit("deepdive:insight-saved", { insight });
+        cb?.({ ok: true, server });
+      } catch (err: any) {
+        cb?.({ ok: false, error: err.message });
       }
     });
 
-    // ========== FLASHCARD EVENTS ==========
+    socket.on("server:leave", async (data: { serverId: string }, cb) => {
+      if (!userId) return cb?.({ ok: false, error: "Not authenticated" });
+      try {
+        await serverService.leave(data.serverId, userId);
+        socket.leave(`server:${data.serverId}`);
 
-    socket.on("fc:add", (data: { front: string; back: string; topicName: string }) => {
-      const { roomId, userId } = socket.data;
-      if (!roomId || !userId) return;
+        collab.to(`server:${data.serverId}`).emit("server:member:left", {
+          serverId: data.serverId,
+          userId,
+        });
 
-      const state = activeRooms.get(roomId);
-      const participant = state?.participants.get(userId);
-      if (!participant) return;
+        cb?.({ ok: true });
+      } catch (err: any) {
+        cb?.({ ok: false, error: err.message });
+      }
+    });
 
-      const card = addFlashcard(roomId, {
-        front: data.front,
-        back: data.back,
-        topicName: data.topicName,
-        createdBy: userId,
-        createdByNickname: participant.user.nickname,
-        source: "manual",
+    // ===== CHANNEL EVENTS =====
+    socket.on("channel:join", async (data: { channelId: string; serverId: string }, cb) => {
+      if (!userId) return cb?.({ ok: false, error: "Not authenticated" });
+      try {
+        // Verify user is a member of the server
+        const server = await serverService.getById(data.serverId);
+        if (!server.memberIds.includes(userId)) {
+          return cb?.({ ok: false, error: "Not a member of this server" });
+        }
+
+        // Leave previous channel
+        const prevChannel = activeChannels.get(socket.id);
+        if (prevChannel) {
+          socket.leave(`channel:${prevChannel}`);
+          collab.to(`channel:${prevChannel}`).emit("channel:presence", {
+            channelId: prevChannel,
+            userId,
+            action: "left",
+          });
+        }
+
+        // Join new channel
+        socket.join(`channel:${data.channelId}`);
+        activeChannels.set(socket.id, data.channelId);
+
+        collab.to(`channel:${data.channelId}`).emit("channel:presence", {
+          channelId: data.channelId,
+          userId,
+          action: "joined",
+        });
+
+        cb?.({ ok: true });
+      } catch (err: any) {
+        cb?.({ ok: false, error: err.message });
+      }
+    });
+
+    socket.on("channel:leave", async (data: { channelId: string }) => {
+      socket.leave(`channel:${data.channelId}`);
+      activeChannels.delete(socket.id);
+
+      if (userId) {
+        collab.to(`channel:${data.channelId}`).emit("channel:presence", {
+          channelId: data.channelId,
+          userId,
+          action: "left",
+        });
+      }
+    });
+
+    // ===== MESSAGE EVENTS =====
+    socket.on("msg:send", async (data: { channelId: string; serverId: string; content: string; threadId?: string }, cb) => {
+      if (!userId) return cb?.({ ok: false, error: "Not authenticated" });
+      if (!checkSocketRateLimit("msg", userId, 5, 1000)) {
+        return cb?.({ ok: false, error: "Rate limited" });
+      }
+
+      try {
+        // Verify user is a member of the server
+        const server = await serverService.getById(data.serverId);
+        if (!server.memberIds.includes(userId)) {
+          return cb?.({ ok: false, error: "Not a member of this server" });
+        }
+
+        const message = await messageService.send(
+          data.channelId, data.serverId, userId, data.content, "text", [], data.threadId
+        );
+
+        // Broadcast to channel
+        collab.to(`channel:${data.channelId}`).emit("msg:new", message);
+
+        // Also notify the server room for unread counts
+        collab.to(`server:${data.serverId}`).emit("channel:activity", {
+          channelId: data.channelId,
+          lastMessageAt: message.createdAt,
+          preview: message.content.slice(0, 100),
+        });
+
+        // Clear typing
+        clearTyping(data.channelId, userId, collab);
+
+        cb?.({ ok: true, message });
+      } catch (err: any) {
+        cb?.({ ok: false, error: err.message });
+      }
+    });
+
+    socket.on("msg:edit", async (data: { channelId: string; messageId: string; content: string }, cb) => {
+      if (!userId) return cb?.({ ok: false, error: "Not authenticated" });
+      try {
+        const message = await messageService.edit(data.channelId, data.messageId, userId, data.content);
+        collab.to(`channel:${data.channelId}`).emit("msg:edited", message);
+        cb?.({ ok: true, message });
+      } catch (err: any) {
+        cb?.({ ok: false, error: err.message });
+      }
+    });
+
+    socket.on("msg:delete", async (data: { channelId: string; messageId: string }, cb) => {
+      if (!userId) return cb?.({ ok: false, error: "Not authenticated" });
+      try {
+        await messageService.delete(data.channelId, data.messageId, userId);
+        collab.to(`channel:${data.channelId}`).emit("msg:deleted", {
+          channelId: data.channelId,
+          messageId: data.messageId,
+        });
+        cb?.({ ok: true });
+      } catch (err: any) {
+        cb?.({ ok: false, error: err.message });
+      }
+    });
+
+    socket.on("msg:react", async (data: { channelId: string; messageId: string; emoji: string }, cb) => {
+      if (!userId) return cb?.({ ok: false, error: "Not authenticated" });
+      try {
+        const message = await messageService.react(data.channelId, data.messageId, data.emoji, userId);
+        collab.to(`channel:${data.channelId}`).emit("msg:reacted", message);
+        cb?.({ ok: true });
+      } catch (err: any) {
+        cb?.({ ok: false, error: err.message });
+      }
+    });
+
+    socket.on("msg:pin", async (data: { channelId: string; serverId: string; messageId: string }, cb) => {
+      if (!userId) return cb?.({ ok: false, error: "Not authenticated" });
+      try {
+        const message = await messageService.pin(data.channelId, data.serverId, data.messageId);
+        collab.to(`channel:${data.channelId}`).emit("msg:pinned", message);
+        cb?.({ ok: true });
+      } catch (err: any) {
+        cb?.({ ok: false, error: err.message });
+      }
+    });
+
+    // ===== LOBBY =====
+    socket.on("lobby:message", async (data: { content: string }, cb) => {
+      if (!userId) return cb?.({ ok: false, error: "Not authenticated" });
+      if (!checkSocketRateLimit("msg", userId, 5, 1000)) {
+        return cb?.({ ok: false, error: "Rate limited" });
+      }
+
+      try {
+        const message = await messageService.sendLobby("global-lobby", userId, data.content);
+        collab.to("channel:global-lobby").emit("msg:new", message);
+        cb?.({ ok: true, message });
+      } catch (err: any) {
+        cb?.({ ok: false, error: err.message });
+      }
+    });
+
+    // ===== TYPING =====
+    socket.on("typing:start", (data: { channelId: string }) => {
+      if (!userId) return;
+      if (!checkSocketRateLimit("typing", userId, 3, 3000)) return;
+
+      if (!typingUsers.has(data.channelId)) typingUsers.set(data.channelId, new Map());
+      const channelTyping = typingUsers.get(data.channelId)!;
+
+      // Clear existing timeout
+      if (channelTyping.has(userId)) clearTimeout(channelTyping.get(userId)!);
+
+      // Set new timeout (stop typing after 5s)
+      channelTyping.set(userId, setTimeout(() => {
+        channelTyping.delete(userId!);
+        socket.to(`channel:${data.channelId}`).emit("typing:stop", {
+          channelId: data.channelId,
+          userId,
+        });
+      }, 5000));
+
+      socket.to(`channel:${data.channelId}`).emit("typing:start", {
+        channelId: data.channelId,
+        userId,
       });
-
-      incrementMemberContribution(roomId, userId);
-      io.to(roomId).emit("fc:added", { card });
     });
 
-    socket.on("fc:edit", (data: { cardId: string; front?: string; back?: string; topicName?: string }) => {
-      const { roomId, userId } = socket.data;
-      if (!roomId || !userId) return;
-
-      const state = activeRooms.get(roomId);
-      const participant = state?.participants.get(userId);
-      if (!participant) return;
-
-      const card = updateFlashcard(roomId, data.cardId, {
-        front: data.front,
-        back: data.back,
-        topicName: data.topicName,
-      }, userId, participant.user.nickname);
-
-      if (card) {
-        io.to(roomId).emit("fc:edited", { card });
-      }
+    socket.on("typing:stop", (data: { channelId: string }) => {
+      if (!userId) return;
+      clearTyping(data.channelId, userId, collab);
     });
 
-    socket.on("fc:delete", (data: { cardId: string }) => {
-      const { roomId } = socket.data;
-      if (!roomId) return;
-
-      const ok = deleteFlashcardWs(roomId, data.cardId);
-      if (ok) {
-        io.to(roomId).emit("fc:deleted", { cardId: data.cardId });
-      }
+    // ===== LESSON LINKING =====
+    socket.on("channel:lesson:linked", (data: { channelId: string; lessonId: string; lessonTitle: string }) => {
+      if (!userId) return;
+      socket.to(`channel:${data.channelId}`).emit("channel:lesson:linked", data);
     });
 
-    socket.on("fc:vote", (data: { cardId: string; vote: "up" | "down" }) => {
-      const { roomId, userId } = socket.data;
-      if (!roomId || !userId) return;
-
-      const votes = voteFlashcard(roomId, data.cardId, userId, data.vote);
-      io.to(roomId).emit("fc:voted", { cardId: data.cardId, votes });
+    socket.on("channel:lesson:unlinked", (data: { channelId: string }) => {
+      if (!userId) return;
+      socket.to(`channel:${data.channelId}`).emit("channel:lesson:unlinked", data);
     });
 
-    socket.on("fc:ai-generate", () => {
-      // AI generation is handled via REST endpoint
-      // The client calls the REST endpoint, gets cards, then emits fc:ai-generated
+    // ===== TOOL EVENTS (real-time sync for study tool channels) =====
+    socket.on("tool:data:update", (data: { channelId: string; toolData: any }) => {
+      if (!userId) return;
+      socket.to(`channel:${data.channelId}`).emit("tool:data:update", data);
     });
 
-    socket.on("fc:ai-generated", (data: { cards: SharedFlashcard[] }) => {
-      const { roomId, userId } = socket.data;
-      if (!roomId || !userId) return;
-
-      addBulkFlashcards(roomId, data.cards);
-      incrementMemberContribution(roomId, userId);
-      io.to(roomId).emit("fc:ai-generated", { cards: data.cards });
+    socket.on("tool:quiz:answer", (data: { channelId: string; result: any }) => {
+      if (!userId) return;
+      collab.to(`channel:${data.channelId}`).emit("tool:quiz:answered", data);
     });
 
-    // ========== MIND MAP EVENTS ==========
+    socket.on("tool:flashcard:add", (data: { channelId: string; card: any }) => {
+      if (!userId) return;
+      socket.to(`channel:${data.channelId}`).emit("tool:flashcard:added", data);
+    });
 
-    socket.on("mindmap:annotate", (data: { nodeLabel: string; type: "note" | "question" | "example" | "understood"; text: string }) => {
-      const { roomId, userId } = socket.data;
-      if (!roomId || !userId) return;
+    socket.on("tool:deepdive:msg", (data: { channelId: string; userMessage: any; aiMessage: any }) => {
+      if (!userId) return;
+      socket.to(`channel:${data.channelId}`).emit("tool:deepdive:newmsg", data);
+    });
 
-      const state = activeRooms.get(roomId);
-      const participant = state?.participants.get(userId);
-      if (!participant) return;
+    socket.on("tool:mindmap:update", (data: { channelId: string; mindMap: any }) => {
+      if (!userId) return;
+      socket.to(`channel:${data.channelId}`).emit("tool:mindmap:updated", data);
+    });
 
-      const annotation = addMindMapAnnotation(roomId, {
-        nodeLabel: data.nodeLabel,
-        type: data.type,
-        text: data.text,
-        authorId: userId,
-        authorNickname: participant.user.nickname,
-        authorAvatar: participant.user.avatar,
+    socket.on("tool:sprint:update", (data: { channelId: string; sprint: any }) => {
+      if (!userId) return;
+      collab.to(`channel:${data.channelId}`).emit("tool:sprint:updated", data);
+    });
+
+    socket.on("tool:notes:add", (data: { channelId: string; note: any }) => {
+      if (!userId) return;
+      socket.to(`channel:${data.channelId}`).emit("tool:notes:added", data);
+    });
+
+    socket.on("tool:notes:edit", (data: { channelId: string; note: any }) => {
+      if (!userId) return;
+      socket.to(`channel:${data.channelId}`).emit("tool:notes:edited", data);
+    });
+
+    socket.on("tool:notes:delete", (data: { channelId: string; noteId: string }) => {
+      if (!userId) return;
+      socket.to(`channel:${data.channelId}`).emit("tool:notes:deleted", data);
+    });
+
+    socket.on("tool:notes:pin", (data: { channelId: string; note: any }) => {
+      if (!userId) return;
+      socket.to(`channel:${data.channelId}`).emit("tool:notes:pinned", data);
+    });
+
+    // ===== READ RECEIPTS =====
+    socket.on("read:mark", async (data: { channelId: string; messageId: string }) => {
+      if (!userId) return;
+      // Emit to user's other sessions
+      socket.to(`user:${userId}`).emit("read:updated", {
+        channelId: data.channelId,
+        lastReadMessageId: data.messageId,
       });
-
-      incrementMemberContribution(roomId, userId);
-      io.to(roomId).emit("mindmap:annotated", { annotation });
     });
 
-    socket.on("mindmap:reply", (data: { annotationId: string; text: string }) => {
-      const { roomId, userId } = socket.data;
-      if (!roomId || !userId) return;
+    // ===== DISCONNECT =====
+    socket.on("disconnect", async () => {
+      if (!userId) return;
 
-      const state = activeRooms.get(roomId);
-      const participant = state?.participants.get(userId);
-      if (!participant) return;
+      const sockets = onlineUsers.get(userId);
+      if (sockets) {
+        sockets.delete(socket.id);
+        if (sockets.size === 0) {
+          onlineUsers.delete(userId);
 
-      const reply = addAnnotationReply(roomId, data.annotationId, {
-        text: data.text,
-        authorId: userId,
-        authorNickname: participant.user.nickname,
-      });
-
-      if (reply) {
-        io.to(roomId).emit("mindmap:replied", { annotationId: data.annotationId, reply });
+          // Set offline
+          try {
+            const profile = await profileService.getByIdOptional(userId);
+            if (profile) {
+              await profileService.setStatus(userId, "offline");
+              broadcastPresence(collab, userId, "offline", profile.serverIds);
+            }
+          } catch {}
+        }
       }
-    });
 
-    socket.on("mindmap:ai-response", (data: { annotation: any }) => {
-      const { roomId } = socket.data;
-      if (!roomId) return;
-
-      io.to(roomId).emit("mindmap:ai-response", { annotation: data.annotation });
-    });
-
-    // ========== NOTES EVENTS ==========
-
-    socket.on("notes:add", (data: { title: string; content: string; category: string; source?: string; sourceId?: string }) => {
-      const { roomId, userId } = socket.data;
-      if (!roomId || !userId) return;
-
-      const state = activeRooms.get(roomId);
-      const participant = state?.participants.get(userId);
-      if (!participant) return;
-
-      const note = addNote(roomId, {
-        title: data.title,
-        content: data.content,
-        category: data.category as any,
-        authorId: userId,
-        authorNickname: participant.user.nickname,
-        authorAvatar: participant.user.avatar,
-        source: (data.source as any) || "manual",
-        sourceId: data.sourceId,
-      });
-
-      incrementMemberContribution(roomId, userId);
-      io.to(roomId).emit("notes:added", { note });
-    });
-
-    socket.on("notes:edit", (data: { noteId: string; title?: string; content?: string; category?: string }) => {
-      const { roomId, userId } = socket.data;
-      if (!roomId || !userId) return;
-
-      const state = activeRooms.get(roomId);
-      const participant = state?.participants.get(userId);
-      if (!participant) return;
-
-      const note = updateNote(roomId, data.noteId, {
-        title: data.title,
-        content: data.content,
-        category: data.category as any,
-      }, userId, participant.user.nickname);
-
-      if (note) {
-        io.to(roomId).emit("notes:edited", { note });
+      // Clean up active channel
+      const channelId = activeChannels.get(socket.id);
+      if (channelId) {
+        activeChannels.delete(socket.id);
+        clearTyping(channelId, userId, collab);
       }
-    });
-
-    socket.on("notes:delete", (data: { noteId: string }) => {
-      const { roomId } = socket.data;
-      if (!roomId) return;
-
-      const ok = deleteNoteWs(roomId, data.noteId);
-      if (ok) {
-        io.to(roomId).emit("notes:deleted", { noteId: data.noteId });
-      }
-    });
-
-    socket.on("notes:pin", (data: { noteId: string }) => {
-      const { roomId } = socket.data;
-      if (!roomId) return;
-
-      const pinned = toggleNotePin(roomId, data.noteId);
-      if (pinned !== null) {
-        io.to(roomId).emit("notes:pinned", { noteId: data.noteId, pinned });
-      }
-    });
-
-    // ========== NOTIFICATIONS ==========
-
-    socket.on("notification:request-count", () => {
-      const count = getUnreadCount();
-      socket.emit("notification:badge-update", { count });
-    });
-
-    // ========== DISCONNECT ==========
-
-    socket.on("disconnect", () => {
-      handleLeave(io, socket);
-      logger.info(`[Socket] Disconnected: ${socket.id}`);
     });
   });
+
+  return collab;
 }
 
-function handleLeave(io: SocketServer, socket: Socket) {
-  const { roomId, userId } = socket.data;
-  if (!roomId || !userId) return;
-
-  const state = activeRooms.get(roomId);
-  if (!state) return;
-
-  const participant = state.participants.get(userId);
-  const nickname = participant?.user.nickname || "Someone";
-
-  socket.leave(roomId);
-  state.participants.delete(userId);
-  leaveRoom(roomId, userId);
-
-  const sysMsg = {
-    id: msgId(),
-    type: "system" as const,
-    author: "System",
-    authorId: "system",
-    text: `${nickname} left the room`,
-    time: new Date().toISOString(),
-  };
-  state.chat.push(sysMsg);
-  broadcastChat(io, roomId, sysMsg);
-
-  if (state.participants.size === 0) {
-    activeRooms.delete(roomId);
-  } else {
-    broadcastPresence(io, roomId);
-    broadcastMemberUpdate(io, roomId);
+function broadcastPresence(collab: any, userId: string, status: string, serverIds: string[]) {
+  for (const serverId of serverIds) {
+    collab.to(`server:${serverId}`).emit("presence:update", { userId, status });
   }
+}
 
-  socket.data.roomId = null;
-  socket.data.userId = null;
+function clearTyping(channelId: string, userId: string, collab: any) {
+  const channelTyping = typingUsers.get(channelId);
+  if (channelTyping) {
+    if (channelTyping.has(userId)) {
+      clearTimeout(channelTyping.get(userId)!);
+      channelTyping.delete(userId);
+    }
+    collab.to(`channel:${channelId}`).emit("typing:stop", { channelId, userId });
+  }
+}
+
+export function getOnlineUserIds(): string[] {
+  return [...onlineUsers.keys()];
+}
+
+export function isUserOnline(userId: string): boolean {
+  return onlineUsers.has(userId) && onlineUsers.get(userId)!.size > 0;
 }

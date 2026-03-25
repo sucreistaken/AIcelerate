@@ -12,6 +12,26 @@ export class AppError extends Error {
   }
 }
 
+/** Shape produced by the validate() middleware on Zod failures. */
+interface ValidationError extends Error {
+  statusCode: number;
+  code: "VALIDATION_ERROR";
+  details: Array<{ path: string; message: string }>;
+}
+
+function isValidationError(err: Error): err is ValidationError {
+  return "statusCode" in err && (err as Record<string, unknown>).code === "VALIDATION_ERROR";
+}
+
+/** Shape produced by lessonAiService when LLM JSON parsing fails. */
+interface LlmParseError extends Error {
+  llmText: string;
+}
+
+function isLlmParseError(err: Error): err is LlmParseError {
+  return "llmText" in err;
+}
+
 export function notFound(msg = "Not found") {
   return new AppError(404, msg, "NOT_FOUND");
 }
@@ -24,17 +44,66 @@ export function forbidden(msg = "Forbidden") {
   return new AppError(403, msg, "FORBIDDEN");
 }
 
+export function conflict(msg = "Conflict") {
+  return new AppError(409, msg, "CONFLICT");
+}
+
+export function unprocessable(msg = "Unprocessable entity") {
+  return new AppError(422, msg, "UNPROCESSABLE_ENTITY");
+}
+
+export function gatewayTimeout(msg = "Gateway timeout") {
+  return new AppError(504, msg, "GATEWAY_TIMEOUT");
+}
+
 export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction) {
+  if (res.headersSent) return;
+
   if (err instanceof AppError) {
     res.status(err.statusCode).json({
+      ok: false,
       error: err.message,
       code: err.code,
     });
     return;
   }
 
+  // Handle validation errors (from validate middleware)
+  if (isValidationError(err)) {
+    res.status(400).json({
+      ok: false,
+      error: err.message,
+      code: "VALIDATION_ERROR",
+      details: err.details,
+    });
+    return;
+  }
+
+  // Handle AI timeout errors
+  if (err.message === "AI_TIMEOUT") {
+    res.status(504).json({
+      ok: false,
+      error: "AI yanıt süresi aşıldı. Lütfen tekrar deneyin.",
+      code: "AI_TIMEOUT",
+    });
+    return;
+  }
+
+  // Handle JSON parse errors from LLM
+  if (isLlmParseError(err)) {
+    logger.error("LLM parse error:", err.message);
+    res.status(500).json({
+      ok: false,
+      error: err.message,
+      code: "LLM_PARSE_ERROR",
+      llmText: err.llmText,
+    });
+    return;
+  }
+
   logger.error("Unhandled error:", err);
   res.status(500).json({
+    ok: false,
     error: "Internal server error",
     code: "INTERNAL_ERROR",
   });

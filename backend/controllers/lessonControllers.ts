@@ -1,14 +1,17 @@
 // controllers/lessonControllers.ts
 import path from "path";
 import { readJSON, writeJSON, ensureDataFiles } from "../utils/file-Handler";
+import { lessonRepo } from "../repositories/lessonRepo";
+import type { LessonPlan, LoAlignment, DeviationResult, MindmapCache, MindmapModuleCacheEntry } from "../types";
+import type { CheatSheet } from "../types";
 
 // ---- Tipler ----
 export type Emphasis = {
   statement: string;
   why: string;
-  in_slides: boolean;
-  evidence: string;
-  confidence: number; // 0..1
+  in_slides?: boolean;
+  evidence?: string;
+  confidence?: number; // 0..1
 };
 
 type QuizQA = { question: string; answer?: string };
@@ -38,21 +41,14 @@ export type LessonLoModules = {
   lessonId: string;
   modules: LoStudyModule[];
 };
-export type CheatSheet = {
-  title: string;
-  updatedAt: string;
-  sections: any[];
-  formulas: any[];
-  pitfalls: any[];
-  quickQuiz: any[];
-};
+export type { CheatSheet } from "../types";
 export type Lesson = {
   id: string;
   title: string;
   date: string;                 // ISO string
   transcript: string;
   slideText: string;
-  plan?: any;
+  plan?: LessonPlan;
   summary?: string;
   highlights?: string[];
   professorEmphases?: Emphasis[];
@@ -72,13 +68,12 @@ export type Lesson = {
   courseCode?: string;          // "MATH 153" gibi
   learningOutcomes?: string[];  // IEU'den çekilen resmi LO listesi
 
-  // 🔹 Transcript–LO alignment (şimdilik any bırakabiliriz)
-  loAlignment?: any;
+  loAlignment?: LoAlignment;
   loModules?: LessonLoModules;
 
-  // 🗺️ Mindmap cache
-  mindmapCache?: { code: string; generatedAt: string };
-  mindmapModuleCache?: { [moduleIndex: string]: { code: string; generatedAt: string } };
+  mindmapCache?: MindmapCache;
+  mindmapModuleCache?: { [moduleIndex: string]: MindmapModuleCacheEntry };
+  deviation?: DeviationResult;
 
   // Compact AI digest (generated after plan creation)
   digest?: import("../services/lessonDigestService").LessonDigest;
@@ -103,11 +98,11 @@ ensureDataFiles([
 
 // ---- Yardımcılar ----
 function loadLessons(): Lesson[] {
-  return readJSON<Lesson[]>(LESSONS_PATH) || [];
+  return lessonRepo.findAllSync();
 }
 
 function saveLessons(list: Lesson[]) {
-  writeJSON(LESSONS_PATH, list);
+  lessonRepo.saveAllSync(list);
 }
 
 function loadMemory(): GlobalMemory {
