@@ -4,26 +4,7 @@ import { useLessonStore } from '../stores/lessonStore';
 import { useUiStore } from '../stores/uiStore';
 import { uploadApi } from '../services/api';
 
-// Time formatting helpers
-function fmtTime(sec: number): string {
-    const s = Math.max(0, sec || 0);
-    const mm = Math.floor(s / 60);
-    const ss = Math.floor(s % 60);
-    return `${mm}:${String(ss).padStart(2, '0')}`;
-}
-
-function formatTime(sec: number): string {
-    const s = Math.max(0, Math.floor(sec || 0));
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const r = s % 60;
-
-    const mm = String(m).padStart(2, '0');
-    const ss = String(r).padStart(2, '0');
-
-    if (h > 0) return `${String(h).padStart(2, '0')}:${mm}:${ss}`;
-    return `${mm}:${ss}`;
-}
+import { formatSeconds as fmtTime, formatDuration as formatTime } from '../utils/formatters';
 
 const ALLOWED_FORMATS = ['audio/mpeg', 'audio/wav', 'audio/mp4', 'audio/x-m4a', 'audio/mp3', 'audio/webm', 'video/mp4'];
 const ALLOWED_EXTENSIONS = ['.mp3', '.wav', '.mp4', '.m4a', '.webm'];

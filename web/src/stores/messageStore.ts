@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { ChannelMessage } from "../types";
 import { messagesApi, lobbyApi } from "../services/collabApi";
-import { getCollabSocket } from "../services/collabSocket";
+import { getCollabSocket } from "../services/socket";
 
 interface MessageState {
   // Messages keyed by channelId

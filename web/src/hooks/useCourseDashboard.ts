@@ -1,0 +1,195 @@
+import { useEffect, useState, useCallback, useRef } from "react";
+import toast from "react-hot-toast";
+import { useCourseStore } from "../stores/courseStore";
+import { useLessonStore } from "../stores/lessonStore";
+import { useUiStore } from "../stores/uiStore";
+import { useStudySelectionStore } from "../stores/studySelectionStore";
+import { courseApi } from "../services/api";
+import type { ModeId } from "../types";
+
+const CHAT_STORAGE_PREFIX = "lc.course-chat.";
+
+export type ChatMessage = { role: string; content: string; suggestions?: string[] };
+export type ActiveTab = "overview" | "progress" | "schedule";
+
+export function useCourseDashboard() {
+  const courses = useCourseStore((s) => s.courses);
+  const currentCourseId = useCourseStore((s) => s.currentCourseId);
+  const fetchCourses = useCourseStore((s) => s.fetchCourses);
+  const selectCourse = useCourseStore((s) => s.selectCourse);
+  const deleteCourse = useCourseStore((s) => s.deleteCourse);
+  const rebuildIndex = useCourseStore((s) => s.rebuildIndex);
+  const removeLessonFromCourse = useCourseStore((s) => s.removeLessonFromCourse);
+  const courseProgress = useCourseStore((s) => s.courseProgress);
+  const weeklySchedule = useCourseStore((s) => s.weeklySchedule);
+  const progressLoading = useCourseStore((s) => s.progressLoading);
+  const scheduleLoading = useCourseStore((s) => s.scheduleLoading);
+  const fetchCourseProgress = useCourseStore((s) => s.fetchCourseProgress);
+  const generateWeeklySchedule = useCourseStore((s) => s.generateWeeklySchedule);
+  const exportCourse = useCourseStore((s) => s.exportCourse);
+  const setMode = useUiStore((s) => s.setMode);
+  const setCurrentLessonId = useLessonStore((s) => s.setCurrentLessonId);
+  const allLessons = useLessonStore((s) => s.lessons);
+
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<ActiveTab>("overview");
+  const chatBottomRef = useRef<HTMLDivElement>(null);
+  const [confirmRebuild, setConfirmRebuild] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmDetach, setConfirmDetach] = useState<{ courseId: string; lessonId: string; title: string } | null>(null);
+
+  // Selection store
+  const selection = useStudySelectionStore();
+
+  useEffect(() => {
+    fetchCourses();
+  }, []);
+
+  // Course switch guard: clear selection if course changed
+  useEffect(() => {
+    if (selection.isSelectionMode && currentCourseId !== selection.courseIdForSelection) {
+      selection.exitSelectionMode();
+    }
+  }, [currentCourseId, selection]);
+
+  const course = courses.find((c) => c.id === currentCourseId) || null;
+
+  useEffect(() => {
+    if (!course) return;
+    const saved = localStorage.getItem(CHAT_STORAGE_PREFIX + course.id);
+    if (saved) {
+      try { setChatHistory(JSON.parse(saved)); } catch { setChatHistory([]); }
+    } else {
+      setChatHistory([]);
+    }
+  }, [course?.id]);
+
+  useEffect(() => {
+    if (!course || chatHistory.length === 0) return;
+    localStorage.setItem(CHAT_STORAGE_PREFIX + course.id, JSON.stringify(chatHistory));
+  }, [chatHistory, course?.id]);
+
+  useEffect(() => {
+    if (course) fetchCourseProgress(course.id);
+  }, [course?.id]);
+
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatHistory, chatLoading]);
+
+  const goToLesson = useCallback(
+    (lessonId: string, mode: ModeId = "plan") => {
+      setCurrentLessonId(lessonId);
+      setMode(mode);
+    },
+    [setCurrentLessonId, setMode]
+  );
+
+  const handleCourseChat = useCallback(async (customMsg?: string) => {
+    const msg = (customMsg || chatInput).trim();
+    if (!msg || !course) return;
+    setChatInput("");
+    setChatHistory((h) => [...h, { role: "user", content: msg }]);
+    setChatLoading(true);
+    try {
+      const result = await courseApi.courseChat(course.id, msg, chatHistory);
+      if (result.ok && result.text) {
+        setChatHistory((h) => [...h, { role: "assistant", content: result.text!, suggestions: result.suggestions }]);
+      }
+    } catch (err: any) {
+      toast.error("Sohbet hatas\ı: " + (err?.message || "Bilinmeyen hata"));
+    }
+    setChatLoading(false);
+  }, [chatInput, course, chatHistory]);
+
+  const clearChat = useCallback(() => {
+    setChatHistory([]);
+    if (course) localStorage.removeItem(CHAT_STORAGE_PREFIX + course.id);
+  }, [course?.id]);
+
+  const createLesson = useCallback(() => {
+    setMode("create-lesson");
+  }, [setMode]);
+
+  const courseLessons = course
+    ? course.lessonIds
+        .map((id) => {
+          const l = allLessons.find((les) => les.id === id);
+          if (!l) return null;
+          return {
+            id: l.id,
+            title: l.title,
+            date: l.date,
+            hasSlides: !!l.slideText,
+            hasTranscript: !!l.transcript,
+            hasPlan: !!l.plan,
+            hasQuiz: !!l.plan?.seed_quiz?.length,
+          };
+        })
+        .filter(Boolean) as Array<{ id: string; title: string; date: string; hasSlides: boolean; hasTranscript: boolean; hasPlan: boolean; hasQuiz: boolean }>
+    : [];
+
+  const enterSelectionMode = useCallback(() => {
+    if (course) selection.enterSelectionMode(course.id);
+  }, [course, selection]);
+
+  const handleSelectAll = useCallback(() => {
+    selection.selectAll(courseLessons.map((l) => l.id));
+  }, [courseLessons, selection]);
+
+  const studySelected = useCallback(() => {
+    if (selection.selectedLessonIds.length === 0) return;
+    setCurrentLessonId(selection.selectedLessonIds[0]);
+    setMode("plan");
+  }, [selection.selectedLessonIds, setCurrentLessonId, setMode]);
+
+  return {
+    courses,
+    course,
+    courseLessons,
+    selectCourse,
+    deleteCourse,
+    rebuildIndex,
+    removeLessonFromCourse,
+    exportCourse,
+    courseProgress,
+    weeklySchedule,
+    progressLoading,
+    scheduleLoading,
+    generateWeeklySchedule,
+    showCreateModal,
+    setShowCreateModal,
+    showAssignModal,
+    setShowAssignModal,
+    chatInput,
+    setChatInput,
+    chatHistory,
+    chatLoading,
+    activeTab,
+    setActiveTab,
+    chatBottomRef,
+    confirmRebuild,
+    setConfirmRebuild,
+    confirmDelete,
+    setConfirmDelete,
+    confirmDetach,
+    setConfirmDetach,
+    goToLesson,
+    createLesson,
+    handleCourseChat,
+    clearChat,
+    // Selection
+    isSelectionMode: selection.isSelectionMode,
+    selectedLessonIds: selection.selectedLessonIds,
+    enterSelectionMode,
+    exitSelectionMode: selection.exitSelectionMode,
+    toggleLesson: selection.toggleLesson,
+    handleSelectAll,
+    clearSelection: selection.clearAll,
+    studySelected,
+  };
+}

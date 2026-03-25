@@ -11,15 +11,15 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-    { id: 'plan', icon: '📋', label: 'Plan' },
-    { id: 'alignment', icon: '🎯', label: 'Eşleştir' },
-    { id: 'quiz', icon: '❓', label: 'Quiz' },
-    { id: 'cheat-sheet', icon: '📝', label: 'Cheat' },
-    { id: 'history', icon: '📚', label: 'Dersler' },
+    { id: 'plan', icon: 'P', label: 'Plan' },
+    { id: 'alignment', icon: 'A', label: 'Eşleştir' },
+    { id: 'quiz', icon: 'Q', label: 'Quiz' },
+    { id: 'cheat-sheet', icon: 'C', label: 'Cheat' },
+    { id: 'history', icon: 'L', label: 'Dersler' },
 ];
 
 export function MobileNav() {
-    const { mode, setMode, showNewLessonModal, setShowNewLessonModal } = useUiStore();
+    const { mode, setMode } = useUiStore();
 
     return (
         <>
@@ -86,7 +86,7 @@ export function MobileNav() {
             {/* Floating Action Button */}
             <motion.button
                 className="fab"
-                onClick={() => setShowNewLessonModal(true)}
+                onClick={() => setMode("create-lesson" as any)}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 aria-label="Yeni ders oluştur"
@@ -101,7 +101,7 @@ export function MobileNav() {
                     background: 'var(--accent)',
                     color: '#fff',
                     border: 'none',
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+                    boxShadow: 'var(--shadow-1)',
                     cursor: 'pointer',
                     fontSize: '24px',
                     display: 'flex',
@@ -110,7 +110,7 @@ export function MobileNav() {
                 }}
             >
                 <motion.span
-                    animate={{ rotate: showNewLessonModal ? 45 : 0 }}
+                    animate={{ rotate: 0 }}
                     transition={{ duration: 0.2 }}
                 >
                     +

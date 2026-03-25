@@ -4,12 +4,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSchedulerStore } from "../stores/schedulerStore";
 import { useUiStore } from "../stores/uiStore";
 
-const taskTypeIcons: Record<string, string> = {
-  "review-weakness": "📖",
-  "flashcard-review": "🃏",
-  "quiz-practice": "❓",
-  "deep-dive": "🔬",
-  revision: "🔄",
+const taskTypeLabelsShort: Record<string, string> = {
+  "review-weakness": "Review",
+  "flashcard-review": "Cards",
+  "quiz-practice": "Quiz",
+  "deep-dive": "Dive",
+  revision: "Rev",
 };
 
 const taskTypeLabels: Record<string, string> = {
@@ -36,7 +36,6 @@ export default function SchedulerWidget() {
     if (taskType === "flashcard-review") setMode("flashcards");
     else if (taskType === "quiz-practice") setMode("quiz");
     else if (taskType === "deep-dive") setMode("deep-dive");
-    else if (taskType === "review-weakness") setMode("weakness");
     else setMode("plan");
   };
 
@@ -57,7 +56,7 @@ export default function SchedulerWidget() {
           {scheduler.nextTask && (
             <>
               <span className="scheduler-widget__icon">
-                {taskTypeIcons[scheduler.nextTask.taskType] || "📚"}
+                {taskTypeLabelsShort[scheduler.nextTask.taskType] || "Study"}
               </span>
               <div className="scheduler-widget__info">
                 <span className="scheduler-widget__label">Study Now</span>
@@ -74,7 +73,7 @@ export default function SchedulerWidget() {
         <div className="scheduler-widget__right">
           {scheduler.streak && scheduler.streak.currentStreak > 0 && (
             <span className="scheduler-widget__streak" title={`${scheduler.streak.currentStreak} day streak`}>
-              🔥 {scheduler.streak.currentStreak}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2c1 4-2 7-2 10a4 4 0 0 0 8 0c0-3-1-5-2-7 0 0-1 3-2 3s-2-3-2-6z"/></svg>{" "}{scheduler.streak.currentStreak}
             </span>
           )}
           {scheduler.nextTask && (
@@ -132,7 +131,7 @@ export default function SchedulerWidget() {
                     onChange={() => !task.completed && handleCompleteTask(task.id)}
                   />
                   <span className="scheduler-widget__task-icon">
-                    {taskTypeIcons[task.taskType] || "📚"}
+                    {taskTypeLabelsShort[task.taskType] || "Study"}
                   </span>
                   <span className="scheduler-widget__task-name">{task.topicName}</span>
                   <span className="scheduler-widget__task-type">

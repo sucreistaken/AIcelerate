@@ -9,7 +9,7 @@ import type {
   ChannelQuizData,
 } from "../types";
 import { channelToolApi } from "../services/channelToolApi";
-import { getCollabSocket } from "../services/collabSocket";
+import { getCollabSocket } from "../services/socket";
 
 interface ChannelToolState {
   dataByChannel: Record<string, ChannelToolData>;

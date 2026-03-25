@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { UserProfile } from "../types";
 import { profilesApi } from "../services/collabApi";
-import { connectCollab, disconnectCollab } from "../services/collabSocket";
+import { connectCollab, disconnectCollab } from "../services/socket";
 
 interface ProfileState {
   profile: UserProfile | null;

@@ -57,7 +57,7 @@ export default function PaneInfoBanner({ id, title, description, tips }: PaneInf
   }
 
   return (
-    <div style={{
+    <div role="status" style={{
       padding: "12px 16px", borderRadius: 10, marginBottom: 12,
       background: "var(--accent-2)08", border: "1px solid var(--accent-2)22",
       position: "relative",

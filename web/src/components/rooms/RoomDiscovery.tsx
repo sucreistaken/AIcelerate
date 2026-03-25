@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import type { StudyServer } from "../../types";
-import { useRoomStore2 } from "../../stores/roomStore2";
+import { useRoomStore } from "../../stores/roomStore";
 import { useAuthStore } from "../../stores/authStore";
 import RoomCard from "./RoomCard";
 
@@ -13,9 +13,9 @@ export default function RoomDiscovery({ onSelectRoom }: Props) {
   const [tagFilter, setTagFilter] = useState("");
   const [results, setResults] = useState<StudyServer[]>([]);
   const [loading, setLoading] = useState(false);
-  const discoverRooms = useRoomStore2((s) => s.discoverRooms);
-  const joinPublicRoom = useRoomStore2((s) => s.joinPublicRoom);
-  const rooms = useRoomStore2((s) => s.rooms);
+  const discoverRooms = useRoomStore((s) => s.discoverRooms);
+  const joinPublicRoom = useRoomStore((s) => s.joinPublicRoom);
+  const rooms = useRoomStore((s) => s.rooms);
   const user = useAuthStore((s) => s.user);
 
   useEffect(() => {

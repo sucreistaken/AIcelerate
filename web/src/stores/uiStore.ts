@@ -7,7 +7,7 @@ import { setLanguage as setI18nLanguage, initLanguage } from '../utils/i18n';
 type Theme = 'light' | 'dark' | 'system';
 type Language = 'tr' | 'en';
 
-interface SttProgress {
+export interface SttProgress {
     progress: number;
     status: string | null;
     now: { start: number; end: number } | null;
@@ -49,6 +49,9 @@ interface UiState {
     // Language
     language: Language;
 
+    // Advanced modes ribbon
+    showAdvancedModes: boolean;
+
     // Actions
     setMode: (mode: ModeId) => void;
     setTheme: (theme: Theme) => void;
@@ -67,6 +70,7 @@ interface UiState {
     setCheatErr: (err: string | null) => void;
     setDevErr: (err: string | null) => void;
     toggleLeftPanel: () => void;
+    toggleAdvancedModes: () => void;
 }
 
 const getInitialMode = (): ModeId => {
@@ -110,6 +114,7 @@ export const useUiStore = create<UiState>()(
             devErr: null,
             leftPanelCollapsed: true,
             language: initLanguage(),
+            showAdvancedModes: false,
 
             // Actions
             setMode: (mode) => {
@@ -169,6 +174,7 @@ export const useUiStore = create<UiState>()(
             setCheatErr: (err) => set({ cheatErr: err }),
             setDevErr: (err) => set({ devErr: err }),
             toggleLeftPanel: () => set((s) => ({ leftPanelCollapsed: !s.leftPanelCollapsed })),
+            toggleAdvancedModes: () => set((s) => ({ showAdvancedModes: !s.showAdvancedModes })),
 
             setLanguage: (lang) => {
                 set({ language: lang });
@@ -181,6 +187,7 @@ export const useUiStore = create<UiState>()(
                 theme: state.theme,
                 leftPanelCollapsed: state.leftPanelCollapsed,
                 language: state.language,
+                showAdvancedModes: state.showAdvancedModes,
             }),
         }
     )

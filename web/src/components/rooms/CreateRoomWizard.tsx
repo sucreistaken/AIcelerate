@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useRoomStore2 } from "../../stores/roomStore2";
+import { useRoomStore } from "../../stores/roomStore";
 import { useAuthStore } from "../../stores/authStore";
 import type { ServerTemplate } from "../../types";
 
@@ -20,9 +20,9 @@ export default function CreateRoomWizard({ onCreated, onCancel }: Props) {
   const [tags, setTags] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const createRoom = useRoomStore2((s) => s.createRoom);
-  const templates = useRoomStore2((s) => s.templates);
-  const loadTemplates = useRoomStore2((s) => s.loadTemplates);
+  const createRoom = useRoomStore((s) => s.createRoom);
+  const templates = useRoomStore((s) => s.templates);
+  const loadTemplates = useRoomStore((s) => s.loadTemplates);
   const user = useAuthStore((s) => s.user);
 
   useEffect(() => {

@@ -22,6 +22,7 @@
   --accent: #111113;
   --accent-2: #2563eb;
   --ring: rgba(37, 99, 235, .14);
+  --accent-2-soft: rgba(37, 99, 235, .08);
 
   /* Semantic status colors – WCAG AA compliant on white */
   --danger: #dc2626;
@@ -131,6 +132,7 @@
   --accent: #fafafa;
   --accent-2: #3b82f6;
   --ring: rgba(59, 130, 246, .22);
+  --accent-2-soft: rgba(59, 130, 246, .1);
 
   --danger: #f87171;
   --danger-bg: #3f1111;
@@ -578,7 +580,13 @@ code,
 .lc-sidebar-drawer__content {
   flex: 1;
   overflow-y: auto;
-  padding: 24px;
+  padding: 20px;
+}
+
+.lc-sidebar-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
 .lc-sidebar-drawer__content::-webkit-scrollbar {
@@ -618,10 +626,17 @@ code,
   z-index: 10;
   display: flex;
   align-items: center;
-  padding: 14px 0;
-  backdrop-filter: saturate(180%) blur(16px);
-  background: var(--nav-bg);
-  border-bottom: 1px solid var(--border);
+  padding: 10px 0;
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  background: rgba(247, 247, 248, 0.78);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  transition: background 0.3s, border-color 0.3s;
+}
+
+.dark .nav {
+  background: rgba(12, 12, 14, 0.72);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
 }
 
 .nav-inner {
@@ -664,7 +679,11 @@ code,
 .nav-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+}
+
+.nav-actions > * {
+  flex-shrink: 0;
 }
 
 @media (max-width:768px) {
@@ -1032,9 +1051,12 @@ code,
 .lc-section {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: 20px;
   padding: var(--space-8);
-  box-shadow: var(--shadow-xs);
+  box-shadow:
+    0 1px 2px rgba(0,0,0,0.03),
+    0 4px 12px rgba(0,0,0,0.04);
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
 }
 
 .section-header {
@@ -6550,11 +6572,16 @@ html {
 
 /* ====== Scheduler Widget ====== */
 .scheduler-widget {
-  background: var(--card-bg, #1c1c24);
-  border: 1px solid var(--border, #2a2a3a);
+  background: var(--card, var(--bg-elevated, #fff));
+  border: 1px solid var(--border);
   border-radius: 12px;
   margin-bottom: 12px;
   overflow: hidden;
+}
+.dark .scheduler-widget {
+  background: #1e1e24;
+  border-color: #2f2f3a;
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, .08), 0 2px 8px rgba(0,0,0,.25);
 }
 
 .scheduler-widget__header {
@@ -6576,8 +6603,15 @@ html {
 }
 
 .scheduler-widget__icon {
-  font-size: 1.3rem;
+  font-size: 0.75rem;
+  font-weight: 700;
   flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--accent-2-soft, rgba(59, 130, 246, .1));
+  color: var(--accent-2, #3b82f6);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .scheduler-widget__info {
@@ -6590,14 +6624,14 @@ html {
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--muted, #888);
-  font-weight: 600;
+  color: var(--accent-2, #3b82f6);
+  font-weight: 700;
 }
 
 .scheduler-widget__topic {
   font-size: 0.88rem;
   font-weight: 600;
-  color: var(--fg, #e4e4e7);
+  color: var(--text, #e4e4e7);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -6630,13 +6664,14 @@ html {
 .scheduler-widget__reason {
   padding: 0 14px 10px;
   font-size: 0.78rem;
-  color: var(--muted, #888);
+  color: var(--text-secondary, #a1a1aa);
   line-height: 1.3;
 }
 
 .scheduler-widget__expanded {
-  border-top: 1px solid var(--border, #2a2a3a);
+  border-top: 1px solid var(--border);
   overflow: hidden;
+  background: rgba(0,0,0,.08);
 }
 
 .scheduler-widget__plan-header {
@@ -6665,7 +6700,7 @@ html {
   padding: 6px 0;
   font-size: 0.82rem;
   cursor: pointer;
-  border-bottom: 1px solid var(--border, #2a2a3a);
+  border-bottom: 1px solid var(--border);
 }
 
 .scheduler-widget__task:last-child {
@@ -6687,7 +6722,13 @@ html {
 
 .scheduler-widget__task-icon {
   flex-shrink: 0;
-  font-size: 0.9rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--accent-2-soft, rgba(59, 130, 246, .08));
+  color: var(--accent-2, #3b82f6);
+  text-transform: uppercase;
 }
 
 .scheduler-widget__task-name {
@@ -6696,7 +6737,7 @@ html {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--fg, #e4e4e7);
+  color: var(--text, #e4e4e7);
 }
 
 .scheduler-widget__task-type {
@@ -6715,9 +6756,10 @@ html {
 .scheduler-widget__summary {
   padding: 8px 14px;
   font-size: 0.76rem;
-  color: var(--muted, #888);
+  color: var(--text-secondary, #a1a1aa);
   text-align: right;
-  border-top: 1px solid var(--border, #2a2a3a);
+  border-top: 1px solid var(--border);
+  font-weight: 600;
 }
 
 /* ====== Notification Bell ====== */
@@ -7876,14 +7918,7 @@ html.dark body {
   background: transparent;
 }
 
-/* --- Navbar: Glass morphism --- */
-.dark .nav {
-  background: rgba(9, 9, 11, 0.5);
-  backdrop-filter: blur(24px) saturate(180%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
-  position: relative;
-}
+/* --- Navbar: Glass morphism (handled in .nav definition) --- */
 
 .dark .nav::after {
   content: '';
@@ -9573,4 +9608,663 @@ body, .page, .lc-section, .nav, .card, .lc-sidebar-drawer, .mode-ribbon {
 
 .progress-stepper__step--done .progress-stepper__line {
   background: var(--success);
+}
+
+/* =========================================
+   WelcomeGuide – Duolingo + Apple Style
+   ========================================= */
+
+.wg {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+}
+
+/* ── Hero ── */
+.wg-hero {
+  text-align: center;
+  margin-bottom: var(--space-10);
+}
+
+.wg-hero__badge {
+  width: 80px;
+  height: 80px;
+  border-radius: 24px;
+  background: linear-gradient(140deg, #3b82f6, #8b5cf6, #a855f7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto var(--space-5);
+  box-shadow:
+    0 8px 24px rgba(99, 102, 241, 0.25),
+    0 2px 8px rgba(0,0,0,0.06);
+}
+
+.wg-hero__badge-icon {
+  font-size: 36px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+}
+
+.wg-hero__title {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  margin: 0 0 var(--space-2);
+  line-height: 1.2;
+}
+
+.wg-hero__subtitle {
+  font-size: 15px;
+  color: var(--text-secondary);
+  max-width: 400px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+.wg-hero__stats {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.wg-hero__stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--bg);
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+}
+
+/* ── Sections ── */
+.wg-section {
+  margin-bottom: var(--space-8);
+}
+
+.wg-section__label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: var(--space-3);
+  padding-left: 2px;
+}
+
+/* ── Step Cards (Duolingo style) ── */
+.wg-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.wg-step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-5);
+  border-radius: 18px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  font-family: var(--font-body);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow:
+    0 1px 2px rgba(0,0,0,0.03),
+    0 2px 8px rgba(0,0,0,0.03);
+}
+
+.dark .wg-step {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.wg-step:hover {
+  border-color: var(--accent-2);
+  box-shadow:
+    0 4px 16px rgba(37, 99, 235, 0.08),
+    0 1px 3px rgba(0,0,0,0.04);
+}
+
+.wg-step--active {
+  border-color: var(--accent-2);
+  background: rgba(37, 99, 235, 0.04);
+  box-shadow:
+    0 0 0 3px rgba(37, 99, 235, 0.08),
+    0 4px 12px rgba(37, 99, 235, 0.06);
+}
+
+.dark .wg-step--active {
+  background: rgba(59, 130, 246, 0.08);
+  box-shadow:
+    0 0 0 3px rgba(59, 130, 246, 0.12),
+    0 4px 16px rgba(59, 130, 246, 0.1);
+}
+
+.wg-step--done {
+  opacity: 0.6;
+  border-color: var(--success);
+}
+
+.wg-step__number {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+  background: var(--bg);
+  border: 2px solid var(--border);
+  color: var(--muted);
+}
+
+.wg-step--active .wg-step__number {
+  background: var(--accent-2);
+  border-color: var(--accent-2);
+  color: #fff;
+}
+
+.wg-step--done .wg-step__number {
+  background: var(--success);
+  border-color: var(--success);
+  color: #fff;
+}
+
+.wg-step__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(37, 99, 235, 0.06);
+  color: var(--accent-2);
+  flex-shrink: 0;
+}
+
+.wg-step--active .wg-step__icon {
+  background: rgba(37, 99, 235, 0.1);
+}
+
+.dark .wg-step__icon {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.wg-step__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.wg-step__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.wg-step__desc {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+.wg-step__arrow {
+  color: var(--muted);
+  flex-shrink: 0;
+  opacity: 0.4;
+}
+
+.wg-step--active .wg-step__arrow {
+  color: var(--accent-2);
+  opacity: 1;
+}
+
+/* ── Recent Lessons ── */
+.wg-lessons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.wg-lesson {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-radius: 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  font-family: var(--font-body);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow:
+    0 1px 2px rgba(0,0,0,0.03),
+    0 2px 8px rgba(0,0,0,0.03);
+}
+
+.dark .wg-lesson {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.wg-lesson:hover {
+  transform: translateX(4px);
+  border-color: var(--accent-2);
+  box-shadow:
+    0 4px 16px rgba(37, 99, 235, 0.08),
+    0 1px 3px rgba(0,0,0,0.04);
+}
+
+.wg-lesson__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(37, 99, 235, 0.06);
+  color: var(--accent-2);
+  flex-shrink: 0;
+}
+
+.dark .wg-lesson__icon {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.wg-lesson__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.wg-lesson__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wg-lesson__meta {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+.wg-lesson__action {
+  display: flex;
+  align-items: center;
+  color: var(--muted);
+  flex-shrink: 0;
+  opacity: 0.4;
+  transition: opacity 0.2s, color 0.2s;
+}
+
+.wg-lesson:hover .wg-lesson__action {
+  opacity: 1;
+  color: var(--accent-2);
+}
+
+/* ── New Lesson ── */
+.wg-new-lesson {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-4);
+  margin-top: var(--space-4);
+  border-radius: 16px;
+  border: 2px dashed var(--border);
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.wg-new-lesson:hover {
+  border-color: var(--accent-2);
+  color: var(--accent-2);
+  background: rgba(37, 99, 235, 0.03);
+  transform: translateY(-1px);
+}
+
+.dark .wg-new-lesson:hover {
+  background: rgba(59, 130, 246, 0.06);
+}
+
+.wg-new-lesson__plus {
+  font-size: 18px;
+  font-weight: 300;
+  line-height: 1;
+}
+
+/* ── Study Tools Grid ── */
+.wg-tools {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+}
+
+@media (max-width: 640px) {
+  .wg-tools {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.wg-tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+  border-radius: 20px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow:
+    0 1px 2px rgba(0,0,0,0.03),
+    0 4px 12px rgba(0,0,0,0.04);
+}
+
+.dark .wg-tool {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.06);
+  box-shadow:
+    0 1px 2px rgba(0,0,0,0.1),
+    0 4px 16px rgba(0,0,0,0.2);
+}
+
+.wg-tool:hover {
+  transform: translateY(-4px);
+  border-color: transparent;
+  box-shadow:
+    0 0 0 1px rgba(37, 99, 235, 0.1),
+    0 8px 28px rgba(37, 99, 235, 0.12),
+    0 2px 8px rgba(0,0,0,0.04);
+}
+
+.dark .wg-tool:hover {
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow:
+    0 0 0 1px rgba(59, 130, 246, 0.2),
+    0 8px 32px rgba(59, 130, 246, 0.15),
+    0 2px 8px rgba(0,0,0,0.2);
+}
+
+.wg-tool__icon-wrap {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgb(var(--tool-tint, 37, 99, 235));
+  background: rgba(var(--tool-tint, 37, 99, 235), 0.08);
+  transition: background 0.2s, color 0.2s;
+}
+
+.wg-tool:hover .wg-tool__icon-wrap {
+  background: rgba(var(--tool-tint, 37, 99, 235), 0.14);
+}
+
+.dark .wg-tool__icon-wrap {
+  background: rgba(var(--tool-tint, 37, 99, 235), 0.12);
+}
+
+.dark .wg-tool:hover .wg-tool__icon-wrap {
+  background: rgba(var(--tool-tint, 37, 99, 235), 0.2);
+}
+
+.wg-tool__label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.wg-tool__desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* ── Apple-vari global card softness ── */
+.lc-section,
+.card {
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.04),
+    0 1px 2px rgba(0, 0, 0, 0.03),
+    0 4px 16px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
+}
+
+.dark .lc-section,
+.dark .card {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* =========================================
+   ModeRibbon – Apple Segment Control
+   ========================================= */
+
+.mr {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: rgba(247, 247, 248, 0.82);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  margin-bottom: var(--space-5);
+}
+
+.dark .mr {
+  background: rgba(12, 12, 14, 0.78);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+.mr-scroll {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.mr-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.mr-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  flex-shrink: 0;
+  margin: 0 4px;
+  opacity: 0.5;
+}
+
+.mr-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.mr-tab:hover {
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.dark .mr-tab:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.mr-tab--active {
+  color: var(--accent-2);
+  font-weight: 600;
+}
+
+.mr-tab--active:hover {
+  background: transparent;
+}
+
+.mr-tab__icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.mr-tab__label {
+  line-height: 1;
+}
+
+.mr-tab__indicator {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 2.5px;
+  border-radius: 2px;
+  background: var(--accent-2);
+}
+
+/* =========================================
+   EmptyState – Duolingo Motivational
+   ========================================= */
+
+.es {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+  text-align: center;
+}
+
+.es__icon {
+  font-size: 56px;
+  margin-bottom: var(--space-5);
+  line-height: 1;
+}
+
+.es__title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 var(--space-2);
+  letter-spacing: -0.02em;
+}
+
+.es__desc {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-4);
+  max-width: 360px;
+  line-height: 1.6;
+}
+
+.es__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--bg);
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  margin-bottom: var(--space-5);
+}
+
+.es__hint-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.es__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 28px;
+  border-radius: var(--radius-full);
+  background: var(--accent-2);
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+  transition: box-shadow 0.2s, background 0.2s;
+}
+
+.es__action:hover {
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.3);
+}
+
+/* =========================================
+   Hero – Minimal Apple Style
+   ========================================= */
+
+.hero {
+  margin: var(--space-4) 0 var(--space-3);
+}
+
+.h1 {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  margin: 0;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.hero-breadcrumb {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
 }

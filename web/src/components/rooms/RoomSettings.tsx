@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import type { StudyServer } from "../../types";
-import { useRoomStore2 } from "../../stores/roomStore2";
+import { useRoomStore } from "../../stores/roomStore";
 import { useAuthStore } from "../../stores/authStore";
 import { roomsApi } from "../../services/roomsApi";
 import { ConfirmModal } from "../ui/ConfirmModal";
@@ -12,9 +12,9 @@ interface Props {
 
 export default function RoomSettings({ room, onClose }: Props) {
   const user = useAuthStore((s) => s.user);
-  const leaveRoom = useRoomStore2((s) => s.leaveRoom);
-  const deleteRoom = useRoomStore2((s) => s.deleteRoom);
-  const archiveRoom = useRoomStore2((s) => s.archiveRoom);
+  const leaveRoom = useRoomStore((s) => s.leaveRoom);
+  const deleteRoom = useRoomStore((s) => s.deleteRoom);
+  const archiveRoom = useRoomStore((s) => s.archiveRoom);
   const [inviteCode, setInviteCode] = useState(room.inviteCode);
   const [copied, setCopied] = useState(false);
   const isOwner = user?.id === room.ownerId;

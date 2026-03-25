@@ -80,7 +80,7 @@ export default function PlanPane({ plan }: { plan: Plan }) {
       </header>
       {plan.learning_outcomes?.length ? (
   <section className="lc-section">
-    <h3 className="h3 mb-2">🎯 Learning Outcomes (Syllabus)</h3>
+    <h3 className="h3 mb-2">Learning Outcomes (Syllabus)</h3>
     <ul className="ul">
       {plan.learning_outcomes.map((lo, i) => (
         <li key={i} className="mb-1">
@@ -101,7 +101,7 @@ export default function PlanPane({ plan }: { plan: Plan }) {
             </span>
           )}
 
-          {/* 👇 Hangi dersler bu LO'yu kapsıyor? */}
+          {/* Hangi dersler bu LO'yu kapsiyor? */}
           {lo.covered_by_lessons?.length ? (
             <div style={{ marginTop: "4px", fontSize: "12px", opacity: 0.8 }}>
               Lessons:&nbsp;
@@ -121,7 +121,7 @@ export default function PlanPane({ plan }: { plan: Plan }) {
     index={idx}
     mod={m}
     defaultOpen={idx === 0}
-    learningOutcomes={plan.learning_outcomes || []}   // 👈 YENİ
+    learningOutcomes={plan.learning_outcomes || []}   // YENİ
   />
 ))}
 
@@ -185,7 +185,7 @@ function ModuleAccordion({
         <div className="lc-acc-body">
           <div className="lc-lesson-grid">
             {mod.lessons?.map((l, li) => {
-              // 🔗 Bu lesson'ı hangi LO'lar kapsıyor?
+              // Bu lesson'i hangi LO'lar kapsiyor?
               const loTags =
                 learningOutcomes
                   ?.filter(
@@ -209,7 +209,7 @@ function ModuleAccordion({
                     </div>
                   </div>
 
-                  {/* 🎯 LO etiketleri */}
+                  {/* LO etiketleri */}
                   {loTags.length > 0 && (
                     <div style={{ marginTop: "4px", marginBottom: "4px" }}>
                       {loTags.map((code) => (

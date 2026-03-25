@@ -1,6 +1,7 @@
 // src/stores/courseStore.ts
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import toast from "react-hot-toast";
 import { Course, CourseProgress, WeeklySchedule } from "../types";
 import { courseApi } from "../services/api";
 
@@ -130,6 +131,7 @@ export const useCourseStore = create<CourseState>()(
             set((s) => ({
               courses: s.courses.map((c) => (c.id === courseId ? result.course! : c)),
             }));
+            toast.success("Ders kurstan çıkarıldı");
           }
         } catch { /* ignore */ }
       },
