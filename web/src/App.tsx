@@ -9,7 +9,7 @@ import ShareModal from "./components/ui/ShareModal";
 import AuthGuard from "./components/auth/AuthGuard";
 import AmbientBackground from "./components/ui/AmbientBackground";
 import CursorGlow from "./components/ui/CursorGlow";
-import ParticleField from "./components/ui/ParticleField";
+
 import NavigationChip from "./components/layout/NavigationChip";
 import PaneRouter from "./components/layout/PaneRouter";
 import SchedulerWidget from "./components/SchedulerWidget";
@@ -43,10 +43,8 @@ export default function App() {
     <AuthGuard>
       <AmbientBackground />
       <CursorGlow />
-      <ParticleField />
       <div className="page" style={{ position: "relative", zIndex: 1 }}>
         <AppNavbar
-          authUser={authUser}
           language={ui.language}
           onToggleLanguage={() =>
             ui.setLanguage(ui.language === "tr" ? "en" : "tr")

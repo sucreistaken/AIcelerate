@@ -1,23 +1,17 @@
 import React from "react";
 import NotificationBell from "../ui/NotificationBell";
 import { StreakBadge } from "../ui/StreakBadge";
-import ShareButton from "../ui/ShareButton";
 import ThemeToggle from "../ui/ThemeToggle";
-import type { AuthUser } from "../../services/authApi";
+
+const SettingsIcon = (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>);
 
 interface AppNavbarProps {
-  authUser: AuthUser | null;
   language: "tr" | "en";
   onToggleLanguage: () => void;
   onOpenSettings: () => void;
 }
 
-export default function AppNavbar({
-  authUser,
-  language,
-  onToggleLanguage,
-  onOpenSettings,
-}: AppNavbarProps) {
+export default function AppNavbar({ language, onToggleLanguage, onOpenSettings }: AppNavbarProps) {
   return (
     <nav className="nav" role="navigation" aria-label="Ana navigasyon">
       <div className="nav-inner">
@@ -26,56 +20,17 @@ export default function AppNavbar({
           <div className="pill">v3.0</div>
         </div>
         <div className="flex-1" />
-        <div className="nav-divider" />
         <div className="nav-actions">
           <NotificationBell />
-          {authUser && (
-            <span
-              className="nav-user-name"
-              style={{
-                fontSize: "var(--text-sm)",
-                color: "var(--muted)",
-              }}
-            >
-              {authUser.profile.nickname}
-            </span>
-          )}
-          <button
-            className="nav-settings-btn"
-            onClick={onOpenSettings}
-            title="Settings"
-            aria-label="Settings"
-            style={{
-              background: "none",
-              border: "none",
-              color: "var(--muted)",
-              cursor: "pointer",
-              fontSize: "var(--text-lg)",
-              padding: "var(--space-1)",
-            }}
-          >
-            &#9881;
+          <button className="nav-icon-btn" onClick={onOpenSettings} title="Settings" aria-label="Settings">
+            {SettingsIcon}
           </button>
+          <div className="nav-divider" />
           <StreakBadge />
-          <button
-            onClick={onToggleLanguage}
-            title={language === "tr" ? "Switch to English" : "Turkceye gec"}
-            aria-label={language === "tr" ? "Switch to English" : "Turkceye gec"}
-            style={{
-              background: "none",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-full)",
-              padding: "3px 8px",
-              fontSize: 11,
-              fontWeight: 600,
-              cursor: "pointer",
-              color: "var(--muted)",
-              transition: "all 0.15s",
-            }}
-          >
+          <div className="nav-divider" />
+          <button className="nav-lang-btn" onClick={onToggleLanguage} title={language === "tr" ? "Switch to English" : "Turkceye gec"} aria-label={language === "tr" ? "Switch to English" : "Turkceye gec"}>
             {language === "tr" ? "EN" : "TR"}
           </button>
-          <ShareButton />
           <ThemeToggle />
         </div>
       </div>

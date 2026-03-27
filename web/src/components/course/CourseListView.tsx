@@ -1,6 +1,22 @@
 import type { Course } from "../../types";
 import { CreateCourseModal } from "./CreateCourseModal";
 import PaneInfoBanner from "../ui/PaneInfoBanner";
+import { EmptyState } from "../ui/EmptyState";
+
+const ChevronIcon = (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" opacity={0.4}>
+    <path d="M6 3l5 5-5 5" />
+  </svg>
+);
+
+const BookIcon = (
+  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 19.5A2.5 2.5 0 016.5 17H20" />
+    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" />
+    <line x1="9" y1="7" x2="16" y2="7" />
+    <line x1="9" y1="11" x2="13" y2="11" />
+  </svg>
+);
 
 interface CourseListViewProps {
   courses: Course[];
@@ -15,8 +31,8 @@ export function CourseListView({ courses, showCreateModal, onShowCreateModal, on
       <PaneInfoBanner
         id="course-dashboard"
         title="Course Dashboard Nedir?"
-        description="Derslerinizi kurslara gruplayarak AI'\ın dersler aras\ı ba\ğlant\ı kurmas\ın\ı sa\ğlay\ın."
-        tips={["Kurs olu\ştur", "Ders ata", "\İlerleme takibi", "Haftal\ık plan"]}
+        description="Derslerinizi kurslara gruplayarak AI'ın dersler arası bağlantı kurmasını sağlayın."
+        tips={["Kurs oluştur", "Ders ata", "İlerleme takibi", "Haftalık plan"]}
       />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <h2 className="h2">Courses</h2>
@@ -24,10 +40,13 @@ export function CourseListView({ courses, showCreateModal, onShowCreateModal, on
       </div>
 
       {courses.length === 0 ? (
-        <div className="muted-block" style={{ padding: 24, textAlign: "center" }}>
-          <p style={{ fontSize: 14, marginBottom: 8 }}>No courses yet. Create a course to organize your lessons.</p>
-          <p className="muted small">Courses group your lessons together so the AI can make cross-lesson connections.</p>
-        </div>
+        <EmptyState
+          icon={BookIcon}
+          title="No courses yet"
+          description="Create your first course to organize lessons. AI will then build cross-lesson connections automatically."
+          hint="Tip: Start with one course and add lessons as you go"
+          action={{ label: "Create Your First Course", onClick: () => onShowCreateModal(true) }}
+        />
       ) : (
         <div style={{ display: "grid", gap: 8 }}>
           {courses.map((c) => (
@@ -47,9 +66,7 @@ export function CourseListView({ courses, showCreateModal, onShowCreateModal, on
                   {c.settings?.examDate ? ` | Exam: ${c.settings.examDate}` : ""}
                 </div>
               </div>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" opacity={0.4}>
-                <path d="M6 3l5 5-5 5" />
-              </svg>
+              {ChevronIcon}
             </div>
           ))}
         </div>

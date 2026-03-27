@@ -52,6 +52,16 @@
   --tracking-normal: 0;
   --tracking-wide: 0.2px;
 
+  /* --- Surface Hierarchy --- */
+  --surface-2: var(--input-bg);
+  --surface-3: #ececee;
+  /* --- Accent Soft --- */
+  --accent-soft: rgba(37, 99, 235, 0.06);
+  --accent-soft-2: rgba(37, 99, 235, 0.1);
+  --accent-ring: rgba(37, 99, 235, 0.2);
+  /* --- Card Hover --- */
+  --shadow-card-hover: 0 0 0 1px rgba(37, 99, 235, 0.08), 0 8px 24px rgba(0, 0, 0, 0.06);
+
   /* --- Motion --- */
   --duration-fast: 150ms;
   --duration-base: 200ms;
@@ -127,6 +137,11 @@
 
 .dark {
   --nb-shadow-color: rgba(255, 255, 255, 0.2);
+  --surface-3: #27272a;
+  --accent-soft: rgba(59, 130, 246, 0.1);
+  --accent-soft-2: rgba(59, 130, 246, 0.15);
+  --accent-ring: rgba(96, 165, 250, 0.25);
+  --shadow-card-hover: 0 0 0 1px rgba(59, 130, 246, 0.2), 0 8px 24px rgba(0, 0, 0, 0.3);
   --nb-yellow: #FFE66D;
   --nb-pink: #FF85B3;
   --nb-green: #5EDDD4;

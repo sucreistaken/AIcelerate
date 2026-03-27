@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 
 interface PaneInfoBannerProps {
   id: string;
@@ -10,10 +10,14 @@ interface PaneInfoBannerProps {
 const DISMISSED_KEY = 'lc.info.dismissed';
 
 function getDismissed(): Set<string> {
-  try { return new Set(JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]')); } catch { return new Set(); }
+  try {
+    return new Set(JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]'));
+  } catch {
+    return new Set();
+  }
 }
 
-function setDismissed(ids: Set<string>) {
+function persistDismissed(ids: Set<string>) {
   localStorage.setItem(DISMISSED_KEY, JSON.stringify([...ids]));
 }
 
@@ -21,22 +25,21 @@ export default function PaneInfoBanner({ id, title, description, tips }: PaneInf
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    const dismissed = getDismissed();
-    setVisible(!dismissed.has(id));
+    setVisible(!getDismissed().has(id));
   }, [id]);
 
   const dismiss = () => {
     setVisible(false);
-    const dismissed = getDismissed();
-    dismissed.add(id);
-    setDismissed(dismissed);
+    const d = getDismissed();
+    d.add(id);
+    persistDismissed(d);
   };
 
   const show = () => {
     setVisible(true);
-    const dismissed = getDismissed();
-    dismissed.delete(id);
-    setDismissed(dismissed);
+    const d = getDismissed();
+    d.delete(id);
+    persistDismissed(d);
   };
 
   if (!visible) {
@@ -58,42 +61,34 @@ export default function PaneInfoBanner({ id, title, description, tips }: PaneInf
 
   return (
     <div role="status" style={{
-      padding: "12px 16px", borderRadius: 10, marginBottom: 12,
-      background: "var(--accent-2)08", border: "1px solid var(--accent-2)22",
+      display: "flex", alignItems: "flex-start", gap: 12,
+      padding: "14px 18px", borderRadius: "var(--radius-md)", marginBottom: 12,
+      background: "linear-gradient(135deg, var(--accent-soft) 0%, transparent 60%)",
+      border: "1px solid var(--accent-ring)",
       position: "relative",
     }}>
-      <button
-        onClick={dismiss}
-        style={{
-          position: "absolute", top: 8, right: 10, background: "none",
-          border: "none", cursor: "pointer", color: "var(--muted)", fontSize: 16, lineHeight: 1,
-        }}
-        title="Kapat"
-      >
-        &times;
-      </button>
-      <div style={{ fontWeight: 700, fontSize: 13, color: "var(--text)", marginBottom: 4, paddingRight: 20 }}>
-        {title}
+      <div style={{
+        width: 36, height: 36, borderRadius: "var(--radius-md)",
+        background: "var(--accent-soft-2)",
+        display: "grid", placeItems: "center", flexShrink: 0, color: "var(--accent-2)",
+      }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
       </div>
-      <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.5, marginBottom: tips?.length ? 8 : 0 }}>
-        {description}
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 600, fontSize: 14, color: "var(--text)", marginBottom: 2 }}>{title}</div>
+        <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.5, marginBottom: tips?.length ? 8 : 0 }}>{description}</div>
+        {!!tips?.length && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {tips.map((tip, i) => (
+              <span key={i} style={{ fontSize: 12, fontWeight: 600, color: "var(--accent-2)" }}>{tip} →</span>
+            ))}
+          </div>
+        )}
       </div>
-      {tips && tips.length > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-          {tips.map((tip, i) => (
-            <span
-              key={i}
-              style={{
-                fontSize: 11, padding: "2px 8px", borderRadius: 4,
-                background: "var(--accent-2)12", color: "var(--accent-2)",
-                fontWeight: 600,
-              }}
-            >
-              {tip}
-            </span>
-          ))}
-        </div>
-      )}
+      <button onClick={dismiss} style={{
+        background: "none", border: "none", cursor: "pointer",
+        color: "var(--muted)", padding: 4, fontSize: 16, lineHeight: 1,
+      }} title="Kapat">&times;</button>
     </div>
   );
 }
