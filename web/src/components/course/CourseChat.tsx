@@ -1,6 +1,7 @@
 import React, { type RefObject } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ChatMessage } from "../../hooks/useCourseDashboard";
+import { t } from "../../utils/i18n";
 
 function formatChatLine(text: string, keyPrefix: string): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
@@ -42,7 +43,7 @@ export function CourseChat({ chatHistory, chatInput, chatLoading, chatBottomRef,
   return (
     <div style={{ marginTop: 20 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <h3 className="h3">Course AI Chat</h3>
+        <h3 className="h3">{t("course.aiChat")}</h3>
         {chatHistory.length > 0 && (
           <button
             className="btn btn-ghost"
@@ -57,9 +58,9 @@ export function CourseChat({ chatHistory, chatInput, chatLoading, chatBottomRef,
         <div style={{ maxHeight: 350, overflowY: "auto", padding: 12 }}>
           {chatHistory.length === 0 && (
             <div style={{ textAlign: "center", padding: "16px 0" }}>
-              <div className="muted small" style={{ marginBottom: 8 }}>Ask anything about your entire course</div>
+              <div className="muted small" style={{ marginBottom: 8 }}>{t("course.askAnything")}</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
-                {["What are the main themes?", "Which topics should I focus on?", "Help me prepare for the exam"].map((suggestion, i) => (
+                {[t("course.suggestion1"), t("course.suggestion2"), t("course.suggestion3")].map((suggestion, i) => (
                   <button
                     key={i}
                     onClick={() => onSend(suggestion)}
@@ -150,7 +151,7 @@ export function CourseChat({ chatHistory, chatInput, chatLoading, chatBottomRef,
           <input
             className="lc-textarea input"
             style={{ flex: 1, marginBottom: 0, height: 38, borderRadius: 19, padding: "0 16px", fontSize: 13 }}
-            placeholder="Ask about the entire course..."
+            placeholder={t("course.askPlaceholder")}
             value={chatInput}
             onChange={(e) => onInputChange(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && onSend()}

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Course } from "../../types";
 import LessonStatusCard, { type LessonStatusData } from "./LessonStatusCard";
+import { t } from "../../utils/i18n";
 
 function CoverageBadge({ level }: { level: "full" | "partial" | "none" }) {
   const colors: Record<string, string> = {
@@ -60,11 +61,11 @@ function OverviewTabInner({
       {ki && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8, marginBottom: 20 }}>
           {[
-            { value: ki.overview.totalLessons, label: "Ders" },
-            { value: ki.progressSnapshot.completedLessons, label: "Tamamlanan" },
-            { value: ki.progressSnapshot.quizAverageScore > 0 ? `${Math.round(ki.progressSnapshot.quizAverageScore * 100)}%` : "-", label: "Quiz Ort." },
-            { value: ki.progressSnapshot.flashcardsDue, label: "Bekleyen Kart" },
-            { value: ki.progressSnapshot.weakTopics.length, label: "Zayıf Konu" },
+            { value: ki.overview.totalLessons, label: t("course.stat.lessons") },
+            { value: ki.progressSnapshot.completedLessons, label: t("course.stat.completed") },
+            { value: ki.progressSnapshot.quizAverageScore > 0 ? `${Math.round(ki.progressSnapshot.quizAverageScore * 100)}%` : "-", label: t("course.stat.quizAvg") },
+            { value: ki.progressSnapshot.flashcardsDue, label: t("course.stat.pendingCards") },
+            { value: ki.progressSnapshot.weakTopics.length, label: t("course.stat.weakTopics") },
           ].map((stat, i) => (
             <div key={i} className="card" style={{ padding: "10px 14px", textAlign: "center" }}>
               <div style={{ fontSize: 22, fontWeight: 700 }}>{stat.value}</div>
@@ -76,7 +77,7 @@ function OverviewTabInner({
 
       <div style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <h3 className="h3">Dersler</h3>
+          <h3 className="h3">{t("course.lessonsTitle")}</h3>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             {/* Selection toggle */}
             {courseLessons.length > 0 && (
@@ -85,7 +86,7 @@ function OverviewTabInner({
                 style={{ fontSize: 12 }}
                 onClick={isSelectionMode ? onExitSelectionMode : onEnterSelectionMode}
               >
-                {isSelectionMode ? "✕ İptal" : "☑ Seç"}
+                {isSelectionMode ? t("course.cancelSelection") : t("course.selectMode")}
               </button>
             )}
             {/* Add lesson dropdown */}
@@ -96,7 +97,7 @@ function OverviewTabInner({
                   style={{ fontSize: 12 }}
                   onClick={() => setShowActions(!showActions)}
                 >
-                  + Ders Ekle
+                  {t("course.addLesson")}
                 </button>
                 {showActions && (
                   <div
@@ -114,8 +115,8 @@ function OverviewTabInner({
                       onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
                     >
                       <span style={{ marginRight: 8 }}>🆕</span>
-                      Yeni Ders Oluştur
-                      <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>Wizard ile adım adım</div>
+                      {t("course.newLessonWizard")}
+                      <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>{t("course.wizardHint")}</div>
                     </button>
                     <div style={{ borderTop: "1px solid var(--border)" }} />
                     <button
@@ -125,8 +126,8 @@ function OverviewTabInner({
                       onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
                     >
                       <span style={{ marginRight: 8 }}>📎</span>
-                      Mevcut Ders Ekle
-                      <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>Listeden ders seç</div>
+                      {t("course.addExistingLesson")}
+                      <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>{t("course.addExistingHint")}</div>
                     </button>
                   </div>
                 )}
@@ -149,11 +150,11 @@ function OverviewTabInner({
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <button className="btn btn-ghost" style={{ fontSize: 11 }} onClick={onSelectAll}>Tümünü Seç</button>
-                <button className="btn btn-ghost" style={{ fontSize: 11 }} onClick={onClearAll} disabled={selectionCount === 0}>Temizle</button>
+                <button className="btn btn-ghost" style={{ fontSize: 11 }} onClick={onSelectAll}>{t("course.selectAll")}</button>
+                <button className="btn btn-ghost" style={{ fontSize: 11 }} onClick={onClearAll} disabled={selectionCount === 0}>{t("course.clearSelection")}</button>
                 {selectionCount > 0 && (
                   <span style={{ fontSize: 12, fontWeight: 600, color: "var(--accent-2, #7c3aed)" }}>
-                    {selectionCount} ders seçildi
+                    {t("course.lessonsSelected", { count: selectionCount })}
                   </span>
                 )}
               </div>
@@ -163,7 +164,7 @@ function OverviewTabInner({
                 disabled={selectionCount === 0}
                 onClick={onStudySelected}
               >
-                Seçilenlerle Çalış →
+                {t("course.studySelected")}
               </button>
             </motion.div>
           )}
@@ -179,8 +180,8 @@ function OverviewTabInner({
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onCreateLesson(); }}
           >
             <div style={{ fontSize: 32, marginBottom: 8 }}>📚</div>
-            <p style={{ fontWeight: 500, marginBottom: 4 }}>Henüz ders eklenmemiş</p>
-            <p className="muted" style={{ fontSize: 12 }}>İlk dersinizi oluşturmak için tıklayın</p>
+            <p style={{ fontWeight: 500, marginBottom: 4 }}>{t("course.noLessonsAdded")}</p>
+            <p className="muted" style={{ fontSize: 12 }}>{t("course.clickToCreate")}</p>
           </div>
         ) : (
           <div style={{ display: "grid", gap: 8 }}>
@@ -203,7 +204,7 @@ function OverviewTabInner({
 
       {ki && ki.loCoverage.length > 0 && (
         <div style={{ marginBottom: 20 }}>
-          <h3 className="h3" style={{ marginBottom: 8 }}>Öğrenme Çıktısı Kapsama</h3>
+          <h3 className="h3" style={{ marginBottom: 8 }}>{t("course.loCoverage")}</h3>
           <div style={{ display: "grid", gap: 4 }}>
             {ki.loCoverage.map((lo) => (
               <div key={lo.loId} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
@@ -219,7 +220,7 @@ function OverviewTabInner({
 
       {ki && ki.conceptBridges.length > 0 && (
         <div style={{ marginBottom: 20 }}>
-          <h3 className="h3" style={{ marginBottom: 8 }}>Dersler Arası Kavramlar</h3>
+          <h3 className="h3" style={{ marginBottom: 8 }}>{t("course.crossConcepts")}</h3>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {ki.conceptBridges.map((b, i) => (
               <div key={i} className="card" style={{ padding: "6px 12px", fontSize: 12 }} title={b.evolution}>
@@ -233,10 +234,10 @@ function OverviewTabInner({
 
       {ki && ki.overview.courseThemes.length > 0 && (
         <div style={{ marginBottom: 20 }}>
-          <h3 className="h3" style={{ marginBottom: 8 }}>Kurs Temaları</h3>
+          <h3 className="h3" style={{ marginBottom: 8 }}>{t("course.courseThemes")}</h3>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {ki.overview.courseThemes.map((t, i) => (
-              <span key={i} className="conn-lesson-tag">{t}</span>
+            {ki.overview.courseThemes.map((theme, i) => (
+              <span key={i} className="conn-lesson-tag">{theme}</span>
             ))}
           </div>
         </div>
@@ -244,10 +245,10 @@ function OverviewTabInner({
 
       {ki && ki.progressSnapshot.weakTopics.length > 0 && (
         <div style={{ marginBottom: 20 }}>
-          <h3 className="h3" style={{ marginBottom: 8 }}>Zayıf Konular</h3>
+          <h3 className="h3" style={{ marginBottom: 8 }}>{t("course.weakTopicsTitle")}</h3>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {ki.progressSnapshot.weakTopics.map((t, i) => (
-              <span key={i} className="conn-lesson-tag" style={{ background: "var(--danger-bg)", color: "var(--danger)" }}>{t}</span>
+            {ki.progressSnapshot.weakTopics.map((topic, i) => (
+              <span key={i} className="conn-lesson-tag" style={{ background: "var(--danger-bg)", color: "var(--danger)" }}>{topic}</span>
             ))}
           </div>
         </div>

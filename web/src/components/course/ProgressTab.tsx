@@ -30,7 +30,7 @@ function ProgressTabInner({ progressLoading, courseProgress }: ProgressTabProps)
   if (!courseProgress) {
     return (
       <div className="muted-block" style={{ padding: 24, textAlign: "center" }}>
-        <p className="muted">No progress data available. Add lessons and take quizzes to see your progress.</p>
+        <p className="muted">{t("course.noProgressData")}</p>
       </div>
     );
   }
@@ -43,7 +43,7 @@ function ProgressTabInner({ progressLoading, courseProgress }: ProgressTabProps)
           value={courseProgress.completedLessons}
           max={courseProgress.totalLessons}
           color="var(--success, #22c55e)"
-          label={`${courseProgress.completedLessons} / ${courseProgress.totalLessons} lessons`}
+          label={`${courseProgress.completedLessons} / ${courseProgress.totalLessons} ${t("course.stat.lessons").toLowerCase()}`}
         />
       </div>
 
@@ -129,12 +129,12 @@ function ProgressTabInner({ progressLoading, courseProgress }: ProgressTabProps)
           <h3 className="h3" style={{ marginBottom: 8 }}>Flashcard Breakdown</h3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))", gap: 8 }}>
             {[
-              { label: "Total", value: courseProgress.flashcardSummary.total, color: "var(--accent-2)" },
-              { label: "New", value: courseProgress.flashcardSummary.new, color: "var(--muted)" },
-              { label: "Learning", value: courseProgress.flashcardSummary.learning, color: "var(--accent-2)" },
-              { label: "Review", value: courseProgress.flashcardSummary.review, color: "var(--warning)" },
-              { label: "Graduated", value: courseProgress.flashcardSummary.graduated, color: "var(--success)" },
-              { label: "Due", value: courseProgress.flashcardSummary.due, color: "var(--danger)" },
+              { label: t("course.flashcardStats.total"), value: courseProgress.flashcardSummary.total, color: "var(--accent-2)" },
+              { label: t("course.flashcardStats.new"), value: courseProgress.flashcardSummary.new, color: "var(--muted)" },
+              { label: t("course.flashcardStats.learning"), value: courseProgress.flashcardSummary.learning, color: "var(--accent-2)" },
+              { label: t("course.flashcardStats.review"), value: courseProgress.flashcardSummary.review, color: "var(--warning)" },
+              { label: t("course.flashcardStats.graduated"), value: courseProgress.flashcardSummary.graduated, color: "var(--success)" },
+              { label: t("course.flashcardStats.due"), value: courseProgress.flashcardSummary.due, color: "var(--danger)" },
             ].map((stat, i) => (
               <div key={i} className="card" style={{ padding: "8px 10px", textAlign: "center" }}>
                 <div style={{ fontSize: 18, fontWeight: 700, color: stat.color }}>{stat.value}</div>

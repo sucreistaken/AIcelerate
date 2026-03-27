@@ -1,9 +1,10 @@
 import type { ActiveTab } from "../../hooks/useCourseDashboard";
+import { t } from "../../utils/i18n";
 
 const TABS: Array<{ id: ActiveTab; label: string }> = [
-  { id: "overview", label: "Overview" },
-  { id: "progress", label: "Progress" },
-  { id: "schedule", label: "Schedule" },
+  { id: "overview", label: "course.overviewTab" },
+  { id: "progress", label: "course.progressTab" },
+  { id: "schedule", label: "course.scheduleTab" },
 ];
 
 interface CourseTabsProps {
@@ -26,7 +27,7 @@ export function CourseTabs({ activeTab, onTabChange }: CourseTabsProps) {
             transition: "all 0.15s",
           }}
         >
-          {tab.label}
+          {t(tab.label)}
         </button>
       ))}
     </div>
