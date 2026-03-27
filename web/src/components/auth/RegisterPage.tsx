@@ -1,5 +1,6 @@
 import React, { useState, FormEvent } from "react";
 import { useAuthStore } from "../../stores/authStore";
+import { t } from "../../utils/i18n";
 import AvatarPicker from "./AvatarPicker";
 import "./auth.css";
 
@@ -28,8 +29,8 @@ export default function RegisterPage({ onSwitchToLogin }: Props) {
       <div className="auth-page">
         <div className="auth-card">
           <div className="auth-header">
-            <h1 className="auth-title">Choose Your Avatar</h1>
-            <p className="auth-subtitle">You can change this later</p>
+            <h1 className="auth-title">{t("auth.chooseAvatar")}</h1>
+            <p className="auth-subtitle">{t("auth.changeAvatarLater")}</p>
           </div>
           <AvatarPicker onSelect={() => setStep("form")} />
           <button
@@ -37,7 +38,7 @@ export default function RegisterPage({ onSwitchToLogin }: Props) {
             className="auth-btn auth-btn--secondary"
             onClick={() => setStep("form")}
           >
-            Skip for now
+            {t("auth.skipForNow")}
           </button>
         </div>
       </div>
@@ -48,8 +49,8 @@ export default function RegisterPage({ onSwitchToLogin }: Props) {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-header">
-          <h1 className="auth-title">LearnCraft AI</h1>
-          <p className="auth-subtitle">Create your account</p>
+          <h1 className="auth-title">{t("auth.appTitle")}</h1>
+          <p className="auth-subtitle">{t("auth.createAccountSubtitle")}</p>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
@@ -60,52 +61,52 @@ export default function RegisterPage({ onSwitchToLogin }: Props) {
           )}
 
           <div className="auth-field">
-            <label htmlFor="nickname">Nickname</label>
+            <label htmlFor="nickname">{t("auth.nickname")}</label>
             <input
               id="nickname"
               type="text"
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
-              placeholder="Your display name"
+              placeholder={t("auth.nicknamePlaceholder")}
               required
               autoFocus
             />
           </div>
 
           <div className="auth-field">
-            <label htmlFor="reg-email">Email</label>
+            <label htmlFor="reg-email">{t("auth.email")}</label>
             <input
               id="reg-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder={t("auth.emailPlaceholder")}
               required
             />
           </div>
 
           <div className="auth-field">
-            <label htmlFor="reg-password">Password</label>
+            <label htmlFor="reg-password">{t("auth.password")}</label>
             <input
               id="reg-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Min. 6 characters"
+              placeholder={t("auth.passwordHint")}
               required
               minLength={6}
             />
           </div>
 
           <button type="submit" className="auth-btn" disabled={loading}>
-            {loading ? "Creating account..." : "Create Account"}
+            {loading ? t("auth.creatingAccount") : t("auth.register")}
           </button>
         </form>
 
         <p className="auth-switch">
-          Already have an account?{" "}
+          {t("auth.hasAccount")}{" "}
           <button type="button" onClick={onSwitchToLogin}>
-            Sign in
+            {t("auth.signInLink")}
           </button>
         </p>
       </div>

@@ -7,6 +7,7 @@ import LessonCard from "./lessons-history/LessonCard";
 import CourseGroup from "./lessons-history/CourseGroup";
 import SharedLessons from "./lessons-history/SharedLessons";
 import DeleteLessonModal from "./lessons-history/DeleteLessonModal";
+import { tLang } from "../utils/i18n";
 
 interface Props {
   setMode: (m: ModeId) => void;
@@ -36,19 +37,17 @@ export default function LessonsHistoryPane({ setMode, setQuiz, onSelectLesson, c
         isOpen={showBulkConfirm}
         onConfirm={executeBulkDelete}
         onCancel={() => setShowBulkConfirm(false)}
-        title={lang === 'tr' ? 'Toplu Silme' : 'Bulk Delete'}
-        message={lang === 'tr'
-          ? `${selectedIds.size} ders silinecek. Emin misiniz?`
-          : `Delete ${selectedIds.size} lessons. Are you sure?`}
-        confirmLabel={lang === 'tr' ? 'Evet, Sil' : 'Yes, Delete'}
-        cancelLabel={lang === 'tr' ? 'İptal' : 'Cancel'}
+        title={tLang("history.bulkDelete", lang)}
+        message={tLang("history.bulkDeleteMsg", lang, { count: selectedIds.size })}
+        confirmLabel={tLang("history.yesDelete", lang)}
+        cancelLabel={tLang("common.cancel", lang)}
         variant="danger"
       />
       <PaneInfoBanner
         id="lessons-history"
-        title="Ders Geçmişi"
-        description="Tüm derslerinizi görüntüleyin, arayın ve yönetin."
-        tips={["Ders ara", "Toplu silme", "Kurs atama", "Paylaşımlar"]}
+        title={tLang("history.title", lang)}
+        description={tLang("history.desc", lang)}
+        tips={[tLang("history.tipSearch", lang), tLang("history.tipBulkDelete", lang), tLang("history.tipAssignCourse", lang), tLang("history.tipShares", lang)]}
       />
       <div className="flex-between mb-4 items-center">
         <h2 className="text-xl font-bold m-0">{t.myLessons}</h2>
@@ -60,7 +59,7 @@ export default function LessonsHistoryPane({ setMode, setQuiz, onSelectLesson, c
               onClick={handleBulkDelete}
               disabled={bulkDeleting}
             >
-              {bulkDeleting ? '...' : `${lang === 'tr' ? 'Sil' : 'Delete'} (${selectedIds.size})`}
+              {bulkDeleting ? '...' : `${tLang("common.delete", lang)} (${selectedIds.size})`}
             </button>
           )}
           <span className="badge badge-gray">{lessons.length} {t.lesson}</span>
@@ -119,7 +118,7 @@ export default function LessonsHistoryPane({ setMode, setQuiz, onSelectLesson, c
 
         {ungrouped.length > 0 && grouped.length > 0 && (
           <div style={{ padding: "6px 10px", fontSize: 13, fontWeight: 600, color: "var(--muted)", marginTop: 4 }}>
-            {lang === 'tr' ? 'Diğer Dersler' : 'Other Lessons'}
+            {tLang("history.otherLessons", lang)}
           </div>
         )}
         {ungrouped.map((l: any) => (

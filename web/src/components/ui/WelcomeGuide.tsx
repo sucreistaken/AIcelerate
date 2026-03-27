@@ -4,6 +4,7 @@ import { useLessonStore } from "../../stores/lessonStore";
 import { useUiStore } from "../../stores/uiStore";
 import { useGamificationStore, getLevelInfo } from "../../stores/gamificationStore";
 import { ModeId } from "../../types";
+import { t } from "../../utils/i18n";
 
 interface LessonSummary {
   id: string;
@@ -78,14 +79,16 @@ const icons = {
 };
 
 /* ── Study Tools Config ── */
-const studyTools: Array<{ id: ModeId; icon: React.ReactNode; label: string; desc: string; tint: string }> = [
-  { id: "deep-dive", icon: icons.deepDive, label: "Deep Dive", desc: "AI ile derinlemesine sohbet", tint: "37, 99, 235" },
-  { id: "quiz", icon: icons.quiz, label: "Quiz", desc: "Kendini test et", tint: "239, 68, 68" },
-  { id: "flashcards", icon: icons.flashcards, label: "Flashcards", desc: "Kartlarla tekrar et", tint: "245, 158, 11" },
-  { id: "mindmap", icon: icons.mindmap, label: "Mind Map", desc: "Kavram haritasi olustur", tint: "16, 185, 129" },
-  { id: "cheat-sheet", icon: icons.cheatSheet, label: "Cheat Sheet", desc: "Sinav odakli ozet", tint: "139, 92, 246" },
-  { id: "notes", icon: icons.notes, label: "Notlar", desc: "Notlarini yonet", tint: "6, 182, 212" },
-];
+function getStudyTools(): Array<{ id: ModeId; icon: React.ReactNode; labelKey: string; descKey: string; tint: string }> {
+  return [
+    { id: "deep-dive", icon: icons.deepDive, labelKey: "mode.deepDive", descKey: "welcome.toolDeepDive", tint: "37, 99, 235" },
+    { id: "quiz", icon: icons.quiz, labelKey: "mode.quiz", descKey: "welcome.toolQuiz", tint: "239, 68, 68" },
+    { id: "flashcards", icon: icons.flashcards, labelKey: "mode.flashcards", descKey: "welcome.toolFlashcards", tint: "245, 158, 11" },
+    { id: "mindmap", icon: icons.mindmap, labelKey: "mode.mindmap", descKey: "welcome.toolMindMap", tint: "16, 185, 129" },
+    { id: "cheat-sheet", icon: icons.cheatSheet, labelKey: "mode.cheatSheet", descKey: "welcome.toolCheatSheet", tint: "139, 92, 246" },
+    { id: "notes", icon: icons.notes, labelKey: "mode.notes", descKey: "welcome.toolNotes", tint: "6, 182, 212" },
+  ];
+}
 
 /* ── Step Card ── */
 function StepCard({ step, icon, title, desc, active, onClick }: {
@@ -153,17 +156,17 @@ export default function WelcomeGuide() {
           </svg>
         </div>
         <h1 className="wg-hero__title">
-          {totalLessons > 0 ? "Tekrar hoş geldin" : "Hoş geldin"}
+          {totalLessons > 0 ? t("welcome.back") : t("welcome.hello")}
         </h1>
         <p className="wg-hero__subtitle">
           {totalLessons > 0
-            ? `${totalLessons} ders yükledin. Bugün ne çalışmak istersin?`
-            : "Ders materyalini yükle, AI plan, quiz ve özet hazırlasın."}
+            ? t("welcome.backDesc", { count: totalLessons })
+            : t("welcome.helloDesc")}
         </p>
 
         {totalXp > 0 && (
           <div className="wg-hero__stats">
-            {streakDays > 0 && <div className="wg-hero__stat">{streakDays} gün seri</div>}
+            {streakDays > 0 && <div className="wg-hero__stat">{streakDays} {t("welcome.dayStreak")}</div>}
             <div className="wg-hero__stat">{totalXp} XP · {level.name}</div>
           </div>
         )}
@@ -177,11 +180,11 @@ export default function WelcomeGuide() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.12 }}
         >
-          <div className="wg-section__label">Başlamak için</div>
+          <div className="wg-section__label">{t("welcome.getStarted")}</div>
           <div className="wg-steps">
-            <StepCard step={1} icon={icons.upload} title="Materyal yükle" desc="PDF slayt veya ses dosyası" active={true} onClick={handleNewLesson} />
-            <StepCard step={2} icon={icons.ai} title="AI analiz etsin" desc="Plan, quiz ve kavramlar çıkarılsın" active={false} onClick={() => {}} />
-            <StepCard step={3} icon={icons.rocket} title="Çalışmaya başla" desc="Quiz çöz, flashcard tekrar et" active={false} onClick={() => {}} />
+            <StepCard step={1} icon={icons.upload} title={t("welcome.step1Title")} desc={t("welcome.step1Desc")} active={true} onClick={handleNewLesson} />
+            <StepCard step={2} icon={icons.ai} title={t("welcome.step2Title")} desc={t("welcome.step2Desc")} active={false} onClick={() => {}} />
+            <StepCard step={3} icon={icons.rocket} title={t("welcome.step3Title")} desc={t("welcome.step3Desc")} active={false} onClick={() => {}} />
           </div>
         </motion.div>
       )}
@@ -194,7 +197,7 @@ export default function WelcomeGuide() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.08 }}
         >
-          <div className="wg-section__label">Kaldığın yerden devam et</div>
+          <div className="wg-section__label">{t("welcome.continueLabel")}</div>
           <div className="wg-lessons">
             {recentLessons.map((l, i) => (
               <motion.button
@@ -211,7 +214,7 @@ export default function WelcomeGuide() {
                 <div className="wg-lesson__info">
                   <div className="wg-lesson__title">{l.title}</div>
                   <div className="wg-lesson__meta">
-                    {l.highlights?.length || 0} kavram{l.date && ` · ${timeAgoShort(l.date)} önce`}
+                    {l.highlights?.length || 0} {t("welcome.concept")}{l.date && ` · ${timeAgoShort(l.date)} ${t("welcome.ago")}`}
                   </div>
                 </div>
                 <div className="wg-lesson__action">
@@ -222,7 +225,7 @@ export default function WelcomeGuide() {
           </div>
           <motion.button className="wg-new-lesson" onClick={handleNewLesson} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
             <span className="wg-new-lesson__plus">+</span>
-            <span>Yeni ders yükle</span>
+            <span>{t("welcome.newLesson")}</span>
           </motion.button>
         </motion.div>
       )}
@@ -234,9 +237,9 @@ export default function WelcomeGuide() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
       >
-        <div className="wg-section__label">Çalışma araçları</div>
+        <div className="wg-section__label">{t("welcome.studyTools")}</div>
         <div className="wg-tools">
-          {studyTools.map((tool, i) => (
+          {getStudyTools().map((tool, i) => (
             <motion.button
               key={tool.id}
               className="wg-tool"
@@ -250,8 +253,8 @@ export default function WelcomeGuide() {
               <div className="wg-tool__icon-wrap" style={{ '--tool-tint': tool.tint } as React.CSSProperties}>
                 {tool.icon}
               </div>
-              <div className="wg-tool__label">{tool.label}</div>
-              <div className="wg-tool__desc">{tool.desc}</div>
+              <div className="wg-tool__label">{t(tool.labelKey)}</div>
+              <div className="wg-tool__desc">{t(tool.descKey)}</div>
             </motion.button>
           ))}
         </div>

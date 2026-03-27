@@ -1,5 +1,6 @@
 import React from "react";
 import type { CourseProgress } from "../../types";
+import { t } from "../../utils/i18n";
 
 function ProgressBar({ value, max, color, label }: { value: number; max: number; color: string; label?: string }) {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0;
@@ -22,7 +23,7 @@ interface ProgressTabProps {
 function ProgressTabInner({ progressLoading, courseProgress }: ProgressTabProps) {
   if (progressLoading) {
     return (
-      <div className="muted-block" style={{ padding: 24, textAlign: "center" }}>Loading progress...</div>
+      <div className="muted-block" style={{ padding: 24, textAlign: "center" }}>{t("course.loadingProgress")}</div>
     );
   }
 
@@ -37,7 +38,7 @@ function ProgressTabInner({ progressLoading, courseProgress }: ProgressTabProps)
   return (
     <div>
       <div style={{ marginBottom: 20 }}>
-        <h3 className="h3" style={{ marginBottom: 8 }}>Lesson Completion</h3>
+        <h3 className="h3" style={{ marginBottom: 8 }}>{t("course.lessonCompletion")}</h3>
         <ProgressBar
           value={courseProgress.completedLessons}
           max={courseProgress.totalLessons}
@@ -47,7 +48,7 @@ function ProgressTabInner({ progressLoading, courseProgress }: ProgressTabProps)
       </div>
 
       <div style={{ marginBottom: 20 }}>
-        <h3 className="h3" style={{ marginBottom: 8 }}>Per-Lesson Status</h3>
+        <h3 className="h3" style={{ marginBottom: 8 }}>{t("course.perLessonStatus")}</h3>
         <div style={{ display: "grid", gap: 6 }}>
           {courseProgress.lessonStatuses.map((ls, i) => (
             <div key={ls.lessonId} className="card" style={{ padding: "10px 14px" }}>

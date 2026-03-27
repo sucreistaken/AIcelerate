@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { t } from "../../utils/i18n";
 import ProfileSettings from "./ProfileSettings";
 import ThemeSettings from "./ThemeSettings";
 import NotificationSettings from "./NotificationSettings";
@@ -7,11 +8,11 @@ import AccountSettings from "./AccountSettings";
 import "./settings.css";
 
 const TABS = [
-  { id: "profile", label: "Profile" },
-  { id: "theme", label: "Appearance" },
-  { id: "notifications", label: "Notifications" },
-  { id: "security", label: "Security" },
-  { id: "account", label: "Account" },
+  { id: "profile", label: "settings.profile" },
+  { id: "theme", label: "settings.appearance" },
+  { id: "notifications", label: "settings.notifications" },
+  { id: "security", label: "settings.security" },
+  { id: "account", label: "settings.account" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -27,7 +28,7 @@ export default function SettingsPage({ onClose }: Props) {
     <div className="settings-overlay" onClick={onClose}>
       <div className="settings-panel" onClick={(e) => e.stopPropagation()}>
         <div className="settings-sidebar">
-          <h2 className="settings-sidebar__title">Settings</h2>
+          <h2 className="settings-sidebar__title">{t("settings.title")}</h2>
           <nav className="settings-nav">
             {TABS.map((tab) => (
               <button
@@ -35,7 +36,7 @@ export default function SettingsPage({ onClose }: Props) {
                 className={`settings-nav__item ${activeTab === tab.id ? "settings-nav__item--active" : ""}`}
                 onClick={() => setActiveTab(tab.id)}
               >
-                {tab.label}
+                {t(tab.label)}
               </button>
             ))}
           </nav>

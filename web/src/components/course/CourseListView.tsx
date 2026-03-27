@@ -2,6 +2,7 @@ import type { Course } from "../../types";
 import { CreateCourseModal } from "./CreateCourseModal";
 import PaneInfoBanner from "../ui/PaneInfoBanner";
 import { EmptyState } from "../ui/EmptyState";
+import { t } from "../../utils/i18n";
 
 const ChevronIcon = (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" opacity={0.4}>
@@ -30,22 +31,22 @@ export function CourseListView({ courses, showCreateModal, onShowCreateModal, on
     <div className="lc-section" style={{ padding: 24 }}>
       <PaneInfoBanner
         id="course-dashboard"
-        title="Course Dashboard Nedir?"
-        description="Derslerinizi kurslara gruplayarak AI'ın dersler arası bağlantı kurmasını sağlayın."
-        tips={["Kurs oluştur", "Ders ata", "İlerleme takibi", "Haftalık plan"]}
+        title={t("course.dashboardTitle")}
+        description={t("course.dashboardDesc")}
+        tips={[t("course.dashboardTip1"), t("course.dashboardTip2"), t("course.dashboardTip3"), t("course.dashboardTip4")]}
       />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <h2 className="h2">Courses</h2>
-        <button className="btn btn-primary" onClick={() => onShowCreateModal(true)}>+ New Course</button>
+        <h2 className="h2">{t("course.title")}</h2>
+        <button className="btn btn-primary" onClick={() => onShowCreateModal(true)}>{t("course.newCourse")}</button>
       </div>
 
       {courses.length === 0 ? (
         <EmptyState
           icon={BookIcon}
-          title="No courses yet"
-          description="Create your first course to organize lessons. AI will then build cross-lesson connections automatically."
-          hint="Tip: Start with one course and add lessons as you go"
-          action={{ label: "Create Your First Course", onClick: () => onShowCreateModal(true) }}
+          title={t("course.noCourses")}
+          description={t("course.noCoursesDesc")}
+          hint={t("course.noCoursesHint")}
+          action={{ label: t("course.createFirst"), onClick: () => onShowCreateModal(true) }}
         />
       ) : (
         <div style={{ display: "grid", gap: 8 }}>
@@ -62,8 +63,8 @@ export function CourseListView({ courses, showCreateModal, onShowCreateModal, on
                   {c.name}
                 </div>
                 <div className="muted small">
-                  {c.lessonIds.length} lesson{c.lessonIds.length !== 1 ? "s" : ""}
-                  {c.settings?.examDate ? ` | Exam: ${c.settings.examDate}` : ""}
+                  {c.lessonIds.length} {c.lessonIds.length !== 1 ? t("course.lessons") : t("course.lesson")}
+                  {c.settings?.examDate ? ` | ${t("course.exam")}: ${c.settings.examDate}` : ""}
                 </div>
               </div>
               {ChevronIcon}

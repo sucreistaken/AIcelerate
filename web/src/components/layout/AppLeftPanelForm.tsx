@@ -4,6 +4,7 @@ import CollapsibleSection from "./CollapsibleSection";
 import CourseInfoSection from "./CourseInfoSection";
 import { ProgressStepper } from "../ui/ProgressStepper";
 import { formatSeconds as fmtTime } from "../../utils/formatters";
+import { t } from "../../utils/i18n";
 
 export interface LeftPanelLessonProps {
   currentLessonId: string | null;
@@ -66,9 +67,9 @@ export default function AppLeftPanelForm({
     return (
       <div style={{ padding: "20px 0", textAlign: "center" }}>
         <div style={{ fontSize: 40, marginBottom: 12, opacity: 0.5 }}>📚</div>
-        <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>Ders seçilmedi</div>
+        <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>{t("leftPanel.noLessonSelected")}</div>
         <p className="muted" style={{ fontSize: 12, marginBottom: 16, lineHeight: 1.5 }}>
-          Bir ders seçin veya yeni ders oluşturmak için wizard'ı kullanın.
+          {t("leftPanel.noLessonDesc")}
         </p>
         {onGoToWizard && (
           <button
@@ -76,7 +77,7 @@ export default function AppLeftPanelForm({
             onClick={onGoToWizard}
             style={{ fontSize: 13 }}
           >
-            + Yeni Ders Oluştur
+            {t("leftPanel.createLesson")}
           </button>
         )}
       </div>
@@ -89,10 +90,10 @@ export default function AppLeftPanelForm({
       {/* Material status cards */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: "var(--text-secondary)" }}>
-          Materyaller
+          {t("leftPanel.materials")}
         </div>
         <MaterialStatus
-          label="Slaytlar"
+          label={t("leftPanel.slides")}
           icon="📄"
           hasContent={!!lesson.slidesText.trim()}
           charCount={lesson.slidesText.trim().length}

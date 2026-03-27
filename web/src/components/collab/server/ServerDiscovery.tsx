@@ -6,6 +6,7 @@ import { useServerStore } from "../../../stores/serverStore";
 import { useProfileStore } from "../../../stores/profileStore";
 import type { StudyServer } from "../../../types";
 import LobbyChat from "../chat/LobbyChat";
+import { t } from "../../../utils/i18n";
 
 interface Props {
   onCreateServer?: () => void;
@@ -174,7 +175,7 @@ export default function ServerDiscovery({ onCreateServer }: Props) {
                   onClick={handleSearch}
                   disabled={loading}
                 >
-                  {loading ? "..." : "Ara"}
+                  {loading ? "..." : t("collab.search")}
                 </button>
               </div>
             </motion.div>

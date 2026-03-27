@@ -3,6 +3,7 @@ import React, { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSchedulerStore } from "../stores/schedulerStore";
 import { useUiStore } from "../stores/uiStore";
+import { t } from "../utils/i18n";
 
 const taskTypeLabelsShort: Record<string, string> = {
   "review-weakness": "Review",
@@ -59,14 +60,14 @@ export default function SchedulerWidget() {
                 {taskTypeLabelsShort[scheduler.nextTask.taskType] || "Study"}
               </span>
               <div className="scheduler-widget__info">
-                <span className="scheduler-widget__label">Study Now</span>
+                <span className="scheduler-widget__label">{t("scheduler.studyNow")}</span>
                 <span className="scheduler-widget__topic">{scheduler.nextTask.topicName}</span>
               </div>
             </>
           )}
           {!scheduler.nextTask && (
             <div className="scheduler-widget__info">
-              <span className="scheduler-widget__label">All caught up!</span>
+              <span className="scheduler-widget__label">{t("scheduler.allCaughtUp")}</span>
             </div>
           )}
         </div>
@@ -84,7 +85,7 @@ export default function SchedulerWidget() {
                 handleStartTask();
               }}
             >
-              Start
+              {t("scheduler.start")}
             </button>
           )}
           <button className="scheduler-widget__toggle" aria-label="Toggle scheduler details">
@@ -117,7 +118,7 @@ export default function SchedulerWidget() {
             transition={{ duration: 0.2 }}
           >
             <div className="scheduler-widget__plan-header">
-              <span className="scheduler-widget__plan-title">Daily Plan</span>
+              <span className="scheduler-widget__plan-title">{t("scheduler.dailyPlan")}</span>
               <span className="muted small">
                 {scheduler.dailyPlan.tasks.filter((t) => t.completed).length}/{scheduler.dailyPlan.tasks.length} done
               </span>
@@ -141,12 +142,12 @@ export default function SchedulerWidget() {
                 </label>
               ))}
               {scheduler.dailyPlan.tasks.length === 0 && (
-                <div className="muted small" style={{ padding: "8px 0" }}>No tasks for today.</div>
+                <div className="muted small" style={{ padding: "8px 0" }}>{t("scheduler.noTasks")}</div>
               )}
             </div>
             {scheduler.dailyPlan.totalEstimatedMinutes > 0 && (
               <div className="scheduler-widget__summary">
-                Total: {scheduler.dailyPlan.totalEstimatedMinutes} min
+                {t("scheduler.total")} {scheduler.dailyPlan.totalEstimatedMinutes} min
               </div>
             )}
           </motion.div>

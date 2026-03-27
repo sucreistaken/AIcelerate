@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useMessageStore } from "../../../stores/messageStore";
 import MessageItem from "./MessageItem";
+import { t } from "../../../utils/i18n";
 
 interface Props {
   channelId: string;
@@ -54,7 +55,7 @@ export default function MessageList({ channelId }: Props) {
             onClick={handleLoadMore}
             disabled={loading}
           >
-            {loading ? "Yükleniyor..." : "Daha eski mesajları yükle"}
+            {loading ? t("common.loading") : t("collab.loadOlder")}
           </button>
         </div>
       )}

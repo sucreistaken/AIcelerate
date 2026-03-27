@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { t } from "../../utils/i18n";
 
 const MailboxIcon = (
     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -125,10 +126,10 @@ export function NoPlanEmpty({ onAction }: { onAction?: () => void }) {
     return (
         <EmptyState
             icon={RocketIcon}
-            title="Harika bir başlangıç yapacaksın!"
-            description="Sol panelden ders materyalini yükle ve Plan & Analyze'a tıkla."
-            hint="Slayt + transkript = en iyi sonuç"
-            action={onAction ? { label: 'Hadi Başlayalım', onClick: onAction } : undefined}
+            title={t("empty.noPlan")}
+            description={t("empty.noPlanDesc")}
+            hint={t("empty.noPlanHint")}
+            action={onAction ? { label: t("empty.getStarted"), onClick: onAction } : undefined}
         />
     );
 }
@@ -137,10 +138,10 @@ export function NoQuizEmpty({ onAction }: { onAction?: () => void }) {
     return (
         <EmptyState
             icon={TargetIcon}
-            title="Quiz hazır değil henüz"
-            description="Önce bir ders planı oluştur, sonra quiz üretebilirsin."
-            hint="Her quiz +10 XP kazandırır"
-            action={onAction ? { label: 'Quiz Oluştur', onClick: onAction } : undefined}
+            title={t("empty.noQuiz")}
+            description={t("empty.noQuizDesc")}
+            hint={t("empty.noQuizHint")}
+            action={onAction ? { label: t("empty.createQuiz"), onClick: onAction } : undefined}
         />
     );
 }
@@ -149,10 +150,10 @@ export function NoLessonsEmpty({ onAction }: { onAction?: () => void }) {
     return (
         <EmptyState
             icon={BookStackIcon}
-            title="Henüz ders yok"
-            description="İlk dersini yükle ve AI'ın sihirini gör."
-            hint="PDF slayt veya ses dosyası yükleyebilirsin"
-            action={onAction ? { label: 'İlk Dersimi Oluştur', onClick: onAction } : undefined}
+            title={t("empty.noLessons")}
+            description={t("empty.noLessonsDesc")}
+            hint={t("empty.noLessonsHint")}
+            action={onAction ? { label: t("empty.createFirstLesson"), onClick: onAction } : undefined}
         />
     );
 }
@@ -161,10 +162,10 @@ export function NoCheatSheetEmpty({ onAction }: { onAction?: () => void }) {
     return (
         <EmptyState
             icon={DocumentIcon}
-            title="Cheat Sheet henüz oluşturulmadı"
-            description="Sınav odaklı tek sayfalık özet oluştur."
-            hint="Cheat sheet oluşturmak +15 XP"
-            action={onAction ? { label: 'Oluştur', onClick: onAction } : undefined}
+            title={t("empty.noCheatSheet")}
+            description={t("empty.noCheatSheetDesc")}
+            hint={t("empty.noCheatSheetHint")}
+            action={onAction ? { label: t("empty.generate"), onClick: onAction } : undefined}
         />
     );
 }

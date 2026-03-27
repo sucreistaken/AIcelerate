@@ -49,6 +49,15 @@ const translations: Record<Lang, Record<string, string>> = {
     'mode.studyRoom': 'Çalışma Odası',
     'mode.studyHub': 'Study Hub',
     'mode.courseDashboard': 'Kurs Paneli',
+    'mode.groupCourse': 'Kurs',
+    'mode.groupAnalysis': 'Analiz',
+    'mode.groupStudy': 'Çalışma',
+    'mode.groupPractice': 'Pratik',
+    'mode.groupResources': 'Kaynaklar',
+    'mode.groupManage': 'Yönetim',
+    'mode.dashboard': 'Dashboard',
+    'mode.myNotes': 'Notlarım',
+    'mode.lessons': 'Dersler',
 
     // Plan
     'plan.title': 'Öğrenme Planı',
@@ -91,13 +100,13 @@ const translations: Record<Lang, Record<string, string>> = {
     'deepDive.noLesson': 'Ders seçin ve sohbete başlayın',
 
     // Notes
-    'notes.title': 'Notlar',
+    'notes.title': 'Notlar Nedir?',
+    'notes.desc': 'Ders sırasında kişisel notlar oluşturun, etiketleyin ve düzenleyin.',
+    'notes.noMatching': 'Eşleşen not bulunamadı',
+    'notes.tryDifferent': 'Farklı arama terimleri deneyin veya filtreleri temizleyin',
     'notes.newNote': 'Yeni Not',
     'notes.clearAll': 'Tümünü Sil',
     'notes.noNotes': 'Henüz not yok.',
-    'notes.deleteConfirmTitle': 'Tüm Notları Sil',
-    'notes.deleteConfirmMsg': 'Tüm notlarınız silinecek. Bu işlem geri alınamaz.',
-
     // Mind Map
     'mindmap.title': 'Mind Map',
     'mindmap.generate': 'Mind Map Oluştur',
@@ -121,8 +130,6 @@ const translations: Record<Lang, Record<string, string>> = {
     'history.search': 'Ders ara...',
     'history.noLessons': 'Henüz hiç dersin yok.',
     'history.bulkDelete': 'Toplu Sil',
-    'history.bulkDeleteConfirm': 'ders silinecek. Emin misiniz?',
-
     // Gamification
     'xp.levelUp': 'Seviye Atladın!',
     'xp.streak': 'gün streak',
@@ -141,6 +148,270 @@ const translations: Record<Lang, Record<string, string>> = {
     'stepper.generating': 'Plan oluşturuluyor...',
     'stepper.extracting': 'Vurgular çıkarılıyor...',
     'stepper.complete': 'Tamamlandı!',
+
+    // Navigation & Layout
+    'nav.allCourses': 'Tüm Kurslar',
+    'nav.noLesson': 'Ders Yok',
+    'nav.selectLesson': '-- Ders Seçin --',
+    'nav.selectCourse': '-- Tüm Kurslar --',
+    'nav.otherLessons': 'Diğer Dersler',
+    'nav.createNewLesson': '+ Yeni Ders Oluştur',
+    'nav.settings': 'Ayarlar',
+    'nav.notifications': 'Bildirimler',
+    'nav.switchToEn': 'Switch to English',
+    'nav.switchToTr': 'Türkçeye geç',
+
+    // Course (additional)
+    'course.newCourse': '+ Yeni Kurs',
+    'course.noCourses': 'Henüz kurs yok',
+    'course.noCoursesDesc': 'İlk kursunuzu oluşturun. AI otomatik olarak dersler arası bağlantı kuracak.',
+    'course.noCoursesHint': 'İpucu: Bir kursla başlayın ve dersleri ekleyin',
+    'course.createFirst': 'İlk Kursunuzu Oluşturun',
+    'course.lesson': 'ders',
+    'course.lessons': 'ders',
+    'course.exam': 'Sınav',
+    'course.code': 'Kurs Kodu',
+    'course.codePlaceholder': 'Örn: MATH 153',
+    'course.name': 'Kurs Adı',
+    'course.dashboardTitle': 'Course Dashboard Nedir?',
+    'course.dashboardDesc': 'Derslerinizi kurslara gruplayarak AI\'ın dersler arası bağlantı kurmasını sağlayın.',
+    'course.dashboardTip1': 'Kurs oluştur',
+    'course.dashboardTip2': 'Ders ata',
+    'course.dashboardTip3': 'İlerleme takibi',
+    'course.dashboardTip4': 'Haftalık plan',
+
+    // Course Info Section
+    'courseInfo.title': 'Kurs Bilgisi',
+    'courseInfo.syllabus': 'Kurs Kodu (IEU Syllabus)',
+    'courseInfo.noCode': 'Kurs kodu yok',
+    'courseInfo.fetchLOs': 'LO Getir',
+    'courseInfo.fetchingLOs': 'LO Getiriliyor',
+    'courseInfo.learningOutcomes': 'Öğrenme Çıktıları',
+    'courseInfo.slideDeviation': 'Slayt Sapma Analizi',
+    'courseInfo.analyzingDeviation': 'Sapma analiz ediliyor',
+    'courseInfo.alignTranscript': 'Transkript ile Eşleştir',
+    'courseInfo.aligning': 'Eşleştiriliyor',
+    'courseInfo.createLoStudy': 'LO Çalışma Modu Oluştur',
+    'courseInfo.generatingLo': 'LO çalışması oluşturuluyor',
+
+    // Lesson Wizard
+    'wizard.newLesson': 'Yeni Ders Ekle',
+    'wizard.back': 'Geri',
+    'wizard.next': 'İleri',
+    'wizard.return': 'Dön',
+    'wizard.lessonInfo': 'Ders Bilgileri',
+    'wizard.lessonInfoDesc': 'Yeni dersinizin temel bilgilerini girin',
+    'wizard.selectCourse': 'Kurs seçin',
+    'wizard.createNewCourse': 'Yeni Kurs Oluştur',
+    'wizard.newCourse': 'Yeni Kurs',
+    'wizard.courseCode': 'Kurs kodu',
+    'wizard.courseName': 'Kurs adı',
+    'wizard.lessonTitle': 'Ders Başlığı',
+    'wizard.summary': 'Özet & Analiz',
+    'wizard.summaryDesc': 'Yüklenen materyalleri gözden geçirin',
+    'wizard.notUploaded': 'Yüklenmedi (opsiyonel)',
+    'wizard.week': 'Hafta',
+
+    // Lessons History (additional)
+    'history.desc': 'Tüm derslerinizi görüntüleyin, arayın ve yönetin.',
+    'history.tipSearch': 'Ders ara',
+    'history.tipBulkDelete': 'Toplu silme',
+    'history.tipAssignCourse': 'Kurs atama',
+    'history.tipShares': 'Paylaşımlar',
+    'history.bulkDeleteMsg': '{count} ders silinecek. Emin misiniz?',
+    'history.yesDelete': 'Evet, Sil',
+    'history.otherLessons': 'Diğer Dersler',
+
+    // Left Panel
+    'leftPanel.noLessonSelected': 'Ders seçilmedi',
+    'leftPanel.noLessonDesc': 'Bir ders seçin veya yeni ders oluşturmak için wizard\'ı kullanın.',
+    'leftPanel.createLesson': 'Yeni Ders Oluştur',
+    'leftPanel.materials': 'Materyaller',
+    'leftPanel.slides': 'Slaytlar',
+    'leftPanel.slideContent': 'Slayt İçeriği',
+    'leftPanel.uploadPdf': 'PDF Yükle',
+    'leftPanel.transcript': 'Transkript',
+    'leftPanel.uploadAudio': 'Ses Yükle',
+    'leftPanel.pasteContent': 'İçerik yapıştırın...',
+
+    // Auth & Profile
+    'auth.login': 'Giriş Yap',
+    'auth.register': 'Hesap Oluştur',
+    'auth.creatingAccount': 'Hesap oluşturuluyor',
+    'auth.email': 'E-posta',
+    'auth.emailPlaceholder': 'ornek@email.com',
+    'auth.password': 'Şifre',
+    'auth.passwordHint': 'Min. 6 karakter',
+    'auth.nickname': 'Kullanıcı Adı',
+    'auth.nicknamePlaceholder': 'Görünen adınız',
+    'auth.chooseAvatar': 'Avatarını Seç',
+    'auth.changeAvatarLater': 'Daha sonra değiştirebilirsiniz',
+    'auth.skipForNow': 'Şimdilik Atla',
+    'auth.appTitle': 'LearnCraft AI',
+    'auth.signIn': 'Giriş Yap',
+    'auth.signingIn': 'Giriş yapılıyor...',
+    'auth.signInSubtitle': 'Hesabınıza giriş yapın',
+    'auth.noAccount': 'Hesabınız yok mu?',
+    'auth.createOne': 'Hesap oluştur',
+    'auth.hasAccount': 'Zaten hesabınız var mı?',
+    'auth.signInLink': 'Giriş yap',
+    'auth.createAccountSubtitle': 'Hesabınızı oluşturun',
+
+    // Settings / Profile
+    'settings.title': 'Ayarlar',
+    'settings.profile': 'Profil',
+    'settings.avatar': 'Avatar',
+    'settings.nickname': 'Kullanıcı Adı',
+    'settings.department': 'Bölüm',
+    'settings.departmentPlaceholder': 'Örn: Bilgisayar Mühendisliği',
+    'settings.bio': 'Biyografi',
+    'settings.bioPlaceholder': 'Kendiniz hakkında kısa bir bilgi',
+    'settings.friendCode': 'Arkadaş Kodu',
+    'settings.saved': 'Kaydedildi!',
+    'settings.saveChanges': 'Değişiklikleri Kaydet',
+    'settings.appearance': 'Görünüm',
+    'settings.notifications': 'Bildirimler',
+    'settings.security': 'Güvenlik',
+    'settings.account': 'Hesap',
+    'settings.currentPassword': 'Mevcut Şifre',
+    'settings.newPassword': 'Yeni Şifre',
+    'settings.changingPassword': 'Değiştiriliyor...',
+    'settings.changePassword': 'Şifre Değiştir',
+    'settings.passwordChanged': 'Şifre başarıyla değiştirildi',
+    'settings.email': 'E-posta',
+    'settings.signOut': 'Çıkış Yap',
+    'settings.deleteAccount': 'Hesabı Sil',
+    'settings.confirmDelete': 'Silmeyi Onayla',
+    'settings.deleting': 'Siliniyor...',
+
+    // Common Actions & States (additional)
+    'common.creating': 'Oluşturuluyor...',
+    'common.deleting': 'Siliniyor',
+    'common.analyzing': 'Analiz ediliyor',
+    'common.generating': 'Oluşturuluyor',
+    'common.fetching': 'Getiriliyor',
+    'common.noTopic': 'Konu yok',
+    'common.lesson': 'Ders',
+    'common.course': 'Kurs',
+    'common.unread': 'okunmamış',
+    'common.noNotifications': 'Bildirim yok',
+
+    // Empty States
+    'empty.noLessons': 'Henüz ders yok',
+    'empty.noLessonsDesc': 'İlk dersini yükle ve AI\'ın sihirini gör.',
+    'empty.noLessonsHint': 'PDF slayt veya ses dosyası yükleyebilirsin',
+    'empty.createFirstLesson': 'İlk Dersimi Oluştur',
+    'empty.noPlan': 'Henüz plan oluşturulmadı',
+    'empty.noPlanDesc': 'Sol panelden ders materyalini yükle ve Plan & Analyze\'a tıkla.',
+    'empty.noPlanHint': 'Slayt + transkript = en iyi sonuç',
+    'empty.getStarted': 'Hadi Başlayalım',
+    'empty.noQuiz': 'Quiz henüz hazır değil',
+    'empty.noQuizDesc': 'Önce bir ders planı oluştur, sonra quiz üretebilirsin.',
+    'empty.noQuizHint': 'Her quiz +10 XP kazandırır',
+    'empty.createQuiz': 'Quiz Oluştur',
+    'empty.noCheatSheet': 'Cheat Sheet henüz oluşturulmadı',
+    'empty.noCheatSheetDesc': 'Sınav odaklı tek sayfalık özet oluştur.',
+    'empty.noCheatSheetHint': 'Cheat sheet oluşturmak +15 XP',
+    'empty.generate': 'Oluştur',
+
+    // Collab
+    'collab.search': 'Ara',
+    'collab.loading': 'Yükleniyor',
+    'collab.loadOlder': 'Daha eski mesajları yükle',
+
+    // Notes (additional)
+    'notes.deleteAll': 'Tüm Notları Sil',
+    'notes.deleteAllMsg': 'Tüm notlarınız silinecek. Emin misiniz?',
+    'notes.noNotesDesc': 'Deep Dive\'dan AI yanıtlarını kaydedin veya manuel not oluşturun',
+    'notes.createFirst': 'İlk Notumu Oluştur',
+    'notes.tagging': 'Etiketleme',
+    'notes.pinning': 'Sabitleme',
+    'notes.pdfExport': 'PDF aktarma',
+
+    // Cheat Sheet (additional)
+    'cheatSheet.langChanged': 'Dil değişti',
+    'cheatSheet.yesCreate': 'Evet, Oluştur',
+
+    // Knowledge Base
+    'kb.title': 'Bilgi Tabanı',
+    'kb.quickStart': 'Hızlı Başlangıç',
+    'kb.step1': 'Slayt içeriğini yükleyin (PDF)',
+    'kb.step2': 'Transkript ekleyin (ses/metin)',
+    'kb.step3': 'Plan & Analyze\'a tıklayın',
+
+    // Scheduler
+    'scheduler.dailyPlan': 'Günlük Plan',
+    'scheduler.studyNow': 'Şimdi Çalış',
+    'scheduler.allCaughtUp': 'Hepsi tamam!',
+    'scheduler.start': 'Başla',
+    'scheduler.noTasks': 'Bugün için görev yok.',
+    'scheduler.total': 'Toplam:',
+
+    // Left Panel extras
+    'leftPanel.openKB': 'Bilgi Tabanını Aç',
+    'leftPanel.collapsePanel': 'Paneli Kapat',
+    'leftPanel.reanalyze': 'Yeniden Analiz Et',
+    'leftPanel.analyzing': 'Analiz ediliyor...',
+
+    // Course extras
+    'course.allCoursesBack': '← Tüm Kurslar',
+    'course.export': 'Dışa Aktar',
+    'course.rebuildIndex': 'İndeksi Yeniden Oluştur',
+    'course.overview': 'Genel Bakış',
+    'course.progress': 'İlerleme',
+    'course.schedule': 'Takvim',
+    'course.loadingProgress': 'İlerleme yükleniyor...',
+    'course.lessonCompletion': 'Ders Tamamlama',
+    'course.perLessonStatus': 'Ders Bazında Durum',
+    'course.createNewCourse': 'Yeni Kurs Oluştur',
+    'course.courseCodeLabel': 'Kurs Kodu',
+    'course.courseCodePlaceholder': 'Örn: MATH 201',
+    'course.courseNameLabel': 'Kurs Adı',
+    'course.courseNamePlaceholder': 'Örn: Lineer Cebir',
+    'course.descriptionOptional': 'Açıklama (opsiyonel)',
+    'course.descriptionPlaceholder': 'Kısa kurs açıklaması...',
+    'course.createCourse': 'Kurs Oluştur',
+    // Settings - Notifications
+    'settings.notifTitle': 'Bildirimler',
+    'settings.enableNotif': 'Bildirimleri Etkinleştir',
+    'settings.enableNotifDesc': 'Etkinlikler için bildirim al',
+    'settings.sound': 'Ses',
+    'settings.soundDesc': 'Yeni bildirimler için ses çal',
+    'settings.mentionsOnly': 'Sadece Bahsetmeler',
+    'settings.mentionsOnlyDesc': 'Sadece bahsedildiğinizde bildirim alın',
+    // Settings - Appearance
+    'settings.appearanceTitle': 'Görünüm',
+    'settings.theme': 'Tema',
+    'settings.themeLight': 'Açık',
+    'settings.themeDark': 'Koyu',
+    'settings.themeSystem': 'Sistem',
+    // Welcome Guide
+    'welcome.back': 'Tekrar hoş geldin',
+    'welcome.hello': 'Hoş geldin',
+    'welcome.backDesc': '{count} ders yükledin. Bugün ne çalışmak istersin?',
+    'welcome.helloDesc': 'Ders materyalini yükle, AI plan, quiz ve özet hazırlasın.',
+    'welcome.dayStreak': 'gün seri',
+    'welcome.getStarted': 'Başlamak için',
+    'welcome.step1Title': 'Materyal yükle',
+    'welcome.step1Desc': 'PDF slayt veya ses dosyası',
+    'welcome.step2Title': 'AI analiz etsin',
+    'welcome.step2Desc': 'Plan, quiz ve kavramlar çıkarılsın',
+    'welcome.step3Title': 'Çalışmaya başla',
+    'welcome.step3Desc': 'Quiz çöz, flashcard tekrar et',
+    'welcome.continueLabel': 'Kaldığın yerden devam et',
+    'welcome.concept': 'kavram',
+    'welcome.ago': 'önce',
+    'welcome.newLesson': 'Yeni ders yükle',
+    'welcome.studyTools': 'Çalışma araçları',
+    'welcome.toolDeepDive': 'AI ile derinlemesine sohbet',
+    'welcome.toolQuiz': 'Kendini test et',
+    'welcome.toolFlashcards': 'Kartlarla tekrar et',
+    'welcome.toolMindMap': 'Kavram haritası oluştur',
+    'welcome.toolCheatSheet': 'Sınav odaklı özet',
+    'welcome.toolNotes': 'Notlarını yönet',
+    // Left Panel extras
+    'leftPanel.noLessonTitle': 'Ders seçilmedi',
+    'leftPanel.noLessonHint': 'Bir ders seçin veya yeni ders oluşturmak için wizard\'ı kullanın.',
   },
   en: {
     // Common
@@ -188,6 +459,15 @@ const translations: Record<Lang, Record<string, string>> = {
     'mode.studyRoom': 'Study Room',
     'mode.studyHub': 'Study Hub',
     'mode.courseDashboard': 'Course Dashboard',
+    'mode.groupCourse': 'Course',
+    'mode.groupAnalysis': 'Analysis',
+    'mode.groupStudy': 'Study',
+    'mode.groupPractice': 'Practice',
+    'mode.groupResources': 'Resources',
+    'mode.groupManage': 'Manage',
+    'mode.dashboard': 'Dashboard',
+    'mode.myNotes': 'My Notes',
+    'mode.lessons': 'Lessons',
 
     // Plan
     'plan.title': 'Learning Plan',
@@ -230,13 +510,13 @@ const translations: Record<Lang, Record<string, string>> = {
     'deepDive.noLesson': 'Select a lesson to start a conversation',
 
     // Notes
-    'notes.title': 'Notes',
+    'notes.title': 'What are Notes?',
+    'notes.desc': 'Create, tag and organize personal notes during lessons.',
+    'notes.noMatching': 'No matching notes',
+    'notes.tryDifferent': 'Try different search terms or clear filters',
     'notes.newNote': 'New Note',
     'notes.clearAll': 'Clear All',
     'notes.noNotes': 'No notes yet.',
-    'notes.deleteConfirmTitle': 'Delete All Notes',
-    'notes.deleteConfirmMsg': 'All your notes will be deleted. This action cannot be undone.',
-
     // Mind Map
     'mindmap.title': 'Mind Map',
     'mindmap.generate': 'Generate Mind Map',
@@ -260,8 +540,6 @@ const translations: Record<Lang, Record<string, string>> = {
     'history.search': 'Search lessons...',
     'history.noLessons': "You don't have any lessons yet.",
     'history.bulkDelete': 'Bulk Delete',
-    'history.bulkDeleteConfirm': 'lessons will be deleted. Are you sure?',
-
     // Gamification
     'xp.levelUp': 'Level Up!',
     'xp.streak': 'day streak',
@@ -280,6 +558,270 @@ const translations: Record<Lang, Record<string, string>> = {
     'stepper.generating': 'Generating plan...',
     'stepper.extracting': 'Extracting highlights...',
     'stepper.complete': 'Complete!',
+
+    // Navigation & Layout
+    'nav.allCourses': 'All Courses',
+    'nav.noLesson': 'No Lesson',
+    'nav.selectLesson': '-- Select Lesson --',
+    'nav.selectCourse': '-- All Courses --',
+    'nav.otherLessons': 'Other Lessons',
+    'nav.createNewLesson': '+ Create New Lesson',
+    'nav.settings': 'Settings',
+    'nav.notifications': 'Notifications',
+    'nav.switchToEn': 'Switch to English',
+    'nav.switchToTr': 'Türkçeye geç',
+
+    // Course (additional)
+    'course.newCourse': '+ New Course',
+    'course.noCourses': 'No courses yet',
+    'course.noCoursesDesc': 'Create your first course to organize lessons. AI will then build cross-lesson connections automatically.',
+    'course.noCoursesHint': 'Tip: Start with one course and add lessons as you go',
+    'course.createFirst': 'Create Your First Course',
+    'course.lesson': 'lesson',
+    'course.lessons': 'lessons',
+    'course.exam': 'Exam',
+    'course.code': 'Course Code',
+    'course.codePlaceholder': 'Ex: MATH 153',
+    'course.name': 'Course Name',
+    'course.dashboardTitle': 'What is Course Dashboard?',
+    'course.dashboardDesc': 'Organize your lessons into courses so the AI builds cross-lesson connections.',
+    'course.dashboardTip1': 'Create course',
+    'course.dashboardTip2': 'Assign lesson',
+    'course.dashboardTip3': 'Track progress',
+    'course.dashboardTip4': 'Weekly plan',
+
+    // Course Info Section
+    'courseInfo.title': 'Course Info',
+    'courseInfo.syllabus': 'Course Code (IEU Syllabus)',
+    'courseInfo.noCode': 'No course code',
+    'courseInfo.fetchLOs': 'Fetch LOs',
+    'courseInfo.fetchingLOs': 'Fetching LOs',
+    'courseInfo.learningOutcomes': 'Learning Outcomes',
+    'courseInfo.slideDeviation': 'Slide Deviation Analysis',
+    'courseInfo.analyzingDeviation': 'Analyzing deviation',
+    'courseInfo.alignTranscript': 'Align with Transcript',
+    'courseInfo.aligning': 'Aligning...',
+    'courseInfo.createLoStudy': 'Create LO Study Mode',
+    'courseInfo.generatingLo': 'Generating LO Study',
+
+    // Lesson Wizard
+    'wizard.newLesson': 'Add New Lesson',
+    'wizard.back': 'Back',
+    'wizard.next': 'Next',
+    'wizard.return': 'Return',
+    'wizard.lessonInfo': 'Lesson Info',
+    'wizard.lessonInfoDesc': 'Enter basic info for your new lesson',
+    'wizard.selectCourse': 'Select a course',
+    'wizard.createNewCourse': 'Create New Course',
+    'wizard.newCourse': 'New Course',
+    'wizard.courseCode': 'Course code',
+    'wizard.courseName': 'Course name',
+    'wizard.lessonTitle': 'Lesson Title',
+    'wizard.summary': 'Summary & Analyze',
+    'wizard.summaryDesc': 'Review uploaded materials',
+    'wizard.notUploaded': 'Not uploaded (optional)',
+    'wizard.week': 'Week',
+
+    // Lessons History (additional)
+    'history.desc': 'View, search and manage all your lessons.',
+    'history.tipSearch': 'Search lessons',
+    'history.tipBulkDelete': 'Bulk delete',
+    'history.tipAssignCourse': 'Assign to course',
+    'history.tipShares': 'Shares',
+    'history.bulkDeleteMsg': 'Delete {count} lessons. Are you sure?',
+    'history.yesDelete': 'Yes, Delete',
+    'history.otherLessons': 'Other Lessons',
+
+    // Left Panel
+    'leftPanel.noLessonSelected': 'No lesson selected',
+    'leftPanel.noLessonDesc': 'Select a lesson or use the wizard to create a new one.',
+    'leftPanel.createLesson': 'Create New Lesson',
+    'leftPanel.materials': 'Materials',
+    'leftPanel.slides': 'Slides',
+    'leftPanel.slideContent': 'Slide Content',
+    'leftPanel.uploadPdf': 'Upload PDF',
+    'leftPanel.transcript': 'Transcript',
+    'leftPanel.uploadAudio': 'Upload Audio',
+    'leftPanel.pasteContent': 'Paste content...',
+
+    // Auth & Profile
+    'auth.login': 'Log In',
+    'auth.register': 'Create Account',
+    'auth.creatingAccount': 'Creating account',
+    'auth.email': 'Email',
+    'auth.emailPlaceholder': 'you@example.com',
+    'auth.password': 'Password',
+    'auth.passwordHint': 'Min. 6 characters',
+    'auth.nickname': 'Nickname',
+    'auth.nicknamePlaceholder': 'Your display name',
+    'auth.chooseAvatar': 'Choose Your Avatar',
+    'auth.changeAvatarLater': 'You can change this later',
+    'auth.skipForNow': 'Skip for now',
+    'auth.appTitle': 'LearnCraft AI',
+    'auth.signIn': 'Sign In',
+    'auth.signingIn': 'Signing in...',
+    'auth.signInSubtitle': 'Sign in to your account',
+    'auth.noAccount': "Don't have an account?",
+    'auth.createOne': 'Create one',
+    'auth.hasAccount': 'Already have an account?',
+    'auth.signInLink': 'Sign in',
+    'auth.createAccountSubtitle': 'Create your account',
+
+    // Settings / Profile
+    'settings.title': 'Settings',
+    'settings.profile': 'Profile',
+    'settings.avatar': 'Avatar',
+    'settings.nickname': 'Nickname',
+    'settings.department': 'Department',
+    'settings.departmentPlaceholder': 'e.g. Computer Engineering',
+    'settings.bio': 'Bio',
+    'settings.bioPlaceholder': 'A short bio about yourself',
+    'settings.friendCode': 'Friend Code',
+    'settings.saved': 'Saved!',
+    'settings.saveChanges': 'Save Changes',
+    'settings.appearance': 'Appearance',
+    'settings.notifications': 'Notifications',
+    'settings.security': 'Security',
+    'settings.account': 'Account',
+    'settings.currentPassword': 'Current Password',
+    'settings.newPassword': 'New Password',
+    'settings.changingPassword': 'Changing...',
+    'settings.changePassword': 'Change Password',
+    'settings.passwordChanged': 'Password changed successfully',
+    'settings.email': 'Email',
+    'settings.signOut': 'Sign Out',
+    'settings.deleteAccount': 'Delete Account',
+    'settings.confirmDelete': 'Confirm Delete',
+    'settings.deleting': 'Deleting...',
+
+    // Common Actions & States (additional)
+    'common.creating': 'Creating...',
+    'common.deleting': 'Deleting',
+    'common.analyzing': 'Analyzing',
+    'common.generating': 'Generating',
+    'common.fetching': 'Fetching',
+    'common.noTopic': 'No topic',
+    'common.lesson': 'Lesson',
+    'common.course': 'Course',
+    'common.unread': 'unread',
+    'common.noNotifications': 'No notifications',
+
+    // Empty States
+    'empty.noLessons': 'No lessons yet',
+    'empty.noLessonsDesc': 'Upload your first lesson and see the AI magic.',
+    'empty.noLessonsHint': 'You can upload PDF slides or audio files',
+    'empty.createFirstLesson': 'Create My First Lesson',
+    'empty.noPlan': 'No plan created yet',
+    'empty.noPlanDesc': 'Upload lesson content from the left panel and click Plan & Analyze.',
+    'empty.noPlanHint': 'Slide + transcript = best results',
+    'empty.getStarted': 'Get Started',
+    'empty.noQuiz': 'No quiz yet',
+    'empty.noQuizDesc': 'Create a lesson plan first, then you can generate a quiz.',
+    'empty.noQuizHint': 'Each quiz earns +10 XP',
+    'empty.createQuiz': 'Create Quiz',
+    'empty.noCheatSheet': 'Cheat Sheet not created yet',
+    'empty.noCheatSheetDesc': 'Generate an exam-focused one-page summary.',
+    'empty.noCheatSheetHint': 'Creating a cheat sheet earns +15 XP',
+    'empty.generate': 'Generate',
+
+    // Collab
+    'collab.search': 'Search',
+    'collab.loading': 'Loading',
+    'collab.loadOlder': 'Load older messages',
+
+    // Notes (additional)
+    'notes.deleteAll': 'Delete All Notes',
+    'notes.deleteAllMsg': 'All notes will be deleted. Are you sure?',
+    'notes.noNotesDesc': 'Save AI responses from Deep Dive or create notes manually',
+    'notes.createFirst': 'Create First Note',
+    'notes.tagging': 'Tagging',
+    'notes.pinning': 'Pinning',
+    'notes.pdfExport': 'PDF export',
+
+    // Cheat Sheet (additional)
+    'cheatSheet.langChanged': 'Language changed',
+    'cheatSheet.yesCreate': 'Yes, Create',
+
+    // Knowledge Base
+    'kb.title': 'Knowledge Base',
+    'kb.quickStart': 'Quick Start',
+    'kb.step1': 'Upload slide content (PDF)',
+    'kb.step2': 'Add transcript (audio/text)',
+    'kb.step3': 'Click Plan & Analyze',
+
+    // Scheduler
+    'scheduler.dailyPlan': 'Daily Plan',
+    'scheduler.studyNow': 'Study Now',
+    'scheduler.allCaughtUp': 'All caught up!',
+    'scheduler.start': 'Start',
+    'scheduler.noTasks': 'No tasks for today.',
+    'scheduler.total': 'Total:',
+
+    // Left Panel extras
+    'leftPanel.openKB': 'Open Knowledge Base',
+    'leftPanel.collapsePanel': 'Collapse panel',
+    'leftPanel.reanalyze': 'Re-Analyze',
+    'leftPanel.analyzing': 'Analyzing...',
+
+    // Course extras
+    'course.allCoursesBack': '← All Courses',
+    'course.export': 'Export',
+    'course.rebuildIndex': 'Rebuild Index',
+    'course.overview': 'Overview',
+    'course.progress': 'Progress',
+    'course.schedule': 'Schedule',
+    'course.loadingProgress': 'Loading progress...',
+    'course.lessonCompletion': 'Lesson Completion',
+    'course.perLessonStatus': 'Per-Lesson Status',
+    'course.createNewCourse': 'Create New Course',
+    'course.courseCodeLabel': 'Course Code',
+    'course.courseCodePlaceholder': 'Ex: MATH 201',
+    'course.courseNameLabel': 'Course Name',
+    'course.courseNamePlaceholder': 'Ex: Linear Algebra',
+    'course.descriptionOptional': 'Description (optional)',
+    'course.descriptionPlaceholder': 'Brief course description...',
+    'course.createCourse': 'Create Course',
+    // Settings - Notifications
+    'settings.notifTitle': 'Notifications',
+    'settings.enableNotif': 'Enable Notifications',
+    'settings.enableNotifDesc': 'Receive notifications for activity',
+    'settings.sound': 'Sound',
+    'settings.soundDesc': 'Play sound for new notifications',
+    'settings.mentionsOnly': 'Mentions Only',
+    'settings.mentionsOnlyDesc': 'Only notify when you\'re mentioned',
+    // Settings - Appearance
+    'settings.appearanceTitle': 'Appearance',
+    'settings.theme': 'Theme',
+    'settings.themeLight': 'Light',
+    'settings.themeDark': 'Dark',
+    'settings.themeSystem': 'System',
+    // Welcome Guide
+    'welcome.back': 'Welcome back',
+    'welcome.hello': 'Welcome',
+    'welcome.backDesc': 'You\'ve uploaded {count} lessons. What would you like to study today?',
+    'welcome.helloDesc': 'Upload lesson materials, let AI prepare plans, quizzes and summaries.',
+    'welcome.dayStreak': 'day streak',
+    'welcome.getStarted': 'Get started',
+    'welcome.step1Title': 'Upload materials',
+    'welcome.step1Desc': 'PDF slides or audio files',
+    'welcome.step2Title': 'Let AI analyze',
+    'welcome.step2Desc': 'Generate plans, quizzes and concepts',
+    'welcome.step3Title': 'Start studying',
+    'welcome.step3Desc': 'Take quizzes, review flashcards',
+    'welcome.continueLabel': 'Continue where you left off',
+    'welcome.concept': 'concept',
+    'welcome.ago': 'ago',
+    'welcome.newLesson': 'Upload new lesson',
+    'welcome.studyTools': 'Study tools',
+    'welcome.toolDeepDive': 'AI-powered deep conversation',
+    'welcome.toolQuiz': 'Test yourself',
+    'welcome.toolFlashcards': 'Review with cards',
+    'welcome.toolMindMap': 'Build concept maps',
+    'welcome.toolCheatSheet': 'Exam-focused summary',
+    'welcome.toolNotes': 'Manage your notes',
+    // Left Panel extras
+    'leftPanel.noLessonTitle': 'No lesson selected',
+    'leftPanel.noLessonHint': 'Select a lesson or use the wizard to create a new one.',
   },
 };
 
@@ -312,17 +854,25 @@ export function initLanguage(): Lang {
  * Translate a key to the current language.
  * Falls back to English, then returns the key itself.
  */
-export function t(key: string): string {
-  return translations[currentLang]?.[key]
-    ?? translations['en']?.[key]
-    ?? key;
+export function t(key: string, params?: Record<string, string | number>): string {
+  let result = translations[currentLang]?.[key] ?? translations['en']?.[key] ?? key;
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      result = result.replace(`{${k}}`, String(v));
+    }
+  }
+  return result;
 }
 
 /**
  * Translate with explicit language.
  */
-export function tLang(key: string, lang: Lang): string {
-  return translations[lang]?.[key]
-    ?? translations['en']?.[key]
-    ?? key;
+export function tLang(key: string, lang: Lang, params?: Record<string, string | number>): string {
+  let result = translations[lang]?.[key] ?? translations['en']?.[key] ?? key;
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      result = result.replace(`{${k}}`, String(v));
+    }
+  }
+  return result;
 }

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { t } from "../../utils/i18n";
 
 export default function NotificationSettings() {
   const [notifications, setNotifications] = useState(true);
@@ -7,13 +8,13 @@ export default function NotificationSettings() {
 
   return (
     <div className="settings-section">
-      <h3 className="settings-section__title">Notifications</h3>
+      <h3 className="settings-section__title">{t("settings.notifTitle")}</h3>
 
       <div className="settings-group">
         <div className="settings-toggle-row">
           <div>
-            <div className="settings-toggle-label">Enable Notifications</div>
-            <div className="settings-toggle-desc">Receive notifications for activity</div>
+            <div className="settings-toggle-label">{t("settings.enableNotif")}</div>
+            <div className="settings-toggle-desc">{t("settings.enableNotifDesc")}</div>
           </div>
           <button
             className={`settings-toggle ${notifications ? "settings-toggle--on" : ""}`}
@@ -27,8 +28,8 @@ export default function NotificationSettings() {
       <div className="settings-group">
         <div className="settings-toggle-row">
           <div>
-            <div className="settings-toggle-label">Sound</div>
-            <div className="settings-toggle-desc">Play sound for new notifications</div>
+            <div className="settings-toggle-label">{t("settings.sound")}</div>
+            <div className="settings-toggle-desc">{t("settings.soundDesc")}</div>
           </div>
           <button
             className={`settings-toggle ${sound ? "settings-toggle--on" : ""}`}
@@ -42,8 +43,8 @@ export default function NotificationSettings() {
       <div className="settings-group">
         <div className="settings-toggle-row">
           <div>
-            <div className="settings-toggle-label">Mentions Only</div>
-            <div className="settings-toggle-desc">Only notify when you're mentioned</div>
+            <div className="settings-toggle-label">{t("settings.mentionsOnly")}</div>
+            <div className="settings-toggle-desc">{t("settings.mentionsOnlyDesc")}</div>
           </div>
           <button
             className={`settings-toggle ${mentions ? "settings-toggle--on" : ""}`}

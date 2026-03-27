@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useAuthStore } from "../../stores/authStore";
 import { authApi } from "../../services/authApi";
+import { t } from "../../utils/i18n";
 
 export default function AccountSettings() {
   const logout = useAuthStore((s) => s.logout);
@@ -25,16 +26,16 @@ export default function AccountSettings() {
 
   return (
     <div className="settings-section">
-      <h3 className="settings-section__title">Account</h3>
+      <h3 className="settings-section__title">{t("settings.account")}</h3>
 
       <div className="settings-group">
-        <label>Email</label>
+        <label>{t("settings.email")}</label>
         <div className="settings-readonly">{user?.email || "—"}</div>
       </div>
 
       <div className="settings-group">
         <button className="settings-btn settings-btn--secondary" onClick={logout}>
-          Sign Out
+          {t("settings.signOut")}
         </button>
       </div>
 
@@ -47,7 +48,7 @@ export default function AccountSettings() {
             className="settings-btn settings-btn--danger"
             onClick={() => setShowDelete(true)}
           >
-            Delete Account
+            {t("settings.deleteAccount")}
           </button>
         ) : (
           <div className="settings-danger-confirm">
@@ -68,7 +69,7 @@ export default function AccountSettings() {
                 onClick={handleDelete}
                 disabled={loading || !deletePassword}
               >
-                {loading ? "Deleting..." : "Confirm Delete"}
+                {loading ? t("settings.deleting") : t("settings.confirmDelete")}
               </button>
               <button
                 className="settings-btn settings-btn--secondary"
@@ -78,7 +79,7 @@ export default function AccountSettings() {
                   setError("");
                 }}
               >
-                Cancel
+                {t("common.cancel")}
               </button>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import React, { useState, FormEvent } from "react";
 import { useAuthStore } from "../../stores/authStore";
+import { t } from "../../utils/i18n";
 import "./auth.css";
 
 interface Props {
@@ -24,8 +25,8 @@ export default function LoginPage({ onSwitchToRegister }: Props) {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-header">
-          <h1 className="auth-title">LearnCraft AI</h1>
-          <p className="auth-subtitle">Sign in to your account</p>
+          <h1 className="auth-title">{t("auth.appTitle")}</h1>
+          <p className="auth-subtitle">{t("auth.signInSubtitle")}</p>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
@@ -36,40 +37,40 @@ export default function LoginPage({ onSwitchToRegister }: Props) {
           )}
 
           <div className="auth-field">
-            <label htmlFor="email">Email</label>
+            <label htmlFor="email">{t("auth.email")}</label>
             <input
               id="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              placeholder={t("auth.emailPlaceholder")}
               required
               autoFocus
             />
           </div>
 
           <div className="auth-field">
-            <label htmlFor="password">Password</label>
+            <label htmlFor="password">{t("auth.password")}</label>
             <input
               id="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Min. 6 characters"
+              placeholder={t("auth.passwordHint")}
               required
               minLength={6}
             />
           </div>
 
           <button type="submit" className="auth-btn" disabled={loading}>
-            {loading ? "Signing in..." : "Sign In"}
+            {loading ? t("auth.signingIn") : t("auth.signIn")}
           </button>
         </form>
 
         <p className="auth-switch">
-          Don't have an account?{" "}
+          {t("auth.noAccount")}{" "}
           <button type="button" onClick={onSwitchToRegister}>
-            Create one
+            {t("auth.createOne")}
           </button>
         </p>
       </div>

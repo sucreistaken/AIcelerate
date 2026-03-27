@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useServerStore } from "../../../stores/serverStore";
 import { useProfileStore } from "../../../stores/profileStore";
 import type { ChannelType, ToolChannelType } from "../../../types";
+import { t } from "../../../utils/i18n";
 
 interface Props {
   open: boolean;
@@ -116,13 +117,13 @@ export default function CreateChannelModal({ open, categoryId, onClose }: Props)
             {error && <p style={{ color: "var(--danger)", marginBottom: 12 }}>{error}</p>}
 
             <div className="sh-modal-actions">
-              <button className="btn btn--ghost" onClick={onClose}>İptal</button>
+              <button className="btn btn--ghost" onClick={onClose}>{t("common.cancel")}</button>
               <button
                 className="btn btn--primary"
                 onClick={handleCreate}
                 disabled={!name.trim() || loading}
               >
-                {loading ? "Oluşturuluyor..." : "Oluştur"}
+                {loading ? t("common.creating") : t("common.create")}
               </button>
             </div>
           </motion.div>

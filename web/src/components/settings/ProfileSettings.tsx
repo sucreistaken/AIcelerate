@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useAuthStore } from "../../stores/authStore";
+import { t } from "../../utils/i18n";
 import AvatarPicker from "../auth/AvatarPicker";
 
 export default function ProfileSettings() {
@@ -18,15 +19,15 @@ export default function ProfileSettings() {
 
   return (
     <div className="settings-section">
-      <h3 className="settings-section__title">Profile</h3>
+      <h3 className="settings-section__title">{t("settings.profile")}</h3>
 
       <div className="settings-group">
-        <label>Avatar</label>
+        <label>{t("settings.avatar")}</label>
         <AvatarPicker />
       </div>
 
       <div className="settings-group">
-        <label htmlFor="s-nickname">Nickname</label>
+        <label htmlFor="s-nickname">{t("settings.nickname")}</label>
         <input
           id="s-nickname"
           type="text"
@@ -37,36 +38,36 @@ export default function ProfileSettings() {
       </div>
 
       <div className="settings-group">
-        <label htmlFor="s-department">Department</label>
+        <label htmlFor="s-department">{t("settings.department")}</label>
         <input
           id="s-department"
           type="text"
           value={department}
           onChange={(e) => setDepartment(e.target.value)}
           className="settings-input"
-          placeholder="e.g. Computer Engineering"
+          placeholder={t("settings.departmentPlaceholder")}
         />
       </div>
 
       <div className="settings-group">
-        <label htmlFor="s-bio">Bio</label>
+        <label htmlFor="s-bio">{t("settings.bio")}</label>
         <textarea
           id="s-bio"
           value={bio}
           onChange={(e) => setBio(e.target.value)}
           className="settings-input settings-textarea"
           rows={3}
-          placeholder="A short bio about yourself"
+          placeholder={t("settings.bioPlaceholder")}
         />
       </div>
 
       <div className="settings-group">
-        <label>Friend Code</label>
+        <label>{t("settings.friendCode")}</label>
         <div className="settings-readonly">{user?.friendCode || "—"}</div>
       </div>
 
       <button className="settings-btn" onClick={handleSave}>
-        {saved ? "Saved!" : "Save Changes"}
+        {saved ? t("settings.saved") : t("settings.saveChanges")}
       </button>
     </div>
   );

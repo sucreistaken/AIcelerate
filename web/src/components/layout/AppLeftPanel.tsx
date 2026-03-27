@@ -1,6 +1,7 @@
 import React from "react";
 import { X, Database } from "lucide-react";
 import AppLeftPanelForm from "./AppLeftPanelForm";
+import { t } from "../../utils/i18n";
 import type {
   LeftPanelLessonProps,
   LeftPanelUiProps,
@@ -36,8 +37,8 @@ export default function AppLeftPanel({
         <button
           className="lc-sidebar-mini__btn"
           onClick={onToggle}
-          title="Open Knowledge Base"
-          aria-label="Open Knowledge Base"
+          title={t("leftPanel.openKB")}
+          aria-label={t("leftPanel.openKB")}
         >
           <Database size={20} />
         </button>
@@ -54,13 +55,13 @@ export default function AppLeftPanel({
             className="text-accent-2"
             style={{ color: "var(--accent-2)" }}
           />
-          Knowledge Base
+          {t("kb.title")}
         </div>
         <button
           className="lc-sidebar-drawer__close"
           onClick={onToggle}
-          title="Collapse panel"
-          aria-label="Collapse panel"
+          title={t("leftPanel.collapsePanel")}
+          aria-label={t("leftPanel.collapsePanel")}
         >
           <X size={18} />
         </button>

@@ -1,5 +1,6 @@
 import React, { useState, FormEvent } from "react";
 import { authApi } from "../../services/authApi";
+import { t } from "../../utils/i18n";
 
 export default function SecuritySettings() {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -13,7 +14,7 @@ export default function SecuritySettings() {
     setMessage(null);
     try {
       await authApi.changePassword(currentPassword, newPassword);
-      setMessage({ type: "success", text: "Password changed successfully" });
+      setMessage({ type: "success", text: t("settings.passwordChanged") });
       setCurrentPassword("");
       setNewPassword("");
     } catch (err: any) {
@@ -25,7 +26,7 @@ export default function SecuritySettings() {
 
   return (
     <div className="settings-section">
-      <h3 className="settings-section__title">Security</h3>
+      <h3 className="settings-section__title">{t("settings.security")}</h3>
 
       <form onSubmit={handleSubmit} className="settings-form">
         {message && (
@@ -35,7 +36,7 @@ export default function SecuritySettings() {
         )}
 
         <div className="settings-group">
-          <label htmlFor="cur-pw">Current Password</label>
+          <label htmlFor="cur-pw">{t("settings.currentPassword")}</label>
           <input
             id="cur-pw"
             type="password"
@@ -47,7 +48,7 @@ export default function SecuritySettings() {
         </div>
 
         <div className="settings-group">
-          <label htmlFor="new-pw">New Password</label>
+          <label htmlFor="new-pw">{t("settings.newPassword")}</label>
           <input
             id="new-pw"
             type="password"
@@ -60,7 +61,7 @@ export default function SecuritySettings() {
         </div>
 
         <button type="submit" className="settings-btn" disabled={loading}>
-          {loading ? "Changing..." : "Change Password"}
+          {loading ? t("settings.changingPassword") : t("settings.changePassword")}
         </button>
       </form>
     </div>

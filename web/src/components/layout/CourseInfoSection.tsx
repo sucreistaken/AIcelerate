@@ -1,5 +1,6 @@
 import React from "react";
 import CollapsibleSection from "./CollapsibleSection";
+import { t } from "../../utils/i18n";
 
 interface CourseInfoSectionProps {
   lesson: {
@@ -24,22 +25,22 @@ interface CourseInfoSectionProps {
 export default function CourseInfoSection({ lesson, ui }: CourseInfoSectionProps) {
   return (
     <CollapsibleSection
-      title="Course Info"
+      title={t("courseInfo.title")}
       summary={
         lesson.courseCode.trim()
           ? `${lesson.courseCode}${lesson.learningOutcomes.length ? ` · ${lesson.learningOutcomes.length} LOs` : ""}`
-          : "No course code"
+          : t("courseInfo.noCode")
       }
       defaultOpen={!lesson.courseCode.trim()}
     >
       <label className="label" htmlFor="course-code" style={{ marginTop: 8 }}>
-        Course Code (IEU Syllabus)
+        {t("courseInfo.syllabus")}
       </label>
       <div className="flex-between mb-2" style={{ gap: 8 }}>
         <input
           id="course-code"
           className="lc-textarea input"
-          placeholder="Ex: MATH 153"
+          placeholder={t("course.codePlaceholder")}
           value={lesson.courseCode}
           onChange={(e) => lesson.setCourseCode(e.target.value)}
           aria-label="Course code"
@@ -51,7 +52,7 @@ export default function CourseInfoSection({ lesson, ui }: CourseInfoSectionProps
           disabled={!lesson.courseCode.trim() || ui.loLoading}
           aria-busy={ui.loLoading}
         >
-          {ui.loLoading ? "Fetching LOs..." : "Fetch LOs"}
+          {ui.loLoading ? t("courseInfo.fetchingLOs") : t("courseInfo.fetchLOs")}
         </button>
       </div>
 
@@ -59,10 +60,10 @@ export default function CourseInfoSection({ lesson, ui }: CourseInfoSectionProps
         <div
           className="muted-block small mb-3"
           role="region"
-          aria-label="Learning Outcomes"
+          aria-label={t("courseInfo.learningOutcomes")}
         >
           <div style={{ fontWeight: 600, marginBottom: 4 }}>
-            Learning Outcomes
+            {t("courseInfo.learningOutcomes")}
           </div>
           <ol className="ol">
             {lesson.learningOutcomes.map((lo, i) => (
@@ -77,7 +78,7 @@ export default function CourseInfoSection({ lesson, ui }: CourseInfoSectionProps
             onClick={lesson.analyzeDeviation}
             disabled={!lesson.currentLessonId || ui.devLoading}
           >
-            {ui.devLoading ? "Analyzing deviation..." : "Slide Deviation Analysis"}
+            {ui.devLoading ? t("courseInfo.analyzingDeviation") : t("courseInfo.slideDeviation")}
           </button>
 
           {ui.devErr && (
@@ -90,7 +91,7 @@ export default function CourseInfoSection({ lesson, ui }: CourseInfoSectionProps
             onClick={lesson.alignWithLO}
             disabled={!lesson.currentLessonId || ui.isLoading}
           >
-            {ui.isLoading ? "Aligning..." : "Align with Transcript"}
+            {ui.isLoading ? t("courseInfo.aligning") : t("courseInfo.alignTranscript")}
           </button>
 
           <button
@@ -103,7 +104,7 @@ export default function CourseInfoSection({ lesson, ui }: CourseInfoSectionProps
               !lesson.learningOutcomes.length
             }
           >
-            {ui.loModulesLoading ? "Generating LO Study..." : "Create LO Study Mode"}
+            {ui.loModulesLoading ? t("courseInfo.generatingLo") : t("courseInfo.createLoStudy")}
           </button>
         </div>
       )}

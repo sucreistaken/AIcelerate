@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useCourseStore } from "../../stores/courseStore";
 import { useLessonStore } from "../../stores/lessonStore";
 import { useUiStore } from "../../stores/uiStore";
+import { t } from "../../utils/i18n";
 
 function NavigationChip() {
   const courseStore = useCourseStore();
@@ -14,8 +15,8 @@ function NavigationChip() {
   const currentCourse = courseStore.courses.find((c) => c.id === courseStore.currentCourseId) || null;
   const currentLesson = lessonStore.lessons.find((l) => l.id === lessonStore.currentLessonId) || null;
 
-  const courseLabel = currentCourse ? currentCourse.code : "All Courses";
-  const lessonLabel = currentLesson ? currentLesson.title : "No Lesson";
+  const courseLabel = currentCourse ? currentCourse.code : t("nav.allCourses");
+  const lessonLabel = currentLesson ? currentLesson.title : t("nav.noLesson");
 
   const filteredLessons = currentCourse
     ? lessonStore.lessons.filter((l) => currentCourse.lessonIds.includes(l.id))
@@ -59,7 +60,7 @@ function NavigationChip() {
               value={courseStore.currentCourseId || ""}
               onChange={(e) => courseStore.selectCourse(e.target.value || null)}
             >
-              <option value="">-- All Courses --</option>
+              <option value="">{t("nav.selectCourse")}</option>
               {courseStore.courses.map((c) => (
                 <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
               ))}
@@ -87,14 +88,14 @@ function NavigationChip() {
                 else localStorage.removeItem("lc.lastLessonId");
               }}
             >
-              <option value="">-- Select Lesson --</option>
-              <option value="__new__" className="fw-700">+ Create New Lesson</option>
+              <option value="">{t("nav.selectLesson")}</option>
+              <option value="__new__" className="fw-700">{t("nav.createNewLesson")}</option>
               {ui.draftTitle && <option value="__draft__">Draft: {ui.draftTitle}</option>}
               {filteredLessons.map((l) => (
                 <option key={l.id} value={l.id}>{l.title}</option>
               ))}
               {otherLessons.length > 0 && (
-                <optgroup label="Other Lessons">
+                <optgroup label={t("nav.otherLessons")}>
                   {otherLessons.map((l) => (
                     <option key={l.id} value={l.id}>{l.title}</option>
                   ))}

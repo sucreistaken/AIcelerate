@@ -8,6 +8,7 @@ import { Select } from "./ui/Select";
 import { Badge } from "./ui/Badge";
 import { ConfirmModal } from "./ui/ConfirmModal";
 import PaneInfoBanner from "./ui/PaneInfoBanner";
+import { t as i18n } from "../utils/i18n";
 
 function timeAgo(dateStr: string, lang: 'tr' | 'en'): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -95,12 +96,10 @@ export default function CheatSheetPane(props: {
         isOpen={showLangConfirm}
         onConfirm={() => { setShowLangConfirm(false); onGenerate(language); }}
         onCancel={() => setShowLangConfirm(false)}
-        title={language === 'tr' ? 'Dil Değişikliği' : 'Language Change'}
-        message={language === 'tr'
-          ? 'Dil değişti. Cheat sheet yeniden oluşturulsun mu?'
-          : 'Language changed. Regenerate cheat sheet?'}
-        confirmLabel={language === 'tr' ? 'Evet, Oluştur' : 'Yes, Regenerate'}
-        cancelLabel={language === 'tr' ? 'İptal' : 'Cancel'}
+        title={i18n("cheatSheet.langChanged")}
+        message={i18n("cheatSheet.langChange")}
+        confirmLabel={i18n("cheatSheet.yesCreate")}
+        cancelLabel={i18n("common.cancel")}
         variant="warning"
       />
       <PaneInfoBanner

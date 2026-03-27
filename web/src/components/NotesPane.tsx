@@ -6,6 +6,7 @@ import NoteCreator from "./notes/NoteCreator";
 import NoteCard from "./notes/NoteCard";
 import NotesHeader from "./notes/NotesHeader";
 import NotesFilters from "./notes/NotesFilters";
+import { t } from "../utils/i18n";
 
 export default function NotesPane() {
     const {
@@ -42,17 +43,17 @@ export default function NotesPane() {
                 isOpen={showClearConfirm}
                 onConfirm={() => { setShowClearConfirm(false); clearAllNotes(); }}
                 onCancel={() => setShowClearConfirm(false)}
-                title="Tüm Notları Sil"
-                message="Tüm notlarınız silinecek. Bu işlem geri alınamaz."
-                confirmLabel="Evet, Sil"
-                cancelLabel="İptal"
+                title={t("notes.deleteAll")}
+                message={t("notes.deleteAllMsg")}
+                confirmLabel={t("history.yesDelete")}
+                cancelLabel={t("common.cancel")}
                 variant="danger"
             />
             <PaneInfoBanner
                 id="notes"
-                title="Notlar Nedir?"
-                description="Ders sırasında kişisel notlar oluşturun, etiketleyin ve düzenleyin."
-                tips={["Etiketleme", "Arama", "PDF export", "Sabitleme"]}
+                title={t("notes.title")}
+                description={t("notes.desc")}
+                tips={[t("notes.tagging"), t("common.search"), t("notes.pdfExport"), t("notes.pinning")]}
             />
             <NotesHeader
                 notesCount={notes.length}
@@ -92,19 +93,19 @@ export default function NotesPane() {
                     <div className="nt-empty-icon">
                         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                     </div>
-                    <div className="nt-empty-title">No notes yet</div>
-                    <div className="nt-empty-desc">Save AI responses from Deep Dive or create notes manually</div>
+                    <div className="nt-empty-title">{t("notes.noNotes")}</div>
+                    <div className="nt-empty-desc">{t("notes.noNotesDesc")}</div>
                     <button className="nt-btn nt-btn--primary" onClick={() => setShowCreator(true)}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
-                        Create First Note
+                        {t("notes.createFirst")}
                     </button>
                 </div>
             )}
 
             {notes.length > 0 && filteredNotes.length === 0 && (
                 <div className="nt-empty">
-                    <div className="nt-empty-title">No matching notes</div>
-                    <div className="nt-empty-desc">Try different search terms or clear filters</div>
+                    <div className="nt-empty-title">{t("notes.noMatching")}</div>
+                    <div className="nt-empty-desc">{t("notes.tryDifferent")}</div>
                 </div>
             )}
 

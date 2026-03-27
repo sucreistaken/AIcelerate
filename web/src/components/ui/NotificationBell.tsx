@@ -6,6 +6,7 @@ import { useUiStore } from "../../stores/uiStore";
 import { getCollabSocket } from "../../services/socket";
 import type { AppNotification, ModeId } from "../../types";
 import { timeAgo } from "../../utils/formatters";
+import { t } from "../../utils/i18n";
 
 const severityColors: Record<string, string> = {
   critical: "var(--danger, #ef4444)",
@@ -102,14 +103,14 @@ export default function NotificationBell() {
             transition={{ duration: 0.15 }}
           >
             <div className="notification-bell__dropdown-header">
-              <span className="notification-bell__dropdown-title">Notifications</span>
+              <span className="notification-bell__dropdown-title">{t("nav.notifications")}</span>
               {store.unreadCount > 0 && (
-                <span className="notification-bell__dropdown-count">{store.unreadCount} unread</span>
+                <span className="notification-bell__dropdown-count">{store.unreadCount} {t("common.unread")}</span>
               )}
             </div>
             <div className="notification-bell__dropdown-list">
               {displayNotifs.length === 0 && (
-                <div className="notification-bell__empty">No notifications</div>
+                <div className="notification-bell__empty">{t("common.noNotifications")}</div>
               )}
               {displayNotifs.map((notif) => (
                 <div
