@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import type { Course } from "../../types";
+import { t } from "../../utils/i18n";
 
 interface Props {
   title: string;
@@ -51,15 +52,15 @@ export default function LessonInfoStep({
 
   return (
     <form onSubmit={handleSubmit} style={{ maxWidth: 480, margin: "0 auto" }}>
-      <h3 className="h3" style={{ marginBottom: 4 }}>Ders Bilgileri</h3>
+      <h3 className="h3" style={{ marginBottom: 4 }}>{t("wizard.lessonInfoTitle")}</h3>
       <p className="muted" style={{ marginBottom: 20, fontSize: 13 }}>
-        Yeni dersinizin temel bilgilerini girin
+        {t("wizard.lessonInfoDesc2")}
       </p>
 
       {/* Kurs Seçimi (Zorunlu) */}
       <div style={{ marginBottom: 16 }}>
         <label style={{ display: "block", marginBottom: 6, fontWeight: 500, fontSize: 13 }}>
-          Kurs *
+          {t("wizard.courseLabel")}
         </label>
         {!showNewCourse ? (
           <>
@@ -69,7 +70,7 @@ export default function LessonInfoStep({
               value={selectedCourseId || ""}
               onChange={(e) => onCourseChange(e.target.value || null)}
             >
-              <option value="">Kurs seçin...</option>
+              <option value="">{t("wizard.selectCourse2")}</option>
               {courses.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.code} — {c.name}
@@ -82,16 +83,16 @@ export default function LessonInfoStep({
               style={{ fontSize: 12, marginTop: 6, padding: "4px 8px" }}
               onClick={() => setShowNewCourse(true)}
             >
-              + Yeni Kurs Oluştur
+              {t("wizard.createNewCourse2")}
             </button>
           </>
         ) : (
           <div className="card" style={{ padding: 14, display: "grid", gap: 10 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>Yeni Kurs</div>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{t("wizard.newCourse")}</div>
             <input
               className="input"
               style={{ width: "100%" }}
-              placeholder="Kurs kodu (ör: MATH 101)"
+              placeholder={t("wizard.courseCodePh")}
               value={newCourseCode}
               onChange={(e) => setNewCourseCode(e.target.value)}
               autoFocus
@@ -99,7 +100,7 @@ export default function LessonInfoStep({
             <input
               className="input"
               style={{ width: "100%" }}
-              placeholder="Kurs adı (ör: Matematik I)"
+              placeholder={t("wizard.courseNamePh")}
               value={newCourseName}
               onChange={(e) => setNewCourseName(e.target.value)}
             />
@@ -111,7 +112,7 @@ export default function LessonInfoStep({
                 disabled={!newCourseName.trim() || !newCourseCode.trim() || creatingCourse}
                 onClick={handleCreateCourse}
               >
-                {creatingCourse ? "Oluşturuluyor..." : "Oluştur"}
+                {creatingCourse ? t("wizard.creating") : t("wizard.create")}
               </button>
               <button
                 type="button"
@@ -119,7 +120,7 @@ export default function LessonInfoStep({
                 style={{ fontSize: 12 }}
                 onClick={() => setShowNewCourse(false)}
               >
-                İptal
+                {t("wizard.cancel")}
               </button>
             </div>
           </div>
@@ -142,21 +143,21 @@ export default function LessonInfoStep({
 
       <div style={{ marginBottom: 16 }}>
         <label style={{ display: "block", marginBottom: 6, fontWeight: 500, fontSize: 13 }}>
-          Ders Başlığı *
+          {t("wizard.titleLabel")}
         </label>
         <input
           className="input"
           type="text"
           value={title}
           onChange={(e) => onTitleChange(e.target.value)}
-          placeholder="Ör: Introduction to Trees"
+          placeholder={t("wizard.titlePlaceholder")}
           style={{ width: "100%" }}
         />
       </div>
 
       <div style={{ marginBottom: 24 }}>
         <label style={{ display: "block", marginBottom: 6, fontWeight: 500, fontSize: 13 }}>
-          Hafta Numarası <span className="muted">(opsiyonel)</span>
+          {t("wizard.weekNumberLabel")} <span className="muted">{t("wizard.optional")}</span>
         </label>
         <input
           className="input"
@@ -165,11 +166,11 @@ export default function LessonInfoStep({
           max={20}
           value={weekNumber}
           onChange={(e) => onWeekChange(e.target.value)}
-          placeholder="Ör: 3"
+          placeholder={t("wizard.weekPlaceholder")}
           style={{ width: 120 }}
         />
         <p className="muted" style={{ fontSize: 11, marginTop: 4 }}>
-          Başlığa "Week X - " öneki eklenir
+          {t("wizard.weekNoteHint")}
         </p>
       </div>
 
@@ -185,7 +186,7 @@ export default function LessonInfoStep({
           type="submit"
           disabled={!canProceed || isCreating}
         >
-          {isCreating ? "Oluşturuluyor..." : "İleri →"}
+          {isCreating ? t("wizard.creating") : t("wizard.next")}
         </button>
       </div>
     </form>

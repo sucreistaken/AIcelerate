@@ -1,11 +1,12 @@
 import React from "react";
 import type { WizardStep } from "../../hooks/useLessonWizard";
+import { t } from "../../utils/i18n";
 
 const STEPS = [
-  { num: 1 as WizardStep, label: "Bilgi", color: "#4CAF50" },
-  { num: 2 as WizardStep, label: "Slaytlar", color: "#2196F3" },
-  { num: 3 as WizardStep, label: "Ders Kaydı", color: "#FF9800" },
-  { num: 4 as WizardStep, label: "Özet & Analiz", color: "#9C27B0" },
+  { num: 1 as WizardStep, label: "wizard.stepInfo", color: "#4CAF50" },
+  { num: 2 as WizardStep, label: "wizard.stepSlides", color: "#2196F3" },
+  { num: 3 as WizardStep, label: "wizard.stepRecording", color: "#FF9800" },
+  { num: 4 as WizardStep, label: "wizard.stepSummary", color: "#9C27B0" },
 ];
 
 interface Props {
@@ -56,7 +57,7 @@ export default function WizardStepHeader({ currentStep, onStepClick, completedSt
                   transition: "all 0.3s ease",
                 }}
               >
-                {s.label}
+                {t(s.label)}
               </span>
             </div>
             {i < STEPS.length - 1 && (

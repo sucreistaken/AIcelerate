@@ -2,6 +2,7 @@ import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLessonWizard } from "../../hooks/useLessonWizard";
 import { useLessonStore } from "../../stores/lessonStore";
+import { t } from "../../utils/i18n";
 import WizardStepHeader from "./WizardStepHeader";
 import LessonInfoStep from "./LessonInfoStep";
 import SlidesUploadStep from "./SlidesUploadStep";
@@ -21,12 +22,12 @@ export default function LessonWizard() {
           onClick={w.goBack}
           style={{ fontSize: 13, padding: "4px 10px" }}
         >
-          ← {w.selectedCourse ? `${w.selectedCourse.code}'e Dön` : "Geri"}
+          {w.selectedCourse ? t("wizard.returnToCourse", { code: w.selectedCourse.code }) : t("wizard.back")}
         </button>
       </div>
 
       <div style={{ textAlign: "center", marginBottom: 4 }}>
-        <h2 className="h2" style={{ fontSize: 20 }}>Yeni Ders Ekle</h2>
+        <h2 className="h2" style={{ fontSize: 20 }}>{t("wizard.newLessonTitle")}</h2>
         {w.selectedCourse && (
           <span className="muted" style={{ fontSize: 12 }}>
             {w.selectedCourse.code} — {w.selectedCourse.name}

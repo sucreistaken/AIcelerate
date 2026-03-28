@@ -23,10 +23,10 @@ router.get("/health", (_req, res) => res.json({ ok: true }));
 // Auth
 router.use("/api", authRoutes);
 
-// Global rate limit for AI-heavy endpoints (20 req/min per user)
+// General API rate limit (200 req/min per user — generous for reads, AI routes have their own stricter limits)
 router.use(
   "/api",
-  rateLimiter("ai-global", 20, 60_000)
+  rateLimiter("api-global", 200, 60_000)
 );
 
 // Core lesson & AI routes

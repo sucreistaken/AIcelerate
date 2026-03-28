@@ -1,5 +1,6 @@
 import React from "react";
 import type { Course } from "../../types";
+import { t } from "../../utils/i18n";
 
 interface Props {
   title: string;
@@ -33,8 +34,8 @@ function MaterialBadge({ label, icon, hasContent, charCount }: {
         <div style={{ fontWeight: 500, fontSize: 13 }}>{label}</div>
         <div className="muted" style={{ fontSize: 11 }}>
           {hasContent
-            ? `${charCount.toLocaleString()} karakter`
-            : "Yüklenmedi (opsiyonel)"}
+            ? `${charCount.toLocaleString()} ${t("wizard.chars")}`
+            : t("wizard.notUploaded")}
         </div>
       </div>
       <span style={{
@@ -55,9 +56,9 @@ export default function SummaryStep({
 
   return (
     <div style={{ maxWidth: 520, margin: "0 auto" }}>
-      <h3 className="h3" style={{ marginBottom: 4 }}>Özet & Analiz</h3>
+      <h3 className="h3" style={{ marginBottom: 4 }}>{t("wizard.summaryTitle")}</h3>
       <p className="muted" style={{ marginBottom: 20, fontSize: 13 }}>
-        Yüklenen materyalleri kontrol edin ve AI analizini başlatın
+        {t("wizard.summaryDesc2")}
       </p>
 
       {/* Lesson info summary */}
@@ -78,13 +79,13 @@ export default function SummaryStep({
       {/* Material status */}
       <div style={{ display: "grid", gap: 8, marginBottom: 24 }}>
         <MaterialBadge
-          label="Slaytlar"
+          label={t("wizard.slidesLabel")}
           icon="📄"
           hasContent={slidesText.length > 0}
           charCount={slidesText.length}
         />
         <MaterialBadge
-          label="Ders Transkripti"
+          label={t("wizard.transcriptLabel")}
           icon="🎙️"
           hasContent={lectureText.length > 0}
           charCount={lectureText.length}
@@ -104,8 +105,7 @@ export default function SummaryStep({
             color: "var(--text)",
           }}
         >
-          ✨ AI analiz ile <strong>ders planı</strong>, <strong>vurgular</strong>,{" "}
-          <strong>quiz soruları</strong> ve <strong>flashcard</strong>'lar otomatik oluşturulacak.
+          ✨ {t("wizard.aiInfo")}
         </div>
       )}
 
@@ -120,7 +120,7 @@ export default function SummaryStep({
             fontSize: 12,
           }}
         >
-          ⚠️ <strong>Analiz zorunludur.</strong> Devam edebilmek için en az slayt veya transkript yükleyin. Geri dönüp materyal ekleyebilirsiniz.
+          ⚠️ {t("wizard.analyzeRequired")}
         </div>
       )}
 
@@ -131,7 +131,7 @@ export default function SummaryStep({
       )}
 
       <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <button className="btn btn-ghost" onClick={onBack} type="button">← Geri</button>
+        <button className="btn btn-ghost" onClick={onBack} type="button">{t("wizard.back")}</button>
         <button
           className="btn btn-primary"
           onClick={onAnalyze}
@@ -141,7 +141,7 @@ export default function SummaryStep({
             background: canAnalyze ? "linear-gradient(135deg, #9C27B0, #7B1FA2)" : undefined,
           }}
         >
-          {isAnalyzing ? "Analiz ediliyor..." : "✨ Analiz Et"}
+          {isAnalyzing ? t("wizard.analyzing") : t("wizard.analyze")}
         </button>
       </div>
     </div>

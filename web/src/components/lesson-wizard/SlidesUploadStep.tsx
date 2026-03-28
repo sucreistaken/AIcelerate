@@ -1,4 +1,5 @@
 import React, { useRef, useState, useCallback } from "react";
+import { t } from "../../utils/i18n";
 
 interface Props {
   slidesText: string;
@@ -38,9 +39,9 @@ export default function SlidesUploadStep({
 
   return (
     <div style={{ maxWidth: 560, margin: "0 auto" }}>
-      <h3 className="h3" style={{ marginBottom: 4 }}>Slaytlar</h3>
+      <h3 className="h3" style={{ marginBottom: 4 }}>{t("wizard.slidesTitle")}</h3>
       <p className="muted" style={{ marginBottom: 20, fontSize: 13 }}>
-        Ders slaytlarını PDF olarak yükleyin veya text olarak yapıştırın
+        {t("wizard.slidesDesc")}
       </p>
 
       {/* Tab toggle */}
@@ -51,7 +52,7 @@ export default function SlidesUploadStep({
           onClick={() => setMode("upload")}
           type="button"
         >
-          📄 PDF Yükle
+          {t("wizard.uploadPdf")}
         </button>
         <button
           className={`btn ${mode === "paste" ? "btn-primary" : "btn-ghost"}`}
@@ -59,7 +60,7 @@ export default function SlidesUploadStep({
           onClick={() => setMode("paste")}
           type="button"
         >
-          📋 Yapıştır
+          {t("wizard.paste")}
         </button>
       </div>
 
@@ -85,22 +86,22 @@ export default function SlidesUploadStep({
             {isUploading ? (
               <div>
                 <div style={{ fontSize: 28, marginBottom: 8 }}>⏳</div>
-                <div style={{ fontWeight: 500 }}>PDF işleniyor...</div>
-                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>OCR ile text çıkarılıyor</div>
+                <div style={{ fontWeight: 500 }}>{t("wizard.processingPdf")}</div>
+                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{t("wizard.extractingOcr")}</div>
               </div>
             ) : pdfFileName ? (
               <div>
                 <div style={{ fontSize: 28, marginBottom: 8 }}>✅</div>
                 <div style={{ fontWeight: 500, color: "var(--success)" }}>{pdfFileName}</div>
                 <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                  {slidesText.length.toLocaleString()} karakter çıkarıldı
+                  {slidesText.length.toLocaleString()} {t("wizard.charsExtracted")}
                 </div>
               </div>
             ) : (
               <div>
                 <div style={{ fontSize: 28, marginBottom: 8 }}>📄</div>
-                <div style={{ fontWeight: 500 }}>PDF dosyasını sürükle-bırak</div>
-                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>veya tıklayarak seç</div>
+                <div style={{ fontWeight: 500 }}>{t("wizard.dragDropPdf")}</div>
+                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{t("wizard.orClickToSelect")}</div>
               </div>
             )}
           </div>
@@ -114,13 +115,13 @@ export default function SlidesUploadStep({
             className="input"
             value={slidesText}
             onChange={(e) => onSlidesTextChange(e.target.value)}
-            placeholder="Slayt içeriğini buraya yapıştırın..."
+            placeholder={t("wizard.pasteSlides")}
             rows={10}
             style={{ width: "100%", resize: "vertical", fontFamily: "inherit" }}
           />
           {slidesText && (
             <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
-              {slidesText.length.toLocaleString()} karakter
+              {slidesText.length.toLocaleString()} {t("wizard.chars")}
             </div>
           )}
         </div>
@@ -133,9 +134,9 @@ export default function SlidesUploadStep({
       )}
 
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
-        <button className="btn btn-ghost" onClick={onBack} type="button">← Geri</button>
+        <button className="btn btn-ghost" onClick={onBack} type="button">{t("wizard.back")}</button>
         <button className="btn btn-primary" onClick={onNext} type="button" disabled={isUploading}>
-          {slidesText ? "İleri →" : "Atla →"}
+          {slidesText ? t("wizard.next") : t("wizard.skip")}
         </button>
       </div>
     </div>

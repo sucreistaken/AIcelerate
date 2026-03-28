@@ -1,5 +1,6 @@
 import React, { useRef, useState, useCallback } from "react";
 import type { SttProgress } from "../../stores/uiStore";
+import { t } from "../../utils/i18n";
 
 interface Props {
   lectureText: string;
@@ -42,9 +43,9 @@ export default function AudioUploadStep({
 
   return (
     <div style={{ maxWidth: 560, margin: "0 auto" }}>
-      <h3 className="h3" style={{ marginBottom: 4 }}>Ders Kaydı</h3>
+      <h3 className="h3" style={{ marginBottom: 4 }}>{t("wizard.recordingTitle")}</h3>
       <p className="muted" style={{ marginBottom: 20, fontSize: 13 }}>
-        Ders ses kaydını yükleyin (otomatik transkripsiyon) veya transkripti yapıştırın
+        {t("wizard.recordingDesc")}
       </p>
 
       {/* Tab toggle */}
@@ -55,7 +56,7 @@ export default function AudioUploadStep({
           onClick={() => setMode("upload")}
           type="button"
         >
-          🎙️ Audio Yükle
+          {t("wizard.uploadAudio")}
         </button>
         <button
           className={`btn ${mode === "paste" ? "btn-primary" : "btn-ghost"}`}
@@ -63,7 +64,7 @@ export default function AudioUploadStep({
           onClick={() => setMode("paste")}
           type="button"
         >
-          📋 Yapıştır
+          {t("wizard.paste")}
         </button>
       </div>
 
@@ -89,7 +90,7 @@ export default function AudioUploadStep({
             {isTranscribing ? (
               <div>
                 <div style={{ fontSize: 28, marginBottom: 8 }}>🎙️</div>
-                <div style={{ fontWeight: 500 }}>Transkripsiyon devam ediyor...</div>
+                <div style={{ fontWeight: 500 }}>{t("wizard.transcribing")}</div>
                 <div style={{ marginTop: 8 }}>
                   <div style={{
                     background: "var(--card-hover)",
@@ -114,10 +115,10 @@ export default function AudioUploadStep({
               <div>
                 <div style={{ fontSize: 28, marginBottom: 8 }}>✅</div>
                 <div style={{ fontWeight: 500, color: "var(--success)" }}>
-                  Transkripsiyon tamamlandı
+                  {t("wizard.transcriptionDone")}
                 </div>
                 <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                  {lectureText.length.toLocaleString()} karakter
+                  {lectureText.length.toLocaleString()} {t("wizard.chars")}
                 </div>
                 <button
                   className="btn btn-ghost"
@@ -125,15 +126,15 @@ export default function AudioUploadStep({
                   onClick={(e) => { e.stopPropagation(); onClearTranscription(); }}
                   type="button"
                 >
-                  Temizle & Yeniden Yükle
+                  {t("wizard.clearReupload")}
                 </button>
               </div>
             ) : (
               <div>
                 <div style={{ fontSize: 28, marginBottom: 8 }}>🎙️</div>
-                <div style={{ fontWeight: 500 }}>Ses dosyasını sürükle-bırak</div>
+                <div style={{ fontWeight: 500 }}>{t("wizard.dragDropAudio")}</div>
                 <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                  MP3, WAV, M4A, FLAC, OGG — maks 100MB
+                  {t("wizard.audioFormats")}
                 </div>
               </div>
             )}
@@ -148,13 +149,13 @@ export default function AudioUploadStep({
             className="input"
             value={lectureText}
             onChange={(e) => onLectureTextChange(e.target.value)}
-            placeholder="Ders transkriptini buraya yapıştırın..."
+            placeholder={t("wizard.pasteTranscript")}
             rows={10}
             style={{ width: "100%", resize: "vertical", fontFamily: "inherit" }}
           />
           {lectureText && (
             <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
-              {lectureText.length.toLocaleString()} karakter
+              {lectureText.length.toLocaleString()} {t("wizard.chars")}
             </div>
           )}
         </div>
@@ -167,9 +168,9 @@ export default function AudioUploadStep({
       )}
 
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
-        <button className="btn btn-ghost" onClick={onBack} type="button">← Geri</button>
+        <button className="btn btn-ghost" onClick={onBack} type="button">{t("wizard.back")}</button>
         <button className="btn btn-primary" onClick={onNext} type="button" disabled={isTranscribing}>
-          {lectureText ? "İleri →" : "Atla →"}
+          {lectureText ? t("wizard.next") : t("wizard.skip")}
         </button>
       </div>
     </div>

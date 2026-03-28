@@ -45,10 +45,10 @@ export async function generatePlan(
       }
       const result = await getModel().generateContent({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 8000 },
+        generationConfig: { maxOutputTokens: 16000 },
       });
       const rawText = result.response.text() || "";
-      logAI("PLAN_FROM_TEXT", prompt.length, rawText.length, 8000);
+      logAI("PLAN_FROM_TEXT", prompt.length, rawText.length, 16000);
       const cleaned = stripCodeFences(rawText);
       plan = tryParseJSON(cleaned);
       if (plan) break;
