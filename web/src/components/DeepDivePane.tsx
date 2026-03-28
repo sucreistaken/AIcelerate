@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import PaneInfoBanner from "./ui/PaneInfoBanner";
 import { useDeepDive } from "../hooks/useDeepDive";
+import { t } from "../utils/i18n";
 import DeepDiveHeader from "./deepdive/DeepDiveHeader";
 import DeepDiveWelcome from "./deepdive/DeepDiveWelcome";
 import DeepDiveMessageList from "./deepdive/DeepDiveMessageList";
@@ -26,9 +27,9 @@ export default function DeepDivePane() {
     >
       <PaneInfoBanner
         id="deep-dive"
-        title="Deep Dive Nedir?"
-        description="Ders konusu hakkında AI ile derinlemesine sohbet edin."
-        tips={["Soru sor", "Sınav hazırlığı", "Kavram açıklaması", "Not olarak kaydet"]}
+        title={t("deepDive.title")}
+        description={t("deepDive.desc")}
+        tips={[t("deepDive.tips1"), t("deepDive.tips2"), t("deepDive.tips3"), t("deepDive.tips4")]}
       />
 
       <DeepDiveHeader

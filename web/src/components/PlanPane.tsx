@@ -3,6 +3,7 @@ import React, { useState, useRef } from "react";
 import { Plan, ModuleT ,LearningOutcome} from "../types";
 import { exportToPdf } from "../utils/pdfExport";
 import PaneInfoBanner from "./ui/PaneInfoBanner";
+import { t } from "../utils/i18n";
 
 /** Yardımcı fonksiyon: Dakikayı okunabilir formata çevirir */
 function prettyMinutes(min?: number) {
@@ -14,10 +15,10 @@ function prettyMinutes(min?: number) {
 }
 
 /** Zorluk Seviyesi Ayarları */
-const diffConfig: Record<string, { label: string; style: React.CSSProperties }> = {
-  Beginner: { label: "Başlangıç Seviyesi", style: { backgroundColor: "var(--success-bg)", color: "var(--success)", border: "1px solid var(--success)" } },
-  Intermediate: { label: "Orta Seviye", style: { backgroundColor: "var(--warning-bg)", color: "var(--warning)", border: "1px solid var(--warning)" } },
-  Advanced: { label: "İleri Seviye", style: { backgroundColor: "var(--danger-bg)", color: "var(--danger)", border: "1px solid var(--danger)" } }
+const diffConfig: Record<string, { labelKey: string; style: React.CSSProperties }> = {
+  Beginner: { labelKey: "plan.diffBeginner", style: { backgroundColor: "var(--success-bg)", color: "var(--success)", border: "1px solid var(--success)" } },
+  Intermediate: { labelKey: "plan.diffIntermediate", style: { backgroundColor: "var(--warning-bg)", color: "var(--warning)", border: "1px solid var(--warning)" } },
+  Advanced: { labelKey: "plan.diffAdvanced", style: { backgroundColor: "var(--danger-bg)", color: "var(--danger)", border: "1px solid var(--danger)" } }
 };
 
 export default function PlanPane({ plan }: { plan: Plan }) {
@@ -42,7 +43,7 @@ export default function PlanPane({ plan }: { plan: Plan }) {
     <div className="grid-gap-16" ref={planRef}>
       <PaneInfoBanner
         id="plan"
-        title="Öğrenme Planı Nedir?"
+        title={t("plan.title")}
         description="AI dersinizi analiz ederek haftalık bir öğrenme planı oluşturur."
         tips={["Haftalık plan", "Zorluk seviyesi", "Ana kavramlar", "PDF export"]}
       />
@@ -56,7 +57,7 @@ export default function PlanPane({ plan }: { plan: Plan }) {
               </button>
               {plan.difficulty && (
                 <span style={{ ...diff.style, fontSize: "12px", fontWeight: "600", padding: "4px 10px", borderRadius: "99px" }}>
-                  {diff.label}
+                  {t(diff.labelKey)}
                 </span>
               )}
             </div>

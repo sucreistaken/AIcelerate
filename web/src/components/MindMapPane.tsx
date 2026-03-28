@@ -1,6 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import PaneInfoBanner from "./ui/PaneInfoBanner";
+import { t } from "../utils/i18n";
 import MindMapHeader from "./MindMapHeader";
 import MindMapNodeDetail from "./MindMapNodeDetail";
 import MindMapProgress, { MindMapSearch } from "./MindMapProgress";
@@ -72,9 +73,9 @@ export default function MindMapPane() {
         <div className="lc-section" style={containerStyles} ref={wrapperRef}>
             <PaneInfoBanner
               id="mindmap"
-              title="Mind Map Nasil Kullanilir?"
-              description="Dersin kavram haritasi AI tarafindan olusturulur. Herhangi bir node'a tiklayarak detayli aciklama, ornek ve mini quiz alin. Yesil node'lar ogrenilmis kavramlari gosterir. Arama kutusuyla belirli bir kavrama hizla ulasin."
-              tips={["Node'a tikla = detay", "Yesil = ogrenildi", "Zoom ve tam ekran", "PNG/SVG/PDF export"]}
+              title={t("mindmap.title")}
+              description={t("mindmap.desc")}
+              tips={[t("mindmap.tips1"), t("mindmap.tips2"), t("mindmap.tips3"), t("mindmap.tips4")]}
             />
 
             <MindMapHeader
@@ -134,7 +135,7 @@ export default function MindMapPane() {
                             <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2A5.5 5.5 0 0 0 4 7.5c0 1.33.47 2.55 1.26 3.5H5a4 4 0 0 0-1 7.89V19a2 2 0 0 0 2 2h2"/><path d="M14.5 2A5.5 5.5 0 0 1 20 7.5c0 1.33-.47 2.55-1.26 3.5H19a4 4 0 0 1 1 7.89V19a2 2 0 0 1-2 2h-2"/><path d="M12 2v20"/></svg>
                         </motion.div>
                         <p className="text-muted fw-600" style={{ fontSize: 16 }}>
-                            AI is connecting concepts...
+                            {t("mindmap.aiConnecting")}
                         </p>
                         <p className="text-muted fs-12">This may take 10-20 seconds</p>
                     </div>
@@ -143,8 +144,8 @@ export default function MindMapPane() {
                 {!loading && !code && !error && (
                     <div className="text-center op-50" style={{ padding: 40 }}>
                         <div style={{ marginBottom: 16 }}><svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg></div>
-                        <p style={{ fontSize: 16, fontWeight: 600 }}>Click generate to see the map.</p>
-                        <p className="text-muted fs-12">Visualize your lesson's key concepts</p>
+                        <p style={{ fontSize: 16, fontWeight: 600 }}>{t("mindmap.clickGenerate")}</p>
+                        <p className="text-muted fs-12">{t("mindmap.visualize")}</p>
                     </div>
                 )}
 

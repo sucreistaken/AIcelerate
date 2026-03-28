@@ -61,34 +61,19 @@ export default function CheatSheetPane(props: {
     }
   };
 
-  const labels = {
-    tr: {
-      title: "Cheat Sheet",
-      subtitle: "Tek sayfalık, sınav odaklı ultra özet.",
-      generate: "Cheat Sheet Oluştur",
-      empty: "Henüz oluşturulmadı. 'Cheat Sheet Oluştur'a bas.",
-      lastUpdate: "Son güncelleme:",
-      formulas: "Formüller",
-      pitfalls: "Dikkat Edilecekler",
-      quickQuiz: "Hızlı Quiz",
-      downloadPdf: "PDF İndir",
-      language: "Dil:",
-    },
-    en: {
-      title: "Cheat Sheet",
-      subtitle: "One-page, exam-focused ultra summary.",
-      generate: "Generate Cheat Sheet",
-      empty: "Not created yet. Click \"Generate Cheat Sheet\".",
-      lastUpdate: "Last update:",
-      formulas: "Formulas",
-      pitfalls: "Pitfalls",
-      quickQuiz: "Quick Quiz",
-      downloadPdf: "Download PDF",
-      language: "Language:",
-    }
+  // All CheatSheet labels now use the global i18n system
+  const cs = {
+    title: i18n("cheatSheet.title"),
+    subtitle: i18n("cheatSheet.subtitle"),
+    generate: i18n("cheatSheet.generate"),
+    empty: i18n("cheatSheet.empty"),
+    lastUpdate: i18n("cheatSheet.lastUpdate"),
+    formulas: i18n("cheatSheet.formulas"),
+    pitfalls: i18n("cheatSheet.pitfalls"),
+    quickQuiz: i18n("cheatSheet.quickQuiz"),
+    downloadPdf: i18n("cheatSheet.downloadPdf"),
+    language: i18n("cheatSheet.langLabel"),
   };
-
-  const t = labels[language];
 
   return (
     <Card padding="md">
@@ -104,34 +89,34 @@ export default function CheatSheetPane(props: {
       />
       <PaneInfoBanner
         id="cheat-sheet"
-        title="Cheat Sheet Nedir?"
-        description="Ders materyalinden tek sayfalık, sınav odaklı ultra özet oluşturur."
-        tips={["Formüller", "Dikkat noktaları", "Hızlı quiz", "PDF export"]}
+        title={i18n("cheatSheet.bannerTitle")}
+        description={i18n("cheatSheet.bannerDesc")}
+        tips={[i18n("cheatSheet.bannerTip1"), i18n("cheatSheet.bannerTip2"), i18n("cheatSheet.bannerTip3"), i18n("cheatSheet.bannerTip4")]}
       />
       <CardHeader>
         <div>
-          <div className="u-font-extrabold u-text-lg">{t.title}</div>
+          <div className="u-font-extrabold u-text-lg">{cs.title}</div>
           <div className="muted-block u-text-sm u-mt-1-5">
-            {t.subtitle}
+            {cs.subtitle}
           </div>
         </div>
 
         <div className="u-flex u-items-center u-gap-2 u-flex-wrap">
           <div className="u-flex u-items-center u-gap-1-5">
-            <span className="u-text-sm u-text-muted">{t.language}</span>
+            <span className="u-text-sm u-text-muted">{cs.language}</span>
             <Select
               value={language}
               onChange={(e) => setLanguage(e.target.value as 'tr' | 'en')}
               selectSize="sm"
               fullWidth={false}
             >
-              <option value="tr">Turkce</option>
-              <option value="en">English</option>
+              <option value="tr">{i18n("cheatSheet.langTr")}</option>
+              <option value="en">{i18n("cheatSheet.langEn")}</option>
             </Select>
           </div>
 
           <Button onClick={handleGenerate} loading={loading} size="md">
-            {t.generate}
+            {cs.generate}
           </Button>
 
           {cheatSheet && (
@@ -141,7 +126,7 @@ export default function CheatSheetPane(props: {
               loading={pdfLoading}
               size="md"
             >
-              {t.downloadPdf}
+              {cs.downloadPdf}
             </Button>
           )}
         </div>
@@ -156,7 +141,7 @@ export default function CheatSheetPane(props: {
 
         {!cheatSheet && !loading && (
           <div className="muted-block u-mt-3">
-            {t.empty}
+            {cs.empty}
           </div>
         )}
 
@@ -164,7 +149,7 @@ export default function CheatSheetPane(props: {
           <div ref={contentRef} className="u-mt-4 u-p-4 u-rounded-sm" style={{ backgroundColor: "var(--bg)" }}>
             <div className="u-font-extrabold u-text-md">{cheatSheet.title}</div>
             <div className="u-text-sm muted-block u-mt-1-5">
-              {t.lastUpdate} {timeAgo(cheatSheet.updatedAt, language)}
+              {cs.lastUpdate} {timeAgo(cheatSheet.updatedAt, language)}
             </div>
 
             <div className="u-grid u-gap-3 u-mt-3">
@@ -184,7 +169,7 @@ export default function CheatSheetPane(props: {
               {!!cheatSheet.formulas?.length && (
                 <div className="muted-block">
                   <div className="u-font-bold u-mb-2">
-                    <Badge variant="soft" size="sm">{t.formulas}</Badge>
+                    <Badge variant="soft" size="sm">{cs.formulas}</Badge>
                   </div>
                   <ul className="u-m-0" style={{ paddingLeft: 18 }}>
                     {cheatSheet.formulas.map((f, i) => (
@@ -197,7 +182,7 @@ export default function CheatSheetPane(props: {
               {!!cheatSheet.pitfalls?.length && (
                 <div className="muted-block">
                   <div className="u-font-bold u-mb-2">
-                    <Badge variant="warning" size="sm">{t.pitfalls}</Badge>
+                    <Badge variant="warning" size="sm">{cs.pitfalls}</Badge>
                   </div>
                   <ul className="u-m-0" style={{ paddingLeft: 18 }}>
                     {cheatSheet.pitfalls.map((p, i) => (
@@ -210,7 +195,7 @@ export default function CheatSheetPane(props: {
               {!!cheatSheet.quickQuiz?.length && (
                 <div className="muted-block">
                   <div className="u-font-bold u-mb-2">
-                    <Badge variant="primary" size="sm">{t.quickQuiz}</Badge>
+                    <Badge variant="primary" size="sm">{cs.quickQuiz}</Badge>
                   </div>
                   <ul className="u-m-0" style={{ paddingLeft: 18 }}>
                     {cheatSheet.quickQuiz.map((qa, i) => (

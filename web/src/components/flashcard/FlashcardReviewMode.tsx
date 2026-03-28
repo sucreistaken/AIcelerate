@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useFlashcardStore } from "../../stores/flashcardStore";
 import { useGamificationStore } from "../../stores/gamificationStore";
 import { getDifficultyFromEF } from "./flashcardUtils";
+import { t } from "../../utils/i18n";
 
 function FlashcardReviewMode() {
   const { dueCards, currentIndex, isFlipped, setFlipped, review, fetchDue } = useFlashcardStore();
@@ -43,27 +44,27 @@ function FlashcardReviewMode() {
         style={{ textAlign: 'center', padding: 24 }}
       >
         <div style={{ fontSize: 48, marginBottom: 12 }}>&#10003;</div>
-        <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 16 }}>Oturum Tamamlandi!</div>
+        <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 16 }}>{t("flashcard.sessionDone")}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, maxWidth: 300, margin: '0 auto 20px' }}>
           <div style={{ padding: 12, borderRadius: 8, background: 'var(--input-bg)' }}>
             <div style={{ fontSize: 20, fontWeight: 800 }}>{reviewedQualities.length}</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)' }}>Kart</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t("flashcard.cards")}</div>
           </div>
           <div style={{ padding: 12, borderRadius: 8, background: 'var(--input-bg)' }}>
             <div style={{ fontSize: 20, fontWeight: 800 }}>{mins}:{String(secs).padStart(2, '0')}</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)' }}>Sure</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t("flashcard.time")}</div>
           </div>
           <div style={{ padding: 12, borderRadius: 8, background: 'var(--input-bg)' }}>
             <div style={{ fontSize: 20, fontWeight: 800, color: Number(avgQ) >= 3 ? '#00b894' : '#fdcb6e' }}>{avgQ}</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)' }}>Ort. Kalite</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t("flashcard.avgQuality")}</div>
           </div>
           <div style={{ padding: 12, borderRadius: 8, background: 'var(--input-bg)' }}>
             <div style={{ fontSize: 20, fontWeight: 800, color: needRepeat > 0 ? '#e17055' : '#00b894' }}>{needRepeat}</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)' }}>Tekrar Gerekli</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t("flashcard.needRepeat")}</div>
           </div>
         </div>
         <button className="btn btn-primary" onClick={() => { setSessionDone(false); setReviewedQualities([]); fetchDue(); }}>
-          Yeni Oturum
+          {t("flashcard.newSession")}
         </button>
       </motion.div>
     );
@@ -80,9 +81,9 @@ function FlashcardReviewMode() {
         >
           &#10003;
         </motion.div>
-        <div className="pane-empty__title">All caught up!</div>
+        <div className="pane-empty__title">{t("flashcard.allCaughtUp")}</div>
         <div className="pane-empty__desc">
-          No cards are due for review right now. Check back later.
+          {t("flashcard.noDueCards")}
         </div>
       </div>
     );
@@ -91,10 +92,10 @@ function FlashcardReviewMode() {
   if (!card) return null;
 
   const qualityButtons = [
-    { q: 1, label: "Again", color: "var(--danger)", dataQ: "again" },
-    { q: 2, label: "Hard", color: "var(--warning)", dataQ: "hard" },
-    { q: 3, label: "Good", color: "var(--accent-2)", dataQ: "good" },
-    { q: 5, label: "Easy", color: "var(--success)", dataQ: "easy" },
+    { q: 1, label: t("flashcard.again"), color: "var(--danger)", dataQ: "again" },
+    { q: 2, label: t("flashcard.hard"), color: "var(--warning)", dataQ: "hard" },
+    { q: 3, label: t("flashcard.good"), color: "var(--accent-2)", dataQ: "good" },
+    { q: 5, label: t("flashcard.easy"), color: "var(--success)", dataQ: "easy" },
   ];
 
   const progressPct = ((currentIndex + 1) / dueCards.length) * 100;

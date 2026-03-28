@@ -2,6 +2,7 @@ import React from "react";
 import { Plan } from "../types";
 import { useQuizPane } from "../hooks/useQuizPane";
 import PaneInfoBanner from "./ui/PaneInfoBanner";
+import { t } from "../utils/i18n";
 import QuizActionBar from "./quiz/QuizActionBar";
 import QuizDashboard from "./quiz/QuizDashboard";
 import QuizQuestionItem from "./quiz/QuizQuestionItem";
@@ -44,15 +45,15 @@ export default function QuizPane({
       <section className="lc-section grid-gap-12">
         <PaneInfoBanner
           id="quiz"
-          title="Quiz Modu Nasil Calisir?"
-          description="AI, ogrenme planiniza dayali farkli zorluk seviyelerinde (Easy/Medium/Hard) sorular uretir. Her soruyu cevaplayin, sonra 'Cevaplarimi Degerlendir' ile AI'dan geri bildirim alin. Dogru/Kismen/Yanlis olarak derecelendirilir."
-          tips={["Zorluk etiketleri", "AI degerlendirme", "Skor takibi", "Eksik konu analizi"]}
+          title={t("quiz.title")}
+          description={t("quiz.desc")}
+          tips={[t("quiz.tips1"), t("quiz.tips2"), t("quiz.tips3"), t("quiz.tips4")]}
         />
-        <div className="fw-800 fs-18">Quiz Modu</div>
+        <div className="fw-800 fs-18">{t("quiz.pageTitle")}</div>
         <div className="lc-chipset">
-          <div className="lc-chip">Zorluk: Easy/Medium/Hard</div>
-          <div className="lc-chip">Kanitli cevaplar</div>
-          <div className="lc-chip">AI Degerlendirme</div>
+          <div className="lc-chip">{t("quiz.chipDifficulty")}</div>
+          <div className="lc-chip">{t("quiz.chipEvidence")}</div>
+          <div className="lc-chip">{t("quiz.chipAI")}</div>
         </div>
 
         <QuizActionBar
@@ -96,7 +97,7 @@ export default function QuizPane({
               </ol>
             ) : (
               <div className="op-65 text-center p-8">
-                Henuz soru yok. "Plandan Quiz Olustur" butonuna tiklayin.
+                {t("quiz.noQuestions")}
               </div>
             )}
           </div>

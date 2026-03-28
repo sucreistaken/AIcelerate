@@ -1,5 +1,6 @@
 import React from "react";
 import { EmphasisSource, Importance } from "./types";
+import { t } from "../../utils/i18n";
 
 type Props = {
   total: number;
@@ -14,18 +15,18 @@ type Props = {
   setSortKey: (v: "recommended" | "lo" | "order") => void;
 };
 
-const sourceOptions = [
-  { id: "all", label: "All" },
-  { id: "lecture", label: "Lecture only" },
-  { id: "both", label: "Lecture + slides" },
-  { id: "slides", label: "Slide only" },
+const getSourceOptions = () => [
+  { id: "all", label: t("lecturerNote.all") },
+  { id: "lecture", label: t("lecturerNote.lectureOnly") },
+  { id: "both", label: t("lecturerNote.lectureSlides") },
+  { id: "slides", label: t("lecturerNote.slideOnly") },
 ] as const;
 
-const importanceOptions = [
-  { id: "all", label: "All" },
-  { id: "high", label: "High" },
-  { id: "medium", label: "Normal" },
-  { id: "low", label: "Low" },
+const getImportanceOptions = () => [
+  { id: "all", label: t("lecturerNote.all") },
+  { id: "high", label: t("lecturerNote.high") },
+  { id: "medium", label: t("lecturerNote.normal") },
+  { id: "low", label: t("lecturerNote.low") },
 ] as const;
 
 const LecturerNoteHeader: React.FC<Props> = ({
@@ -42,30 +43,28 @@ const LecturerNoteHeader: React.FC<Props> = ({
 }) => (
   <header className="ln-header mb-3">
     <div>
-      <h2 className="panel__title mb-1">Teacher Notes</h2>
+      <h2 className="panel__title mb-1">{t("lecturerNote.title")}</h2>
       <p className="muted small">
-        Processed highlights of what the instructor really stressed in the
-        lecture. Click a card to see the full explanation and self-check
-        questions.
+        {t("lecturerNote.desc")}
       </p>
     </div>
 
     {total > 0 && (
       <div className="ln-summary-row">
         <span className="ln-summary-chip">
-          <span className="ln-summary-label">Total</span>
+          <span className="ln-summary-label">{t("lecturerNote.total")}</span>
           <span className="ln-summary-value">{total}</span>
         </span>
         <span className="ln-summary-chip">
-          <span className="ln-summary-label">Lecture only</span>
+          <span className="ln-summary-label">{t("lecturerNote.lectureOnly")}</span>
           <span className="ln-summary-value">{countLecture}</span>
         </span>
         <span className="ln-summary-chip">
-          <span className="ln-summary-label">Lecture + slides</span>
+          <span className="ln-summary-label">{t("lecturerNote.lectureSlides")}</span>
           <span className="ln-summary-value">{countBoth}</span>
         </span>
         <span className="ln-summary-chip">
-          <span className="ln-summary-label">Slide only</span>
+          <span className="ln-summary-label">{t("lecturerNote.slideOnly")}</span>
           <span className="ln-summary-value">{countSlides}</span>
         </span>
       </div>
@@ -73,9 +72,9 @@ const LecturerNoteHeader: React.FC<Props> = ({
 
     <div className="ln-toolbar">
       <div className="ln-filter-group">
-        <span className="ln-filter-label small">Source</span>
+        <span className="ln-filter-label small">{t("lecturerNote.source")}</span>
         <div className="ln-filter-chips">
-          {sourceOptions.map((f) => (
+          {getSourceOptions().map((f) => (
             <button
               key={f.id}
               type="button"
@@ -92,9 +91,9 @@ const LecturerNoteHeader: React.FC<Props> = ({
       </div>
 
       <div className="ln-filter-group">
-        <span className="ln-filter-label small">Importance</span>
+        <span className="ln-filter-label small">{t("lecturerNote.importance")}</span>
         <div className="ln-filter-chips">
-          {importanceOptions.map((f) => (
+          {getImportanceOptions().map((f) => (
             <button
               key={f.id}
               type="button"
@@ -111,7 +110,7 @@ const LecturerNoteHeader: React.FC<Props> = ({
       </div>
 
       <div className="ln-sort">
-        <span className="ln-filter-label small">Sort</span>
+        <span className="ln-filter-label small">{t("lecturerNote.sort")}</span>
         <select
           className="ln-sort-select"
           value={sortKey}
@@ -119,9 +118,9 @@ const LecturerNoteHeader: React.FC<Props> = ({
             setSortKey(e.target.value as "recommended" | "lo" | "order")
           }
         >
-          <option value="recommended">Recommended</option>
-          <option value="lo">By LO</option>
-          <option value="order">Lecture order</option>
+          <option value="recommended">{t("lecturerNote.recommended")}</option>
+          <option value="lo">{t("lecturerNote.byLO")}</option>
+          <option value="order">{t("lecturerNote.lectureOrder")}</option>
         </select>
       </div>
     </div>

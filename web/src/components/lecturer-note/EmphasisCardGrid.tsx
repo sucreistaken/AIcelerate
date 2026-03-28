@@ -1,6 +1,7 @@
 import React from "react";
 import { EnrichedEmphasis, LoMap } from "./types";
 import { getImportance, getImportanceChip, getSourceChip, truncate } from "./utils";
+import { t } from "../../utils/i18n";
 
 type Props = {
   visible: EnrichedEmphasis[];
@@ -75,7 +76,7 @@ const EmphasisCardGrid: React.FC<Props> = ({ visible, loMap, onOpenModal }) => {
                   onOpenModal(idx);
                 }}
               >
-                View details
+                {t("lecturerNote.viewDetails")}
               </button>
             </div>
           </article>

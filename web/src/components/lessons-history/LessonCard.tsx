@@ -74,7 +74,7 @@ function LessonCard({
         )}
         {hasTranscript && (
           <span className="text-xs" style={{ padding: '2px 6px', borderRadius: 4, background: 'rgba(0,184,148,0.15)', color: '#00b894', fontWeight: 600 }}>
-            Transcript
+            {t.transcript}
           </span>
         )}
         {quizCount > 0 && (

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useProfileStore } from "../../stores/profileStore";
+import { t } from "../../utils/i18n";
 
 const COLORS = [
   "#6C5CE7", "#00B894", "#FDCB6E", "#E17055", "#0984E3",
@@ -17,7 +18,7 @@ export default function ProfileSetup() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nickname.trim() || nickname.trim().length < 2) {
-      setError("Takma ad en az 2 karakter olmalıdır.");
+      setError(t("studyHub.nickError"));
       return;
     }
     setLoading(true);
@@ -40,35 +41,35 @@ export default function ProfileSetup() {
         transition={{ type: "spring", stiffness: 300, damping: 20 }}
       >
         <div className="sh-profile-setup__brand">A</div>
-        <h2 className="sh-profile-setup__title">Study Hub'a Hoş Geldin!</h2>
+        <h2 className="sh-profile-setup__title">{t("studyHub.welcome")}</h2>
         <p className="sh-profile-setup__subtitle">
-          Birlikte çalışmaya başlamak için bir profil oluştur
+          {t("studyHub.welcomeDesc")}
         </p>
 
         {/* Steps indicator */}
         <div className="sh-profile-setup__steps">
           <div className="sh-step sh-step--active">
             <div className="sh-step__number">1</div>
-            <span className="sh-step__label">Profil Oluştur</span>
+            <span className="sh-step__label">{t("studyHub.step1")}</span>
           </div>
           <div className="sh-step__line" />
           <div className="sh-step">
             <div className="sh-step__number">2</div>
-            <span className="sh-step__label">Sunucuya Katıl</span>
+            <span className="sh-step__label">{t("studyHub.step2")}</span>
           </div>
           <div className="sh-step__line" />
           <div className="sh-step">
             <div className="sh-step__number">3</div>
-            <span className="sh-step__label">Birlikte Çalış</span>
+            <span className="sh-step__label">{t("studyHub.step3")}</span>
           </div>
         </div>
 
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
-            <label className="sh-label">Takma Ad</label>
+            <label className="sh-label">{t("studyHub.nickname")}</label>
             <input
               className="input w-full sh-input--lg"
-              placeholder="Ör: Kadir"
+              placeholder={t("studyHub.nicknamePh")}
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
               maxLength={20}
@@ -77,7 +78,7 @@ export default function ProfileSetup() {
           </div>
 
           <div className="mb-4">
-            <label className="sh-label">Avatar Rengi</label>
+            <label className="sh-label">{t("studyHub.avatarColor")}</label>
             <div className="sh-color-picker">
               {COLORS.map((c) => (
                 <button
@@ -107,9 +108,9 @@ export default function ProfileSetup() {
             </motion.div>
             <div>
               <span className="sh-profile-setup__preview-name">
-                {nickname || "Takma Ad"}
+                {nickname || t("studyHub.nickname")}
               </span>
-              <span className="sh-profile-setup__preview-status">Çevrimiçi</span>
+              <span className="sh-profile-setup__preview-status">{t("studyHub.online")}</span>
             </div>
           </motion.div>
 
@@ -131,7 +132,7 @@ export default function ProfileSetup() {
             {loading ? (
               <span className="sh-btn-spinner" />
             ) : (
-              "Başla →"
+              t("studyHub.start")
             )}
           </button>
         </form>

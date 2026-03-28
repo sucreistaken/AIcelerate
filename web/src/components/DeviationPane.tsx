@@ -1,5 +1,6 @@
 import React from "react";
 import PaneInfoBanner from "./ui/PaneInfoBanner";
+import { t } from "../utils/i18n";
 import { useDeviation } from "../hooks/useDeviation";
 import DeviationLoading from "./deviation/DeviationLoading";
 import DeviationError from "./deviation/DeviationError";
@@ -41,9 +42,9 @@ export default function DeviationPane({
         <div className="grid-gap-12">
             <PaneInfoBanner
                 id="deviation"
-                title="Sapma Analizi Nedir?"
-                description="Dersin slaytlardan ne kadar saptığını segmentler halinde gösterir."
-                tips={["Skor göstergesi", "Segment detayı", "Ekstra konular", "Eksik konular"]}
+                title={t("deviation.title")}
+                description={t("deviation.desc")}
+                tips={[t("deviation.tips1"), t("deviation.tips2"), t("deviation.tips3"), t("deviation.tips4")]}
             />
 
             <DeviationSummary

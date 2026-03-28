@@ -1,4 +1,5 @@
 import React from "react";
+import { t } from "../../utils/i18n";
 
 interface DeepDiveInputAreaProps {
   input: string;
@@ -21,7 +22,7 @@ export default function DeepDiveInputArea({
         <textarea
           ref={textareaRef}
           className="dd-textarea"
-          placeholder="Message LearnCraft AI..."
+          placeholder={t("deepDive.placeholder")}
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
@@ -36,7 +37,7 @@ export default function DeepDiveInputArea({
         </button>
       </div>
       <div className="dd-input-hint">
-        Press Enter to send, Shift+Enter for new line
+        {t("deepDive.enterHint")}
       </div>
     </div>
   );

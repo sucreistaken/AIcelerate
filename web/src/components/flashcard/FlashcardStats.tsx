@@ -1,18 +1,21 @@
 import { motion } from "framer-motion";
 import { FlashcardStats as FlashcardStatsType } from "../../types";
+import { t } from "../../utils/i18n";
 
 interface FlashcardStatsProps {
   stats: FlashcardStatsType;
 }
 
-const STAT_ITEMS = [
-  { key: "total", label: "Total", color: "var(--text)" },
-  { key: "new", label: "New", color: "var(--accent-2)" },
-  { key: "learning", label: "Learning", color: "var(--warning)" },
-  { key: "review", label: "Review", color: "var(--accent-2)" },
-  { key: "graduated", label: "Graduated", color: "var(--success)" },
-  { key: "dueToday", label: "Due Today", color: "var(--danger)" },
-] as const;
+function getStatItems() {
+  return [
+    { key: "total", label: t("flashcard.statTotal"), color: "var(--text)" },
+    { key: "new", label: t("flashcard.statNew"), color: "var(--accent-2)" },
+    { key: "learning", label: t("flashcard.statLearning"), color: "var(--warning)" },
+    { key: "review", label: t("flashcard.statReview"), color: "var(--accent-2)" },
+    { key: "graduated", label: t("flashcard.statGraduated"), color: "var(--success)" },
+    { key: "dueToday", label: t("flashcard.statDue"), color: "var(--danger)" },
+  ];
+}
 
 export default function FlashcardStats({ stats }: FlashcardStatsProps) {
   return (
@@ -26,7 +29,7 @@ export default function FlashcardStats({ stats }: FlashcardStatsProps) {
         show: { opacity: 1, transition: { staggerChildren: 0.06 } },
       }}
     >
-      {STAT_ITEMS.map(({ key, label, color }) => (
+      {getStatItems().map(({ key, label, color }) => (
         <motion.div
           key={key}
           className="fc-stat-card"

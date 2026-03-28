@@ -1,6 +1,7 @@
 import React from "react";
 import { Plan } from "../types";
 import PaneInfoBanner from "./ui/PaneInfoBanner";
+import { t } from "../utils/i18n";
 
 /** Helper: Ortalama hesaplama */
 function average(ns: number[]) {
@@ -26,12 +27,12 @@ export default function AlignmentPane({
     <div className="grid-gap-12">
       <PaneInfoBanner
         id="alignment"
-        title="Eşleştirme Analizi Nedir?"
-        description="Ders içeriğinin slaytlarla ne kadar örtüştüğünü analiz eder."
-        tips={["Slayt eşleşme", "Süre analizi", "Kapsam skoru"]}
+        title={t("alignment.title")}
+        description={t("alignment.desc")}
+        tips={[t("alignment.tips1"), t("alignment.tips2"), t("alignment.tips3")]}
       />
       <section className="lc-section grid-gap-10">
-        <div className="fw-800 fs-18">Eşleştirme Özeti</div>
+        <div className="fw-800 fs-18">{t("alignment.summaryTitle")}</div>
 
         {a?.summary_chatty ? (
           <p className="m-0">{a.summary_chatty}</p>
@@ -44,7 +45,7 @@ export default function AlignmentPane({
 
         <div className="lc-chipset">
           <div className="lc-chip">
-            Ortalama süre: ~{Number.isFinite(avg) ? `${avg.toFixed(1)} dk` : "—"}
+            {t("alignment.avgDuration")} ~{Number.isFinite(avg) ? `${avg.toFixed(1)} ${t("alignment.min")}` : "—"}
           </div>
         </div>
 
@@ -68,10 +69,10 @@ export default function AlignmentPane({
         <table className="aligned-table">
           <thead>
             <tr>
-              <th>Konu / Kavramlar</th>
-              <th>Vurgu</th>
-              <th>Kaynaklar</th>
-              <th>Süre (dk)</th>
+              <th>{t("alignment.topicConcepts")}</th>
+              <th>{t("alignment.emphasis")}</th>
+              <th>{t("alignment.sources")}</th>
+              <th>{t("alignment.durationMin")}</th>
             </tr>
           </thead>
           <tbody>
@@ -87,11 +88,11 @@ export default function AlignmentPane({
                 <td>
                   <div className="lc-chipset m-0">
                     <span className="pill">
-                      {it.in_both ? "Konuşma+Slayt" : "Tek kaynak"}
+                      {it.in_both ? t("alignment.bothSources") : t("alignment.singleSource")}
                     </span>
                     <span className="pill">Emphasis: {it.emphasis_level}</span>
                     <span className="pill">
-                      Güven: %{Math.round((it.confidence ?? 0) * 100)}
+                      {t("alignment.confidence")} %{Math.round((it.confidence ?? 0) * 100)}
                     </span>
                   </div>
                 </td>

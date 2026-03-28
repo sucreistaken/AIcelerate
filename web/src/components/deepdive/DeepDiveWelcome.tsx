@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { QUICK_ACTIONS } from "./types";
+import { t } from "../../utils/i18n";
 
 interface DeepDiveWelcomeProps {
   send: (query: string) => void;
@@ -24,7 +25,7 @@ export default function DeepDiveWelcome({ send }: DeepDiveWelcomeProps) {
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.1, duration: 0.4 }}
       >
-        How can I help you?
+        {t("deepDive.welcome")}
       </motion.h2>
       <motion.p
         className="dd-welcome-sub"
@@ -32,7 +33,7 @@ export default function DeepDiveWelcome({ send }: DeepDiveWelcomeProps) {
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.2, duration: 0.4 }}
       >
-        Ders notu, slayt ve plan verileri kullanilarak cevap verilir
+        {t("deepDive.welcomeSub")}
       </motion.p>
       <motion.p
         style={{ fontSize: 11, color: "var(--muted)", maxWidth: 380, textAlign: "center", lineHeight: 1.5, margin: "0 auto" }}
@@ -40,7 +41,7 @@ export default function DeepDiveWelcome({ send }: DeepDiveWelcomeProps) {
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
       >
-        Asagidaki hizli eylemleri kullanin veya kendi sorunuzu yazin. Yanitlar canli akis ile gelir. Onemli yanitlari kaydedip notlariniza ekleyebilirsiniz.
+        {t("deepDive.welcomeHint")}
       </motion.p>
 
       <motion.div
@@ -58,7 +59,7 @@ export default function DeepDiveWelcome({ send }: DeepDiveWelcomeProps) {
             whileTap={{ scale: 0.97 }}
           >
             <span className="dd-suggestion-icon">{action.icon}</span>
-            <span className="dd-suggestion-label">{action.label}</span>
+            <span className="dd-suggestion-label">{t(action.labelKey)}</span>
           </motion.button>
         ))}
       </motion.div>

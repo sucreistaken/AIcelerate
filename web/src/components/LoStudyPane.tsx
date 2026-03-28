@@ -1,6 +1,7 @@
 import { LoStudyModule } from "../types";
 import { useLoStudy } from "../hooks/useLoStudy";
 import PaneInfoBanner from "./ui/PaneInfoBanner";
+import { t } from "../utils/i18n";
 import LoProgressSidebar from "./lo-study/LoProgressSidebar";
 import LoModuleList from "./lo-study/LoModuleList";
 import LoModuleDetail from "./lo-study/LoModuleDetail";
@@ -39,8 +40,8 @@ export default function LoStudyPane({ modules }: Props) {
             <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
           </svg>
         </div>
-        <p className="fw-600 fs-16">No LO modules available yet.</p>
-        <p className="text-muted fs-12">Generate LO alignment first to see study modules.</p>
+        <p className="fw-600 fs-16">{t("loStudy.noModules")}</p>
+        <p className="text-muted fs-12">{t("loStudy.noModulesDesc")}</p>
       </div>
     );
   }
@@ -53,9 +54,9 @@ export default function LoStudyPane({ modules }: Props) {
       <div style={{ gridColumn: "1 / -1" }}>
         <PaneInfoBanner
           id="lo-study"
-          title="Öğrenme Çıktıları Çalışması"
-          description="Dersin öğrenme çıktılarına göre yapılandırılmış çalışma modülleri."
-          tips={["Modül bazlı çalışma", "İlerleme takibi", "Quiz soruları", "PDF export"]}
+          title={t("loStudy.title")}
+          description={t("loStudy.desc")}
+          tips={[t("loStudy.tips1"), t("loStudy.tips2"), t("loStudy.tips3"), t("loStudy.tips4")]}
         />
       </div>
 

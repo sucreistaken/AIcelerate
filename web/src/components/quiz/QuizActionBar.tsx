@@ -1,4 +1,5 @@
 import React from "react";
+import { t } from "../../utils/i18n";
 
 interface QuizActionBarProps {
   hasPlan: boolean;
@@ -27,7 +28,7 @@ export default function QuizActionBar({
           onClick={onGenerate}
           disabled={!hasPlan || loading}
         >
-          {loading ? "Olusturuluyor..." : "Plandan Quiz Olustur"}
+          {loading ? t("quiz.generatingQuiz") : t("quiz.generateFromPlan")}
         </button>
 
         <button
@@ -35,7 +36,7 @@ export default function QuizActionBar({
           onClick={onFetchAnswers}
           disabled={!quizLength || loadingAns}
         >
-          {loadingAns ? "Cevaplar Getiriliyor..." : "Cevaplari Goster"}
+          {loadingAns ? t("quiz.fetchingAnswers") : t("quiz.showAnswers")}
         </button>
 
         {quizLength > 0 && (
@@ -44,26 +45,26 @@ export default function QuizActionBar({
             onClick={onEvaluate}
             disabled={evaluating || userAnswersCount === 0}
           >
-            {evaluating ? "Degerlendiriliyor..." : "Cevaplarimi Degerlendir"}
+            {evaluating ? t("quiz.evaluating") : t("quiz.evaluateAnswers")}
           </button>
         )}
 
         {quizLength > 0 && (
           <button className="btn btn-secondary" onClick={onExportPdf} disabled={pdfLoading}>
-            {pdfLoading ? "Exporting..." : "PDF Export"}
+            {pdfLoading ? t("notes.exporting") : "PDF"}
           </button>
         )}
 
         {quizLength > 0 && (
           <button className="btn btn-ghost" onClick={onCopy}>
-            Kopyala
+            {t("quiz.copy")}
           </button>
         )}
       </div>
 
       {!hasPlan && (
         <div className="op-60 fs-12 mt-2">
-          Quiz olusturmak icin once soldaki panelden ders verisi girip "Planla" butonuna basmalsiniz.
+          {t("quiz.needPlan")}
         </div>
       )}
     </>

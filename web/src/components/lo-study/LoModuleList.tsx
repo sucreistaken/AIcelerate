@@ -1,4 +1,5 @@
 import { LoStudyModule } from "../../types";
+import { t } from "../../utils/i18n";
 
 type Props = {
   modules: LoStudyModule[];
@@ -14,7 +15,7 @@ export default function LoModuleList({ modules, activeLoId, completedSet, onSele
       style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column", padding: 12 }}
     >
       <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, paddingLeft: 4 }}>
-        Learning Outcomes
+        {t("loStudy.learningOutcomes")}
       </div>
       <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
         {modules.map((m, index) => {

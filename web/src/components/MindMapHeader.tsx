@@ -1,5 +1,6 @@
 import React from "react";
 import type { ModuleInfo } from "../hooks/useMindMap";
+import { t } from "../utils/i18n";
 
 interface MindMapHeaderProps {
     mapTitle: string;
@@ -55,7 +56,7 @@ export default function MindMapHeader({
         }}>
             <div>
                 <h3 className="fw-800 m-0" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>{' '}{mapTitle || "Zihin Haritası"}
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>{' '}{mapTitle || t("mindmap.mindMapTitle")}
                     {isFullscreen && (
                         <span style={{
                             fontSize: 12,
@@ -80,7 +81,7 @@ export default function MindMapHeader({
                     )}
                 </h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
-                    <p className="text-muted fs-12 m-0">Concept map for this lesson</p>
+                    <p className="text-muted fs-12 m-0">{t("mindmap.conceptMap")}</p>
                     {code && (
                         <button
                             onClick={clearSavedMap}
@@ -224,7 +225,7 @@ export default function MindMapHeader({
                     disabled={loading}
                     style={{ minWidth: 140 }}
                 >
-                    {loading ? 'Generating...' : code ? 'Regenerate' : 'Generate Map'}
+                    {loading ? 'Generating...' : code ? 'Regenerate' : t("mindmap.generateMap")}
                 </button>
             </div>
         </div>
