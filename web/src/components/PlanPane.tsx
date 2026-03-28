@@ -129,7 +129,7 @@ export default function PlanPane({ plan }: { plan: Plan }) {
       {/* Kaynaklar (Çökme Korumalı - Sorunun Kaynağı Burasıydı) */}
       {plan.resources?.length ? (
         <section className="lc-section">
-          <div className="resources-title">Kaynak Önerileri</div>
+          <div className="resources-title">{t("plan.resources")}</div>
           <ul className="ul">
             {plan.resources.map((r, i) => {
               let content;

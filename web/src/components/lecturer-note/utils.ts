@@ -1,5 +1,6 @@
 import { Emphasis } from "../../types";
 import { EmphasisSource, Importance } from "./types";
+import { t } from "../../utils/i18n";
 
 export function normalizeSource(e: Emphasis): EmphasisSource {
   const raw = (e as any).source as string | undefined;
@@ -27,31 +28,31 @@ export function getSourceChip(e: Emphasis) {
   switch (src) {
     case "lecture":
       return {
-        label: "Lecture only",
+        label: t("lecturerNote.chipLectureOnly"),
         icon: "",
         className: "ln-chip ln-chip--lecture",
-        tooltip: "Emphasis mainly comes from the spoken transcript.",
+        tooltip: "",
       };
     case "slides":
       return {
-        label: "Slide only",
+        label: t("lecturerNote.chipSlideOnly"),
         icon: "",
         className: "ln-chip ln-chip--slides",
-        tooltip: "Emphasis mainly comes from the slide text.",
+        tooltip: "",
       };
     case "both":
       return {
-        label: "Lecture + slides",
+        label: t("lecturerNote.chipBoth"),
         icon: "",
         className: "ln-chip ln-chip--both",
-        tooltip: "The same idea is stressed in both transcript and slides.",
+        tooltip: "",
       };
     default:
       return {
-        label: "Unclassified",
+        label: t("lecturerNote.chipUnclassified"),
         icon: "",
         className: "ln-chip ln-chip--neutral",
-        tooltip: "Source not clearly classified.",
+        tooltip: "",
       };
   }
 }
@@ -59,18 +60,18 @@ export function getSourceChip(e: Emphasis) {
 export function getImportanceChip(importance: Importance) {
   if (importance === "high") {
     return {
-      label: "High exam risk",
+      label: t("lecturerNote.chipHighExam"),
       className: "ln-chip ln-chip--importance ln-chip--high",
     };
   }
   if (importance === "low") {
     return {
-      label: "Nice to know",
+      label: t("lecturerNote.chipNiceToKnow"),
       className: "ln-chip ln-chip--importance ln-chip--low",
     };
   }
   return {
-    label: "Normal",
+    label: t("lecturerNote.chipNormal"),
     className: "ln-chip ln-chip--importance ln-chip--medium",
   };
 }

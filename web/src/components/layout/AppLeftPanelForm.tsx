@@ -99,7 +99,7 @@ export default function AppLeftPanelForm({
           charCount={lesson.slidesText.trim().length}
         />
         <MaterialStatus
-          label="Transkript"
+          label={t("leftPanel.transcript")}
           icon="🎙️"
           hasContent={!!lesson.lectureText.trim()}
           charCount={lesson.lectureText.trim().length}
@@ -151,7 +151,7 @@ function MaterialStatus({ label, icon, hasContent, charCount, style }: {
       <span>{icon}</span>
       <span style={{ flex: 1, fontWeight: 500 }}>{label}</span>
       <span style={{ color: hasContent ? "var(--success)" : "var(--muted)", fontWeight: 600, fontSize: 11 }}>
-        {hasContent ? `✓ ${charCount.toLocaleString()} karakter` : "— Yok"}
+        {hasContent ? `✓ ${charCount.toLocaleString()} ${t("leftPanel.chars")}` : t("leftPanel.none")}
       </span>
     </div>
   );
@@ -166,14 +166,14 @@ function SlidesSection({
 }) {
   return (
     <CollapsibleSection
-      title="Slayt Güncelle"
-      summary={slidesText.trim() ? `${slidesText.trim().length.toLocaleString()} karakter` : "Boş"}
+      title={t("leftPanel.updateSlides")}
+      summary={slidesText.trim() ? `${slidesText.trim().length.toLocaleString()} ${t("leftPanel.chars")}` : t("leftPanel.empty")}
       defaultOpen={!slidesText.trim()}
     >
       <div className="flex-between mb-2">
-        <label className="label m-0">Slayt</label>
+        <label className="label m-0">{t("leftPanel.slide")}</label>
         <div className="file-upload-wrapper">
-          <label htmlFor="pdf-upload" className="btn-small">PDF Yükle</label>
+          <label htmlFor="pdf-upload" className="btn-small">{t("leftPanel.uploadPdfBtn")}</label>
           <input id="pdf-upload" type="file" accept=".pdf" onChange={onPdfUpload} style={{ display: "none" }} />
           {isLoading && loadingMessage?.includes("PDF") && (
             <div className="mt-2">
@@ -194,7 +194,7 @@ function SlidesSection({
         className="lc-textarea textarea"
         value={slidesText}
         onChange={(e) => onSlidesChange(e.target.value)}
-        placeholder="Slayt içeriği burada görünecek..."
+        placeholder={t("leftPanel.slidePlaceholder")}
         rows={6}
         aria-label="Slide content"
       />
@@ -211,15 +211,15 @@ function TranscriptSection({
 }) {
   return (
     <CollapsibleSection
-      title="Transkript Güncelle"
-      summary={lectureText.trim() ? `${lectureText.trim().length.toLocaleString()} karakter` : "Boş"}
+      title={t("leftPanel.updateTranscript")}
+      summary={lectureText.trim() ? `${lectureText.trim().length.toLocaleString()} ${t("leftPanel.chars")}` : t("leftPanel.empty")}
       defaultOpen={!lectureText.trim()}
     >
-      <label className="label">Ses Dosyası</label>
+      <label className="label">{t("leftPanel.audioFile")}</label>
       <div className="stt-row">
         <div className="stt-left">
           <span className="stt-hint">
-            {transcription.stt.status || "Manuel olarak düzenleyebilirsiniz."}
+            {transcription.stt.status || t("leftPanel.editManually")}
             {transcription.stt.now && (
               <span className="stt-now">
                 {fmtTime(transcription.stt.now.start)}–{fmtTime(transcription.stt.now.end)}
@@ -228,8 +228,8 @@ function TranscriptSection({
           </span>
         </div>
         <div className="stt-right">
-          <label className="stt-upload" htmlFor="audio-upload" title="Ses yükle ve transkribe et">Ses Yükle</label>
-          <button type="button" className="stt-clear" onClick={transcription.clearTranscription} title="Temizle">Temizle</button>
+          <label className="stt-upload" htmlFor="audio-upload" title={t("leftPanel.uploadAudioBtn")}>{t("leftPanel.uploadAudioBtn")}</label>
+          <button type="button" className="stt-clear" onClick={transcription.clearTranscription} title={t("leftPanel.clearBtn")}>{t("leftPanel.clearBtn")}</button>
           <input id="audio-upload" type="file" accept=".mp3,.wav,.m4a,.flac,.ogg" onChange={onAudioUpload} style={{ display: "none" }} />
         </div>
       </div>
@@ -240,7 +240,7 @@ function TranscriptSection({
         className="lc-textarea textarea"
         value={lectureText}
         onChange={(e) => onLectureChange(e.target.value)}
-        placeholder="Transkript metni..."
+        placeholder={t("leftPanel.transcriptPlaceholder")}
         rows={6}
         aria-label="Transcript"
       />
@@ -260,17 +260,17 @@ function ReanalyzeActions({ canSubmit, isLoading, error }: {
         aria-busy={isLoading}
         style={{ width: "100%", padding: "12px" }}
       >
-        {isLoading ? "Analiz ediliyor..." : "Yeniden Analiz Et"}
+        {isLoading ? t("leftPanel.analyzing") : t("leftPanel.reanalyze")}
       </button>
       <ProgressStepper isActive={isLoading} />
       {!canSubmit && !isLoading && (
         <div style={{ fontSize: 11, color: "var(--muted)", textAlign: "center", marginTop: 6 }}>
-          Slayt veya transkript alanlarını doldurun
+          {t("leftPanel.fillContent")}
         </div>
       )}
       {canSubmit && !isLoading && (
         <div style={{ fontSize: 11, color: "var(--muted)", textAlign: "center", marginTop: 6 }}>
-          Materyalleri güncelledikten sonra yeniden analiz edin
+          {t("leftPanel.reanalyzeHint")}
         </div>
       )}
       {error && (

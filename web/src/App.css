@@ -520,6 +520,13 @@ code,
   transition: all var(--transition-med);
 }
 
+.dark .lc-sidebar-drawer {
+  background: rgba(24, 24, 27, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
 @media (max-width: 1099px) {
   .lc-sidebar-drawer {
     position: fixed;
@@ -545,7 +552,8 @@ code,
 }
 
 .dark .lc-sidebar-drawer__header {
-  background: rgba(255, 255, 255, 0.01);
+  background: transparent;
+  border-bottom-color: rgba(255, 255, 255, 0.06);
 }
 
 .lc-sidebar-drawer__inner-title {
@@ -892,6 +900,10 @@ code,
   margin-top: 16px;
   border-top: 1px solid var(--hair);
   z-index: 2;
+}
+
+.dark .actions--sticky {
+  background: transparent;
 }
 
 .lc-textarea {
@@ -7857,9 +7869,9 @@ html.dark body {
 }
 
 .dark .btn--disabled {
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.3);
-  border-color: rgba(255, 255, 255, 0.06);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: none;
 }
 
@@ -7987,8 +7999,8 @@ html.dark body {
 
 /* --- Form sections: Glass --- */
 .dark .form-section {
-  background: rgba(255, 255, 255, 0.02);
-  border-color: rgba(255, 255, 255, 0.04);
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.06);
 }
 
 .dark .form-section__title {
@@ -8000,8 +8012,8 @@ html.dark body {
 }
 
 .dark .actions--sticky {
-  background: rgba(13, 13, 15, 0.55);
-  backdrop-filter: blur(20px);
+  background: transparent;
+  backdrop-filter: none;
 }
 
 /* --- Pane headers --- */
