@@ -4,8 +4,11 @@ import { useFlashcardStore } from "../../stores/flashcardStore";
 import { useGamificationStore } from "../../stores/gamificationStore";
 import { getDifficultyFromEF } from "./flashcardUtils";
 import { t } from "../../utils/i18n";
+import { useUiStore } from "../../stores/uiStore";
 
 function FlashcardReviewMode() {
+  // Subscribe to language changes so t() re-renders correctly
+  useUiStore((s) => s.language);
   const { dueCards, currentIndex, isFlipped, setFlipped, review, fetchDue } = useFlashcardStore();
   const card = dueCards[currentIndex];
   const [sessionStart] = useState(() => Date.now());

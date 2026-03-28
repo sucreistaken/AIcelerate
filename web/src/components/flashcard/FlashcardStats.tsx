@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { FlashcardStats as FlashcardStatsType } from "../../types";
 import { t } from "../../utils/i18n";
+import { useUiStore } from "../../stores/uiStore";
 
 interface FlashcardStatsProps {
   stats: FlashcardStatsType;
@@ -18,6 +19,7 @@ function getStatItems() {
 }
 
 export default function FlashcardStats({ stats }: FlashcardStatsProps) {
+  useUiStore((s) => s.language);
   return (
     <motion.div
       className="fc-stat-grid"
