@@ -157,11 +157,14 @@ router.post("/plan-from-text/stream", async (req, res) => {
     // Generate digest in background
     generateDigest(lId, lectureText, slidesText, plan).catch(() => {});
 
-    // Send final done event
-    if (aborted) { res.end(); return; }
-    res.write(`data: ${JSON.stringify({ type: "done", plan, lessonId: lId })}\n\n`);
+    // Send final done event — always attempt even if client appears disconnected
+    // (the plan is already saved, frontend needs the lessonId to navigate)
+    try {
+      res.write(`data: ${JSON.stringify({ type: "done", plan, lessonId: lId })}\n\n`);
+    } catch { /* client already gone, that's ok — lesson is saved */ }
     res.end();
   } catch (err: any) {
+    console.error("[Stream] Error in streaming route:", err.message);
     if (!res.headersSent) {
       res.status(500).json({ ok: false, error: err.message });
     } else {
