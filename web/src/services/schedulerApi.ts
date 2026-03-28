@@ -2,6 +2,7 @@
 // Scheduler, Notification, and Gamification APIs
 
 import { API_BASE } from './httpClient';
+import { t } from '../utils/i18n';
 import { StudyTask, DailyPlan, WeeklyOverview, StreakData, AppNotification } from '../types';
 
 // ============ Scheduler API ============
@@ -14,7 +15,7 @@ export const schedulerApi = {
             const res = await fetch(url);
             return await res.json();
         } catch (error) {
-            return { ok: false, error: 'Failed to get next session' };
+            return { ok: false, error: t('error.loadFailed') };
         }
     },
 
@@ -26,7 +27,7 @@ export const schedulerApi = {
             const res = await fetch(url);
             return await res.json();
         } catch (error) {
-            return { ok: false, error: 'Failed to get daily plan' };
+            return { ok: false, error: t('error.loadFailed') };
         }
     },
 
@@ -38,7 +39,7 @@ export const schedulerApi = {
             const res = await fetch(url);
             return await res.json();
         } catch (error) {
-            return { ok: false, error: 'Failed to get weekly overview' };
+            return { ok: false, error: t('error.loadFailed') };
         }
     },
 
@@ -51,7 +52,7 @@ export const schedulerApi = {
             });
             return await res.json();
         } catch (error) {
-            return { ok: false, error: 'Failed to complete task' };
+            return { ok: false, error: t('error.updateFailed') };
         }
     },
 
@@ -60,7 +61,7 @@ export const schedulerApi = {
             const res = await fetch(`${API_BASE}/api/scheduler/streak`);
             return await res.json();
         } catch (error) {
-            return { ok: false, error: 'Failed to get streak' };
+            return { ok: false, error: t('error.loadFailed') };
         }
     },
 };
@@ -75,7 +76,7 @@ export const notificationApi = {
             const res = await fetch(url);
             return await res.json();
         } catch (error) {
-            return { ok: false, error: 'Failed to load notifications' };
+            return { ok: false, error: t('error.loadFailed') };
         }
     },
 
@@ -86,7 +87,7 @@ export const notificationApi = {
             });
             return await res.json();
         } catch (error) {
-            return { ok: false, error: 'Failed to dismiss notification' };
+            return { ok: false, error: t('error.updateFailed') };
         }
     },
 
@@ -95,7 +96,7 @@ export const notificationApi = {
             const res = await fetch(`${API_BASE}/api/notifications/unread-count`);
             return await res.json();
         } catch (error) {
-            return { ok: false, error: 'Failed to get unread count' };
+            return { ok: false, error: t('error.loadFailed') };
         }
     },
 
@@ -106,7 +107,7 @@ export const notificationApi = {
             });
             return await res.json();
         } catch (error) {
-            return { ok: false, error: 'Failed to check notifications' };
+            return { ok: false, error: t('error.loadFailed') };
         }
     },
 };
@@ -122,7 +123,7 @@ export const gamificationApi = {
             });
             return await res.json();
         } catch (error) {
-            return { ok: false, error: 'Failed to add XP' };
+            return { ok: false, error: t('error.updateFailed') };
         }
     },
 
@@ -131,7 +132,7 @@ export const gamificationApi = {
             const res = await fetch(`${API_BASE}/api/xp/stats`);
             return await res.json();
         } catch (error) {
-            return { ok: false, error: 'Failed to get stats' };
+            return { ok: false, error: t('error.loadFailed') };
         }
     },
 };

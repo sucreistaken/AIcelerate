@@ -116,7 +116,9 @@ export function useLessonWizard() {
   // Step 4: Analyze (streaming)
   const handleAnalyze = useCallback(() => {
     const slides = state.slidesText || lessonStore.slidesText;
-    if (!slides && !lectureText) { setError(t("wizard.needContent")); return; }
+    const hasSlides = !!slides?.trim();
+    const hasTranscript = !!lectureText?.trim();
+    if (!hasSlides && !hasTranscript) { setError(t("wizard.needBoth")); return; }
     setState((s) => ({ ...s, isAnalyzing: true, error: null }));
 
     streaming.startStream(

@@ -6,6 +6,7 @@ import { useUiStore } from '../stores/uiStore';
 import { API_BASE } from '../config';
 import { lessonsApi, planApi, loApi, cheatSheetApi, deviationApi, uploadApi } from '../services/api';
 import { invalidateLessonCache } from '../utils/cacheInvalidation';
+import { t } from '../utils/i18n';
 import { useGamificationStore } from '../stores/gamificationStore';
 
 export function useLesson() {
@@ -180,7 +181,7 @@ export function useLesson() {
         try {
             const result = await loApi.generateModules(currentLessonId);
             if (!result.ok) {
-                throw new Error(result.error || 'Failed to generate LO modules');
+                throw new Error(result.error || t('error.generic'));
             }
             store.setLoModules(result.modules || []);
             ui.setMode('lo-study');
@@ -206,7 +207,7 @@ export function useLesson() {
         try {
             const result = await cheatSheetApi.generate(currentLessonId, language);
             if (!result.ok) {
-                throw new Error(result.error || 'Failed to generate cheat sheet');
+                throw new Error(result.error || t('error.generic'));
             }
             store.setCheatSheet(result.cheatSheet || null);
             useGamificationStore.getState().addXp('cheat-sheet-create');
