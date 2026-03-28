@@ -1,6 +1,8 @@
 import React from "react";
 import type { Course } from "../../types";
 import { t } from "../../utils/i18n";
+import StreamingOverlay from "../ui/StreamingOverlay";
+import type { StreamingState } from "../../hooks/useStreamingAnalysis";
 
 interface Props {
   title: string;
@@ -11,6 +13,7 @@ interface Props {
   isAnalyzing: boolean;
   canAnalyze: boolean;
   error: string | null;
+  streaming?: StreamingState;
   onAnalyze: () => void;
   onBack: () => void;
 }
@@ -50,7 +53,7 @@ function MaterialBadge({ label, icon, hasContent, charCount }: {
 
 export default function SummaryStep({
   title, weekNumber, course, slidesText, lectureText,
-  isAnalyzing, canAnalyze, error, onAnalyze, onBack,
+  isAnalyzing, canAnalyze, error, streaming, onAnalyze, onBack,
 }: Props) {
   const fullTitle = weekNumber ? `Week ${weekNumber} - ${title}` : title;
 
@@ -124,26 +127,42 @@ export default function SummaryStep({
         </div>
       )}
 
-      {error && (
+      {/* Streaming Overlay - shows during analysis */}
+      {streaming?.isStreaming && (
+        <StreamingOverlay
+          isStreaming={streaming.isStreaming}
+          phases={streaming.phases}
+          progress={streaming.progress}
+          tokenCount={streaming.tokenCount}
+          modules={streaming.modules}
+          emphases={streaming.emphases}
+          currentPhase={streaming.currentPhase}
+          error={streaming.error}
+        />
+      )}
+
+      {error && !streaming?.isStreaming && (
         <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 12 }}>
           {error}
         </div>
       )}
 
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <button className="btn btn-ghost" onClick={onBack} type="button">{t("wizard.back")}</button>
-        <button
-          className="btn btn-primary"
-          onClick={onAnalyze}
-          disabled={!canAnalyze || isAnalyzing}
-          type="button"
-          style={{
-            background: canAnalyze ? "linear-gradient(135deg, #9C27B0, #7B1FA2)" : undefined,
-          }}
-        >
-          {isAnalyzing ? t("wizard.analyzing") : t("wizard.analyze")}
-        </button>
-      </div>
+      {!streaming?.isStreaming && (
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <button className="btn btn-ghost" onClick={onBack} type="button">{t("wizard.back")}</button>
+          <button
+            className="btn btn-primary"
+            onClick={onAnalyze}
+            disabled={!canAnalyze || isAnalyzing}
+            type="button"
+            style={{
+              background: canAnalyze ? "linear-gradient(135deg, #9C27B0, #7B1FA2)" : undefined,
+            }}
+          >
+            {isAnalyzing ? t("wizard.analyzing") : t("wizard.analyze")}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -2,6 +2,7 @@
 // Course and Learning Objectives APIs
 
 import { logger } from "../utils/logger";
+import { t } from "../utils/i18n";
 import { API_BASE } from './httpClient';
 import { Course, CourseKnowledgeIndex, CourseProgress, WeeklySchedule, CourseExport, LoAlignment, LoStudyModule } from '../types';
 
@@ -13,7 +14,7 @@ export const courseApi = {
             return await res.json();
         } catch (error) {
             logger.warn('Courses could not be loaded', error);
-            return { ok: false, error: 'Failed to load courses' };
+            return { ok: false, error: t('error.loadFailed') };
         }
     },
 
@@ -22,7 +23,7 @@ export const courseApi = {
             const res = await fetch(`${API_BASE}/api/courses/${id}`);
             return await res.json();
         } catch (error) {
-            return { ok: false, error: 'Failed to load course' };
+            return { ok: false, error: t('error.loadFailed') };
         }
     },
 
@@ -35,7 +36,7 @@ export const courseApi = {
             });
             return await res.json();
         } catch (error) {
-            return { ok: false, error: 'Failed to create course' };
+            return { ok: false, error: t('error.createFailed') };
         }
     },
 
@@ -48,7 +49,7 @@ export const courseApi = {
             });
             return await res.json();
         } catch (error) {
-            return { ok: false, error: 'Failed to update course' };
+            return { ok: false, error: t('error.updateFailed') };
         }
     },
 
@@ -57,7 +58,7 @@ export const courseApi = {
             const res = await fetch(`${API_BASE}/api/courses/${id}`, { method: 'DELETE' });
             return await res.json();
         } catch (error) {
-            return { ok: false, error: 'Failed to delete course' };
+            return { ok: false, error: t('error.deleteFailed') };
         }
     },
 
@@ -68,7 +69,7 @@ export const courseApi = {
             });
             return await res.json();
         } catch (error) {
-            return { ok: false, error: 'Failed to add lesson' };
+            return { ok: false, error: t('error.updateFailed') };
         }
     },
 
@@ -79,7 +80,7 @@ export const courseApi = {
             });
             return await res.json();
         } catch (error) {
-            return { ok: false, error: 'Failed to remove lesson' };
+            return { ok: false, error: t('error.updateFailed') };
         }
     },
 
@@ -90,7 +91,7 @@ export const courseApi = {
             });
             return await res.json();
         } catch (error) {
-            return { ok: false, error: 'Failed to rebuild index' };
+            return { ok: false, error: t('error.generic') };
         }
     },
 
@@ -103,7 +104,7 @@ export const courseApi = {
             });
             return await res.json();
         } catch (error) {
-            return { ok: false, error: 'Failed to chat' };
+            return { ok: false, error: t('error.generic') };
         }
     },
 
@@ -112,7 +113,7 @@ export const courseApi = {
             const res = await fetch(`${API_BASE}/api/courses/${courseId}/progress`);
             return await res.json();
         } catch (error) {
-            return { ok: false, error: 'Failed to get progress' };
+            return { ok: false, error: t('error.loadFailed') };
         }
     },
 
@@ -125,7 +126,7 @@ export const courseApi = {
             });
             return await res.json();
         } catch (error) {
-            return { ok: false, error: 'Failed to generate schedule' };
+            return { ok: false, error: t('error.generic') };
         }
     },
 
@@ -134,7 +135,7 @@ export const courseApi = {
             const res = await fetch(`${API_BASE}/api/courses/${courseId}/export`);
             return await res.json();
         } catch (error) {
-            return { ok: false, error: 'Failed to export course' };
+            return { ok: false, error: t('error.generic') };
         }
     },
 };

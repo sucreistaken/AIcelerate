@@ -8,6 +8,7 @@ import { useGamificationStore } from "../stores/gamificationStore";
 import { exportToPdf } from "../utils/pdfExport";
 import { withRetry } from "../utils/apiRetry";
 import { logger } from "../utils/logger";
+import { t } from "../utils/i18n";
 
 const QUIZ_ANSWERS_KEY_PREFIX = 'lc.quiz.answers.';
 const QUIZ_EVAL_KEY_PREFIX = 'lc.quiz.eval.';
@@ -159,10 +160,10 @@ export function useQuizPane(
           localStorage.removeItem(QUIZ_EVAL_KEY_PREFIX + currentLessonId);
         }
       } else {
-        toast.error(j.error || "Quiz uretilemedi");
+        toast.error(j.error || t("quiz.generateFailed"));
       }
     } catch (e: any) {
-      toast.error("Hata: " + e.message);
+      toast.error(t("quiz.errorPrefix") + e.message);
     } finally {
       setLoading(false);
     }
@@ -185,10 +186,10 @@ export function useQuizPane(
         j.answers.forEach((a: any, i: number) => { map[i] = a; });
         setAnswers(map);
       } else {
-        toast.error("Cevaplar alinamadi.");
+        toast.error(t("quiz.answersFailed"));
       }
     } catch (e: any) {
-      toast.error("Hata: " + e.message);
+      toast.error(t("quiz.errorPrefix") + e.message);
     } finally {
       setLoadingAns(false);
     }
@@ -218,7 +219,7 @@ export function useQuizPane(
     })).filter(item => item.student_answer.trim());
 
     if (items.length === 0) {
-      toast.error("Lutfen en az bir soruyu cevaplayin.");
+      toast.error(t("quiz.needAnswer"));
       return;
     }
 
@@ -242,12 +243,12 @@ export function useQuizPane(
         for (let i = 0; i < answeredCount; i++) {
           useGamificationStore.getState().addXp('quiz-answer');
         }
-        toast.success(`Degerlendirme tamamlandi! +${answeredCount * 10} XP`);
+        toast.success(`${t("quiz.evalDone")} +${answeredCount * 10} XP`);
       } else {
-        toast.error("Degerlendirme yapilamadi.");
+        toast.error(t("quiz.evalFailed"));
       }
     } catch (e: any) {
-      toast.error("Hata: " + e.message);
+      toast.error(t("quiz.errorPrefix") + e.message);
     } finally {
       setEvaluating(false);
     }
@@ -276,8 +277,8 @@ export function useQuizPane(
   }, [evalResults]);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(quiz.join("\n")).catch(() => toast.error("Kopyalanamadi"));
-    toast.success("Kopyalandi!");
+    navigator.clipboard.writeText(quiz.join("\n")).catch(() => toast.error(t("error.clipboardFailed")));
+    toast.success(t("error.copied"));
   };
 
   return {

@@ -66,6 +66,111 @@ export async function generatePlan(
   return plan;
 }
 
+export async function generatePlanStream(
+  res: import("express").Response,
+  lectureText: string,
+  slidesText: string,
+  courseCode?: string,
+  learningOutcomes?: string[]
+): Promise<LessonPlan> {
+  const LEC = lectureText.slice(0, 18000);
+  const SLD = slidesText.slice(0, 18000);
+  const LO_BLOCK = learningOutcomes?.length
+    ? `\n\nLearning Outcomes:\n${learningOutcomes.map((lo, i) => `${i + 1}. ${lo}`).join("\n")}`
+    : "";
+  const prompt = buildPlanFromTextPrompt(LEC, SLD, courseCode, LO_BLOCK);
+
+  // Phase 1: Started
+  const sendEvent = (data: Record<string, unknown>) => {
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
+  sendEvent({ type: "phase", phase: "analyzing", message: "Analyzing lesson content..." });
+
+  let rawText = "";
+  let plan: LessonPlan | null = null;
+  let lastError = "";
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      if (attempt > 0) {
+        const delay = 2000 * Math.pow(2, attempt - 1);
+        await new Promise(r => setTimeout(r, delay));
+        sendEvent({ type: "phase", phase: "retrying", message: `Retry attempt ${attempt + 1}...` });
+      }
+
+      sendEvent({ type: "phase", phase: "generating", message: "Creating learning plan..." });
+
+      // Use streaming API
+      const result = await getModel().generateContentStream({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 16000 },
+      });
+
+      rawText = "";
+      let tokenCount = 0;
+      let lastProgressSent = 0;
+
+      for await (const chunk of result.stream) {
+        const chunkText = chunk.text() || "";
+        rawText += chunkText;
+        tokenCount += chunkText.split(/\s+/).length;
+
+        // Send progress every ~100 words
+        if (tokenCount - lastProgressSent >= 100) {
+          lastProgressSent = tokenCount;
+          sendEvent({ type: "progress", tokens: tokenCount, message: "Generating..." });
+        }
+      }
+
+      logAI("PLAN_FROM_TEXT_STREAM", prompt.length, rawText.length, 16000);
+
+      sendEvent({ type: "phase", phase: "parsing", message: "Structuring content..." });
+
+      const cleaned = stripCodeFences(rawText);
+      plan = tryParseJSON(cleaned);
+
+      if (plan) {
+        // Send modules progressively
+        if (plan.modules?.length) {
+          for (let i = 0; i < plan.modules.length; i++) {
+            await new Promise(r => setTimeout(r, 50)); // slight delay for animation
+            sendEvent({ type: "module", index: i, total: plan.modules.length, data: plan.modules[i] });
+          }
+        }
+
+        // Send emphases progressively
+        if (plan.emphases?.length) {
+          sendEvent({ type: "phase", phase: "emphases", message: "Extracting key insights..." });
+          for (let i = 0; i < plan.emphases.length; i++) {
+            await new Promise(r => setTimeout(r, 30));
+            sendEvent({ type: "emphasis", index: i, total: plan.emphases.length, data: plan.emphases[i] });
+          }
+        }
+
+        break; // success
+      }
+
+      lastError = cleaned.slice(0, 2000);
+      logger.error(`[Stream Parse FAIL attempt ${attempt + 1}]`);
+    } catch (retryErr: unknown) {
+      lastError = retryErr instanceof Error ? retryErr.message : "AI call failed";
+      logger.error(`[Stream PLAN attempt ${attempt + 1} error]:`, lastError);
+      if (attempt === 2) {
+        sendEvent({ type: "error", message: lastError });
+        throw retryErr;
+      }
+    }
+  }
+
+  if (!plan) {
+    sendEvent({ type: "error", message: "Failed to generate plan after retries" });
+    throw Object.assign(new Error("LLM JSON parse error after retries"), { llmText: lastError });
+  }
+
+  return plan;
+}
+
 // ---- Chat ----
 export function buildChatContextForLesson(lesson: Lesson, lessonId: string, message: string, history?: ChatMessage[]) {
   const plan = lesson.plan;

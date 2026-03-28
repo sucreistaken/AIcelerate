@@ -4,6 +4,7 @@ import { persist } from "zustand/middleware";
 import toast from "react-hot-toast";
 import { Course, CourseProgress, WeeklySchedule } from "../types";
 import { courseApi } from "../services/api";
+import { t } from "../utils/i18n";
 
 interface CourseState {
   courses: Course[];
@@ -53,7 +54,7 @@ export const useCourseStore = create<CourseState>()(
           if (result.ok && result.courses) {
             set({ courses: result.courses, loading: false });
           } else {
-            set({ loading: false, error: result.error || "Failed to load courses" });
+            set({ loading: false, error: result.error || t("error.loadFailed") });
           }
         } catch (e: any) {
           set({ loading: false, error: e.message });
@@ -131,7 +132,7 @@ export const useCourseStore = create<CourseState>()(
             set((s) => ({
               courses: s.courses.map((c) => (c.id === courseId ? result.course! : c)),
             }));
-            toast.success("Ders kurstan çıkarıldı");
+            toast.success(t("error.lessonRemoved"));
           }
         } catch { /* ignore */ }
       },

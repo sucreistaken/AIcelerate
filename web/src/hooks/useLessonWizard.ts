@@ -1,10 +1,12 @@
 // src/hooks/useLessonWizard.ts
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useLessonStore, type Lesson } from "../stores/lessonStore";
 import { useCourseStore } from "../stores/courseStore";
 import { useUiStore } from "../stores/uiStore";
 import { useTranscription } from "./useTranscription";
+import { useStreamingAnalysis } from "./useStreamingAnalysis";
 import { lessonsApi, planApi, courseApi } from "../services/api";
+import { t } from "../utils/i18n";
 import type { Plan } from "../types";
 
 export type WizardStep = 1 | 2 | 3 | 4;
@@ -35,6 +37,8 @@ export function useLessonWizard() {
   const courseStore = useCourseStore();
   const ui = useUiStore();
   const transcription = useTranscription();
+  const streaming = useStreamingAnalysis();
+  const completionTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const [state, setState] = useState<WizardState>({
     ...INITIAL,
     selectedCourseId: courseStore.currentCourseId,
@@ -109,30 +113,36 @@ export function useLessonWizard() {
     await transcription.startTranscription(file);
   }, [transcription]);
 
-  // Step 4: Analyze
-  const handleAnalyze = useCallback(async () => {
+  // Step 4: Analyze (streaming)
+  const handleAnalyze = useCallback(() => {
     const slides = state.slidesText || lessonStore.slidesText;
-    if (!slides && !lectureText) { setError("En az slayt veya transkript gerekli"); return; }
+    if (!slides && !lectureText) { setError(t("wizard.needContent")); return; }
     setState((s) => ({ ...s, isAnalyzing: true, error: null }));
-    try {
-      const result = await planApi.createFromText({
-        lectureText, slidesText: slides, title: state.title,
+
+    streaming.startStream(
+      {
+        lectureText,
+        slidesText: slides,
+        title: state.title,
         lessonId: state.lessonId || undefined,
-        courseCode: currentCourse?.code, learningOutcomes: currentCourse?.learningOutcomes,
-      });
-      if (result.plan) {
-        lessonStore.setPlan(result.plan as Plan);
-        if (state.lessonId) { lessonStore.setLessons(await lessonsApi.getAll() as Lesson[]); }
+        courseCode: currentCourse?.code,
+        learningOutcomes: currentCourse?.learningOutcomes,
+      },
+      async (plan, lessonId) => {
+        // Stream complete — update stores
+        lessonStore.setPlan(plan as Plan);
+        if (lessonId) { lessonStore.setCurrentLessonId(lessonId); }
+        lessonStore.setLessons(await lessonsApi.getAll() as Lesson[]);
         if (state.selectedCourseId) { courseStore.rebuildIndex(state.selectedCourseId); }
-        setState((s) => ({ ...s, isAnalyzing: false, analysisCompleted: true }));
-        ui.setMode("plan");
-      } else {
-        setState((s) => ({ ...s, isAnalyzing: false, error: result.error || "Analiz başarısız oldu" }));
-      }
-    } catch (e: unknown) {
-      setState((s) => ({ ...s, isAnalyzing: false, error: e instanceof Error ? e.message : "Analiz hatası" }));
-    }
-  }, [state, lectureText, currentCourse, lessonStore, courseStore, ui, setError]);
+
+        // Brief delay for completion animation to show
+        completionTimerRef.current = setTimeout(() => {
+          setState((s) => ({ ...s, isAnalyzing: false, analysisCompleted: true }));
+          ui.setMode("plan");
+        }, 800);
+      },
+    );
+  }, [state, lectureText, currentCourse, lessonStore, courseStore, ui, streaming, setError]);
 
   const nextStep = useCallback(() => { if (state.step < 4) setStep((state.step + 1) as WizardStep); }, [state.step, setStep]);
   const prevStep = useCallback(() => { if (state.step > 1) setStep((state.step - 1) as WizardStep); }, [state.step, setStep]);
@@ -160,9 +170,22 @@ export function useLessonWizard() {
     }
   }, [state.step, state.title, state.selectedCourseId, state.slidesText, lectureText]);
 
+  // Sync streaming errors to wizard state
+  useEffect(() => {
+    if (streaming.error) {
+      setState((s) => ({ ...s, isAnalyzing: false, error: streaming.error }));
+    }
+  }, [streaming.error]);
+
+  // Cleanup completion timer on unmount
+  useEffect(() => {
+    return () => { clearTimeout(completionTimerRef.current); };
+  }, []);
+
   return {
     ...state, currentCourse, selectedCourse, courses: courseStore.courses,
     lectureText, stt: transcription.stt, canProceed, hasProgress,
+    streaming,
     setTitle, setWeekNumber, setSelectedCourseId, setSlidesText, setError, setStep,
     createLessonAndNext, handlePdfUpload, handleAudioUpload, handleAnalyze,
     clearTranscription: transcription.clearTranscription,

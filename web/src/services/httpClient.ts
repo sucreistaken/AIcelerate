@@ -2,6 +2,7 @@
 // Shared types and fetch helpers used across all API modules
 
 import { API_BASE } from '../config';
+import { t } from '../utils/i18n';
 
 export { API_BASE };
 
@@ -43,7 +44,7 @@ export interface TranscribeStartResponse {
 export async function handleResponse<T>(response: Response): Promise<ApiResponse<T>> {
     const json = await response.json();
     if (!response.ok || !json.ok) {
-        return { ok: false, error: json.error || 'Bir hata olustu' };
+        return { ok: false, error: json.error || t('error.generic') };
     }
     return { ok: true, data: json };
 }

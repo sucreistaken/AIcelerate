@@ -12,7 +12,7 @@ import { generateDigest } from "../services/lessonDigestService";
 import { analyzeDeviation } from "../services/deviationService";
 import { fetchIeuLearningOutcomes } from "../services/ieuService";
 import {
-  generatePlan, generateQuizFromPlan, generateQuizAnswers,
+  generatePlan, generatePlanStream, generateQuizFromPlan, generateQuizAnswers,
   evaluateQuizAnswer, evaluateQuizBatch,
   buildChatContextForLesson, generateChatResponseStream, generateChatResponseSync,
   generateMindmap, generateMindmapModule, generateMindmapNodeDetail,
@@ -100,8 +100,83 @@ router.post("/lessons/:id/lo-align", validate(loAlignSchema), asyncHandler(async
 }));
 
 // ---- Plan from Text ----
+
+// Streaming plan generation via SSE
+router.post("/plan-from-text/stream", async (req, res) => {
+  const parsed = planFromTextSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ ok: false, error: parsed.error.issues.map(i => i.message).join(", ") });
+  }
+
+  const { lectureText, slidesText, title, lessonId: reqLessonId, courseCode, learningOutcomes } = parsed.data;
+
+  // At least one content source required
+  if (!lectureText?.trim() && !slidesText?.trim()) {
+    return res.status(400).json({ ok: false, error: "At least slides or transcript is required" });
+  }
+
+  // SSE headers
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders();
+
+  // Track client disconnect
+  let aborted = false;
+  req.on("close", () => { aborted = true; });
+
+  try {
+    const plan = await generatePlanStream(res, lectureText, slidesText, courseCode, learningOutcomes);
+
+    // Save lesson (same logic as non-streaming endpoint)
+    const lId = reqLessonId || `lec-${Date.now()}`;
+    const lessonTitle = title || plan.topic || "Untitled Lesson";
+
+    upsertLesson({
+      id: lId,
+      title: lessonTitle,
+      transcript: lectureText,
+      slideText: slidesText,
+      plan,
+      summary: plan.alignment?.summary_chatty || "",
+      highlights: plan.key_concepts || [],
+      professorEmphases: plan.emphases || [],
+      courseCode,
+      learningOutcomes,
+    });
+
+    // Calculate alignment duration
+    if (plan.alignment?.items) {
+      const durations = plan.alignment.items.map(it => it.duration_min ?? 0).filter(d => d > 0);
+      if (durations.length) {
+        plan.alignment.average_duration_min = parseFloat((durations.reduce((a, b) => a + b, 0) / durations.length).toFixed(1));
+      }
+    }
+
+    // Generate digest in background
+    generateDigest(lId, lectureText, slidesText, plan).catch(() => {});
+
+    // Send final done event
+    if (aborted) { res.end(); return; }
+    res.write(`data: ${JSON.stringify({ type: "done", plan, lessonId: lId })}\n\n`);
+    res.end();
+  } catch (err: any) {
+    if (!res.headersSent) {
+      res.status(500).json({ ok: false, error: err.message });
+    } else {
+      res.write(`data: ${JSON.stringify({ type: "error", message: err.message })}\n\n`);
+      res.end();
+    }
+  }
+});
+
 router.post("/plan-from-text", validate(planFromTextSchema), asyncHandler(async (req, res) => {
   const { lectureText, slidesText, alignOnly, prevPlan, lessonId, title, courseCode, learningOutcomes } = req.body;
+
+  if (!lectureText?.trim() && !slidesText?.trim()) {
+    return res.status(400).json({ ok: false, error: "At least slides or transcript is required" });
+  }
 
   if (alignOnly) {
     if (!prevPlan) throw badRequest("prevPlan is required when alignOnly = true");

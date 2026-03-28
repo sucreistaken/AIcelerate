@@ -17,8 +17,8 @@ export const progressSchema = z.object({
 });
 
 export const planFromTextSchema = z.object({
-  lectureText: z.string().min(1, "lectureText is required"),
-  slidesText: z.string().min(1, "slidesText is required"),
+  lectureText: z.string().default(""),
+  slidesText: z.string().default(""),
   alignOnly: z.boolean().optional(),
   prevPlan: z.any().optional(),
   lessonId: z.string().optional(),

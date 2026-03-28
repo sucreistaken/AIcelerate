@@ -1,4 +1,5 @@
 import toast from "react-hot-toast";
+import { t } from "./i18n";
 
 export async function withRetry<T>(
   fn: () => Promise<T>,
@@ -16,6 +17,6 @@ export async function withRetry<T>(
       }
     }
   }
-  toast.error("İşlem başarısız oldu. Lütfen tekrar deneyin.");
+  toast.error(t("error.retryFailed"));
   throw lastError;
 }

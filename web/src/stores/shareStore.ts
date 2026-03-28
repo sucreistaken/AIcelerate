@@ -2,6 +2,7 @@
 import { create } from 'zustand';
 import { SharedBundle } from '../types';
 import { sharesApi } from '../services/api';
+import { t } from '../utils/i18n';
 
 interface ShareState {
   shares: SharedBundle[];
@@ -43,7 +44,7 @@ export const useShareStore = create<ShareState>((set, get) => ({
         set((s) => ({ shares: [res.share!, ...s.shares] }));
         return res.share.shareId;
       }
-      set({ error: res.error || 'Failed to create share' });
+      set({ error: res.error || t('error.shareFailed') });
       return null;
     } catch (e: any) {
       set({ error: e.message });
@@ -58,7 +59,7 @@ export const useShareStore = create<ShareState>((set, get) => ({
     try {
       const res = await sharesApi.get(shareId);
       if (res.ok && res.share) set({ currentShare: res.share });
-      else set({ error: res.error || 'Share not found' });
+      else set({ error: res.error || t('error.shareNotFound') });
     } catch (e: any) {
       set({ error: e.message });
     } finally {
@@ -85,7 +86,7 @@ export const useShareStore = create<ShareState>((set, get) => ({
     try {
       const res = await sharesApi.import(shareId);
       if (res.ok) return res.lessonId || null;
-      set({ error: res.error || 'Import failed' });
+      set({ error: res.error || t('error.importFailed') });
       return null;
     } catch (e: any) {
       set({ error: e.message });

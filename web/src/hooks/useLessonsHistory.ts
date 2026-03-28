@@ -5,6 +5,7 @@ import { SharedBundle } from "../types";
 import { lessonsApi, sharesApi } from "../services/api";
 import { useCourseStore } from "../stores/courseStore";
 import { logger } from "../utils/logger";
+import { t as i18nt } from "../utils/i18n";
 
 const formatDate = (d?: string, locale: string = "tr-TR") => {
   if (!d) return "";
@@ -110,10 +111,10 @@ export function useLessonsHistory({ currentLessonId, onLessonDeleted, lang }: Us
     setSelectedIds(new Set());
     setBulkDeleting(false);
     if (failCount > 0) {
-      toast.error(lang === 'tr' ? `${failCount} ders silinemedi` : `${failCount} lessons failed to delete`);
+      toast.error(i18nt("error.lessonDeleteFailed", { count: failCount }));
     }
     if (deletedIds.size > 0) {
-      toast.success(lang === 'tr' ? `${deletedIds.size} ders silindi` : `${deletedIds.size} lessons deleted`);
+      toast.success(i18nt("error.lessonsDeleted", { count: deletedIds.size }));
     }
   };
 

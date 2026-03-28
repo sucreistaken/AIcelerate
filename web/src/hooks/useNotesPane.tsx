@@ -4,6 +4,7 @@ import { useNotesStore, Note } from "../stores/notesStore";
 import { exportToPdf } from "../utils/pdfExport";
 import { useGamificationStore } from "../stores/gamificationStore";
 import { logger } from "../utils/logger";
+import { t } from "../utils/i18n";
 
 const NOTE_MAX_CHARS = 10000;
 
@@ -75,7 +76,7 @@ export function useNotesPane() {
             setCopiedId(id);
             setTimeout(() => setCopiedId(null), 2000);
         } catch {
-            toast.error("Panoya kopyalanamadı. Tarayıcı izni gerekebilir.");
+            toast.error(t("error.clipboardFailed"));
         }
     };
 

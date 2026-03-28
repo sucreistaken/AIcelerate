@@ -5,6 +5,7 @@ import { deepDiveApi } from "../services/api";
 import { useLessonStore } from "../stores/lessonStore";
 import { exportToPdf } from "../utils/pdfExport";
 import { useGamificationStore } from "../stores/gamificationStore";
+import { t } from "../utils/i18n";
 
 export interface ModuleInfo {
     id: number;
@@ -174,7 +175,7 @@ export function useMindMap() {
 
             saveMindMap(res.code, newTitle);
         } else {
-            setError(res.error || "Failed to generate map.");
+            setError(res.error || t("error.mapFailed"));
         }
     };
 
@@ -284,11 +285,11 @@ export function useMindMap() {
                     })
                     .catch((e) => {
                         logger.error("Mermaid Render Error:", e);
-                        setError("Diagram render failed (syntax error).");
+                        setError(t("error.diagramFailed"));
                     });
             } catch (e: any) {
                 logger.error(e);
-                setError("Diagram render failed.");
+                setError(t("error.diagramFailed"));
             }
         }
     }, [code, learnedNodes]);

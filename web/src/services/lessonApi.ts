@@ -2,6 +2,7 @@
 // Lesson-related APIs: lessonsApi, uploadApi, planApi, cheatSheetApi, deviationApi, deepDiveApi, connectionsApi
 
 import { logger } from "../utils/logger";
+import { t } from "../utils/i18n";
 import { API_BASE, LessonData, PlanResponse, TranscribeStartResponse } from './httpClient';
 import { Plan, CheatSheet, ConceptConnection } from '../types';
 
@@ -55,7 +56,7 @@ export const lessonsApi = {
             return await res.json();
         } catch (error) {
             logger.error('Ders silme hatasi:', error);
-            return { ok: false, error: 'Ders silinemedi' };
+            return { ok: false, error: t('error.lessonDeleteSingle') };
         }
     },
 
@@ -99,6 +100,100 @@ export const planApi = {
             body: JSON.stringify(params),
         });
         return await res.json();
+    },
+
+    createFromTextStream(
+        params: {
+            lectureText: string;
+            slidesText: string;
+            title: string;
+            lessonId?: string;
+            courseCode?: string;
+            learningOutcomes?: string[];
+        },
+        callbacks: {
+            onPhase: (phase: string, message: string) => void;
+            onProgress: (tokens: number) => void;
+            onModule: (index: number, total: number, data: any) => void;
+            onEmphasis: (index: number, total: number, data: any) => void;
+            onDone: (plan: any, lessonId: string) => void;
+            onError: (error: string) => void;
+        }
+    ): AbortController {
+        const controller = new AbortController();
+
+        (async () => {
+            try {
+                const res = await fetch(`${API_BASE}/api/plan-from-text/stream`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(params),
+                    signal: controller.signal,
+                });
+
+                if (!res.ok) {
+                    try {
+                        const errBody = await res.json();
+                        callbacks.onError(errBody.error || t('streaming.connectionFailed'));
+                    } catch {
+                        callbacks.onError(t('streaming.connectionFailed'));
+                    }
+                    return;
+                }
+                if (!res.body) {
+                    callbacks.onError(t('streaming.connectionFailed'));
+                    return;
+                }
+
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (!line.startsWith('data: ')) continue;
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            switch (data.type) {
+                                case 'phase':
+                                    callbacks.onPhase(data.phase, data.message);
+                                    break;
+                                case 'progress':
+                                    callbacks.onProgress(data.tokens);
+                                    break;
+                                case 'module':
+                                    callbacks.onModule(data.index, data.total, data.data);
+                                    break;
+                                case 'emphasis':
+                                    callbacks.onEmphasis(data.index, data.total, data.data);
+                                    break;
+                                case 'done':
+                                    callbacks.onDone(data.plan, data.lessonId);
+                                    break;
+                                case 'error':
+                                    callbacks.onError(data.message);
+                                    break;
+                            }
+                        } catch {
+                            // skip malformed events
+                        }
+                    }
+                }
+            } catch (err: any) {
+                if (err.name !== 'AbortError') {
+                    callbacks.onError(err.message || t('streaming.failed'));
+                }
+            }
+        })();
+
+        return controller;
     },
 };
 

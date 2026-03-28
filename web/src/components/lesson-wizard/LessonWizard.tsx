@@ -105,6 +105,7 @@ export default function LessonWizard() {
               isAnalyzing={w.isAnalyzing}
               canAnalyze={w.canProceed}
               error={w.error}
+              streaming={w.streaming}
               onAnalyze={w.handleAnalyze}
               onBack={w.prevStep}
             />

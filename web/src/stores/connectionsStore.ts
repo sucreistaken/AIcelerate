@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { ConceptConnection } from '../types';
 import { connectionsApi } from '../services/api';
+import { t } from '../utils/i18n';
 
 type SortMode = 'strength' | 'alpha' | 'lesson-count';
 
@@ -55,7 +56,7 @@ export const useConnectionsStore = create<ConnectionsState>()((set, get) => ({
         set({ connections: res.connections });
       }
     } catch (err: any) {
-      set({ error: err.message || 'Failed to fetch connections' });
+      set({ error: err.message || t('error.loadFailed') });
     }
     set({ loading: false });
   },
@@ -67,10 +68,10 @@ export const useConnectionsStore = create<ConnectionsState>()((set, get) => ({
       if (res.ok && res.connections) {
         set({ connections: res.connections });
       } else {
-        set({ error: res.error || 'Build failed' });
+        set({ error: res.error || t('error.connectionsFailed') });
       }
     } catch (err: any) {
-      set({ error: err.message || 'Failed to build connections' });
+      set({ error: err.message || t('error.connectionsFailed') });
     }
     set({ loading: false });
   },
