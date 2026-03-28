@@ -467,7 +467,7 @@ const translations: Record<Lang, Record<string, string>> = {
 
     // Streaming
     'wizard.needContent': 'Analiz için en az slayt veya transkript yüklemeniz gerekiyor. Lütfen 2. veya 3. adıma geri dönüp içerik ekleyin.',
-    'wizard.needBoth': 'Analiz için en az bir materyal gerekli. Lütfen geri dönüp slayt (2. adım) veya transkript (3. adım) yükleyin.',
+    'wizard.needBoth': 'Analiz yapabilmem için en az bir içerik gerekli. Slayt yüklemek için 2. adıma, ses kaydı/transkript eklemek için 3. adıma geri dönün. İkisinden birini yüklemeniz yeterli.',
 
     'streaming.analyzing': 'Ders içeriği analiz ediliyor...',
     'streaming.generating': 'Öğrenme planı oluşturuluyor...',
@@ -1208,7 +1208,7 @@ const translations: Record<Lang, Record<string, string>> = {
 
     // Streaming
     'wizard.needContent': 'You need to upload at least slides or a transcript for analysis. Please go back to step 2 or 3 and add content.',
-    'wizard.needBoth': 'At least one material is required for analysis. Please go back and upload slides (step 2) or a transcript (step 3).',
+    'wizard.needBoth': 'I need at least one content source to analyze. Go back to step 2 to upload slides, or step 3 to add audio/transcript. Either one is enough.',
 
     'streaming.analyzing': 'Analyzing lesson content...',
     'streaming.generating': 'Creating learning plan...',
