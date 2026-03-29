@@ -1,9 +1,10 @@
 import React from "react";
+import { motion } from "framer-motion";
 import { Plan } from "../types";
 import PaneInfoBanner from "./ui/PaneInfoBanner";
+import { EmptyState } from "./ui/EmptyState";
 import { t } from "../utils/i18n";
 
-/** Helper: Ortalama hesaplama */
 function average(ns: number[]) {
   if (!ns.length) return NaN;
   const s = ns.reduce((a, b) => a + (Number.isFinite(b) ? b : 0), 0);
@@ -24,7 +25,12 @@ export default function AlignmentPane({
     average(a?.items?.map((i) => i.duration_min) || []);
 
   return (
-    <div className="grid-gap-12">
+    <motion.div
+      className="grid-gap-12"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+    >
       <PaneInfoBanner
         id="alignment"
         title={t("alignment.title")}
@@ -37,10 +43,7 @@ export default function AlignmentPane({
         {a?.summary_chatty ? (
           <p className="m-0">{a.summary_chatty}</p>
         ) : (
-          <p className="m-0 op-70">
-            Özet metni bulunamadı. Yine de aşağıdaki tablo eşleşmeleri ve
-            süreleri gösterir.
-          </p>
+          <p className="m-0 op-70">{t("alignment.noSummary")}</p>
         )}
 
         <div className="lc-chipset">
@@ -49,11 +52,10 @@ export default function AlignmentPane({
           </div>
         </div>
 
-        {/* ✅ Slayt Uyumu Özeti */}
         {deviation?.summary && (
           <div className="muted-block small mt-3">
             <div style={{ fontWeight: 700, marginBottom: 6 }}>
-              Slayt Uyumu Özeti
+              {t("alignment.deviationSummary")}
             </div>
             <div className="small">
               On-slide: {deviation.summary.percent.on_slide}% • Expanded:{" "}
@@ -66,66 +68,58 @@ export default function AlignmentPane({
       </section>
 
       <section className="lc-section">
-        <table className="aligned-table">
-          <thead>
-            <tr>
-              <th>{t("alignment.topicConcepts")}</th>
-              <th>{t("alignment.emphasis")}</th>
-              <th>{t("alignment.sources")}</th>
-              <th>{t("alignment.durationMin")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(a?.items || []).map((it, i) => (
-              <tr key={i}>
-                <td>
-                  <div className="fw-700">{it.topic}</div>
-                  {!!it.concepts?.length && (
-                    <div className="muted">{it.concepts.join(", ")}</div>
-                  )}
-                </td>
-
-                <td>
-                  <div className="lc-chipset m-0">
-                    <span className="pill">
-                      {it.in_both ? t("alignment.bothSources") : t("alignment.singleSource")}
-                    </span>
-                    <span className="pill">Emphasis: {it.emphasis_level}</span>
-                    <span className="pill">
-                      {t("alignment.confidence")} %{Math.round((it.confidence ?? 0) * 100)}
-                    </span>
-                  </div>
-                </td>
-
-                <td>
-                  {it.lecture_quotes?.slice(0, 2).map((q, qi) => (
-                    <div key={qi} className="muted">
-                      “{q}”
-                    </div>
-                  ))}
-                  {it.slide_refs?.slice(0, 2).map((s, si) => (
-                    <div key={si} className="muted">
-                      • {s}
-                    </div>
-                  ))}
-                </td>
-
-                <td className="fw-700">
-                  {Number.isFinite(it.duration_min) ? it.duration_min.toFixed(1) : "—"}
-                </td>
-              </tr>
-            ))}
-
-            {!a?.items?.length && (
+        {(a?.items?.length ?? 0) > 0 ? (
+          <table className="aligned-table">
+            <thead>
               <tr>
-                <td colSpan={4} className="muted">
-                  Eşleşme bulunamadı.
-                </td>
+                <th>{t("alignment.topicConcepts")}</th>
+                <th>{t("alignment.emphasis")}</th>
+                <th>{t("alignment.sources")}</th>
+                <th>{t("alignment.durationMin")}</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {(a?.items || []).map((it, i) => (
+                <tr key={i}>
+                  <td>
+                    <div className="fw-700">{it.topic}</div>
+                    {!!it.concepts?.length && (
+                      <div className="muted">{it.concepts.join(", ")}</div>
+                    )}
+                  </td>
+                  <td>
+                    <div className="lc-chipset m-0">
+                      <span className="pill">
+                        {it.in_both ? t("alignment.bothSources") : t("alignment.singleSource")}
+                      </span>
+                      <span className="pill">Emphasis: {it.emphasis_level}</span>
+                      <span className="pill">
+                        {t("alignment.confidence")} %{Math.round((it.confidence ?? 0) * 100)}
+                      </span>
+                    </div>
+                  </td>
+                  <td>
+                    {it.lecture_quotes?.slice(0, 2).map((q, qi) => (
+                      <div key={qi} className="muted">"{q}"</div>
+                    ))}
+                    {it.slide_refs?.slice(0, 2).map((s, si) => (
+                      <div key={si} className="muted">• {s}</div>
+                    ))}
+                  </td>
+                  <td className="fw-700">
+                    {Number.isFinite(it.duration_min) ? it.duration_min.toFixed(1) : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <EmptyState
+            title={t("alignment.noItems")}
+            description={t("alignment.noItemsDesc")}
+          />
+        )}
       </section>
-    </div>
+    </motion.div>
   );
 }

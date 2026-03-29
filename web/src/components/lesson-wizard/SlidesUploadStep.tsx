@@ -38,14 +38,14 @@ export default function SlidesUploadStep({
   }, [onPdfUpload]);
 
   return (
-    <div style={{ maxWidth: 560, margin: "0 auto" }}>
-      <h3 className="h3" style={{ marginBottom: 4 }}>{t("wizard.slidesTitle")}</h3>
-      <p className="muted" style={{ marginBottom: 20, fontSize: 13 }}>
+    <div className="wizard-step-card" style={{ maxWidth: 560 }}>
+      <h3 className="wizard-step-card__title">{t("wizard.slidesTitle")}</h3>
+      <p className="wizard-step-card__desc">
         {t("wizard.slidesDesc")}
       </p>
 
       {/* Tab toggle */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
         <button
           className={`btn ${mode === "upload" ? "btn-primary" : "btn-ghost"}`}
           style={{ fontSize: 12 }}
@@ -67,41 +67,32 @@ export default function SlidesUploadStep({
       {mode === "upload" && (
         <>
           <div
+            className={`wizard-upload-zone ${isDragging ? "wizard-upload-zone--dragging" : ""}`}
             onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
             onDragEnter={() => setIsDragging(true)}
             onDragLeave={() => setIsDragging(false)}
             onDrop={handleDrop}
             onClick={() => fileRef.current?.click()}
-            style={{
-              border: `2px dashed ${isDragging ? "var(--accent-2)" : "var(--border)"}`,
-              borderRadius: 12,
-              padding: "40px 24px",
-              textAlign: "center",
-              cursor: "pointer",
-              background: isDragging ? "var(--ring)" : "transparent",
-              transition: "all 0.2s ease",
-              marginBottom: 16,
-            }}
           >
             {isUploading ? (
-              <div>
-                <div style={{ fontSize: 28, marginBottom: 8 }}>⏳</div>
-                <div style={{ fontWeight: 500 }}>{t("wizard.processingPdf")}</div>
-                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{t("wizard.extractingOcr")}</div>
+              <div style={{ position: "relative", zIndex: 1 }}>
+                <span className="wizard-upload-zone__icon">⏳</span>
+                <div className="wizard-upload-zone__title">{t("wizard.processingPdf")}</div>
+                <div className="wizard-upload-zone__subtitle">{t("wizard.extractingOcr")}</div>
               </div>
             ) : pdfFileName ? (
-              <div>
-                <div style={{ fontSize: 28, marginBottom: 8 }}>✅</div>
-                <div style={{ fontWeight: 500, color: "var(--success)" }}>{pdfFileName}</div>
-                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+              <div style={{ position: "relative", zIndex: 1 }}>
+                <span className="wizard-upload-zone__icon">✅</span>
+                <div className="wizard-upload-zone__title" style={{ color: "var(--success)" }}>{pdfFileName}</div>
+                <div className="wizard-upload-zone__subtitle">
                   {slidesText.length.toLocaleString()} {t("wizard.charsExtracted")}
                 </div>
               </div>
             ) : (
-              <div>
-                <div style={{ fontSize: 28, marginBottom: 8 }}>📄</div>
-                <div style={{ fontWeight: 500 }}>{t("wizard.dragDropPdf")}</div>
-                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{t("wizard.orClickToSelect")}</div>
+              <div style={{ position: "relative", zIndex: 1 }}>
+                <span className="wizard-upload-zone__icon">📄</span>
+                <div className="wizard-upload-zone__title">{t("wizard.dragDropPdf")}</div>
+                <div className="wizard-upload-zone__subtitle">{t("wizard.orClickToSelect")}</div>
               </div>
             )}
           </div>
@@ -110,17 +101,17 @@ export default function SlidesUploadStep({
       )}
 
       {mode === "paste" && (
-        <div style={{ marginBottom: 16 }}>
+        <div className="wizard-field">
           <textarea
             className="input"
             value={slidesText}
             onChange={(e) => onSlidesTextChange(e.target.value)}
             placeholder={t("wizard.pasteSlides")}
             rows={10}
-            style={{ width: "100%", resize: "vertical", fontFamily: "inherit" }}
+            style={{ width: "100%", resize: "vertical", fontFamily: "inherit", padding: "12px 14px" }}
           />
           {slidesText && (
-            <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+            <div className="wizard-field__hint">
               {slidesText.length.toLocaleString()} {t("wizard.chars")}
             </div>
           )}
@@ -128,12 +119,12 @@ export default function SlidesUploadStep({
       )}
 
       {error && (
-        <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 12 }}>
+        <div className="wizard-error">
           {error}
         </div>
       )}
 
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
+      <div className="wizard-actions">
         <button className="btn btn-ghost" onClick={onBack} type="button">{t("wizard.back")}</button>
         <button className="btn btn-primary" onClick={onNext} type="button" disabled={isUploading}>
           {slidesText ? t("wizard.next") : t("wizard.skip")}

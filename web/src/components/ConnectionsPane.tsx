@@ -1,6 +1,8 @@
 import { AnimatePresence } from "framer-motion";
 import { useConnections } from "../hooks/useConnections";
 import PaneInfoBanner from "./ui/PaneInfoBanner";
+import { EmptyState } from "./ui/EmptyState";
+import { ListSkeleton } from "./ui/Skeleton";
 import { t } from "../utils/i18n";
 import {
   StatsSummary,
@@ -74,25 +76,18 @@ export default function ConnectionsPane() {
 
       <section className="lc-section">
         {loading ? (
-          <div className="pane-empty" style={{ padding: 32 }}>
-            <div className="pane-empty__desc">{t("connections.buildingMsg")}</div>
-          </div>
+          <ListSkeleton count={4} />
         ) : connections.length === 0 ? (
-          <div className="pane-empty">
-            <div className="pane-empty__icon">C</div>
-            <div className="pane-empty__title">{t("connections.noConnections")}</div>
-            <div className="pane-empty__desc">
-              {t("connections.emptyHint")}
-            </div>
-          </div>
+          <EmptyState
+            title={t("connections.noConnections")}
+            description={t("connections.emptyHint")}
+            action={{ label: t("connections.buildBtn"), onClick: buildConnections }}
+          />
         ) : filteredConnections.length === 0 ? (
-          <div className="pane-empty">
-            <div className="pane-empty__icon">?</div>
-            <div className="pane-empty__title">{t("connections.noMatches")}</div>
-            <div className="pane-empty__desc">
-              {t("connections.noMatchesDesc")}
-            </div>
-          </div>
+          <EmptyState
+            title={t("connections.noMatches")}
+            description={t("connections.noMatchesDesc")}
+          />
         ) : view === "list" ? (
           <ListView
             connections={filteredConnections}

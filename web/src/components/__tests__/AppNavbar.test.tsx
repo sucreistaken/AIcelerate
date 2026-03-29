@@ -19,10 +19,10 @@ vi.mock("../ui/ThemeToggle", () => ({
 
 describe("AppNavbar", () => {
   const defaultProps = {
-    authUser: null,
     language: "tr" as const,
     onToggleLanguage: vi.fn(),
     onOpenSettings: vi.fn(),
+    onOpenShortcuts: vi.fn(),
   };
 
   it("renders brand text", () => {

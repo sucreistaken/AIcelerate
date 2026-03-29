@@ -1,0 +1,251 @@
+/* =========================================
+   Onboarding Tour
+   ========================================= */
+
+.ot-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(3px);
+}
+
+.ot-overlay--touring {
+  background: rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.ot-overlay--touring > * {
+  pointer-events: auto;
+}
+
+/* ---- Welcome Modal ---- */
+.ot-welcome {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  width: min(480px, 90vw);
+  padding: 44px 36px 32px;
+  text-align: center;
+  box-shadow: var(--shadow-2);
+}
+
+.ot-welcome__emoji {
+  display: block;
+  font-size: 52px;
+  margin-bottom: 16px;
+}
+
+.ot-welcome__title {
+  font-size: var(--fs-3xl);
+  font-weight: var(--fw-bold);
+  margin: 0 0 6px;
+  letter-spacing: -0.3px;
+}
+
+.ot-welcome__brand {
+  background: linear-gradient(135deg, var(--accent-2), #a855f7);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.ot-welcome__desc {
+  color: var(--text-secondary);
+  font-size: var(--fs-md);
+  line-height: var(--lh-relaxed);
+  max-width: 360px;
+  margin: 0 auto 28px;
+}
+
+/* Chips */
+.ot-welcome__steps {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 28px;
+}
+
+.ot-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text-secondary);
+}
+
+.ot-chip--active {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.25);
+  color: var(--text);
+}
+
+.ot-chip__num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: var(--fw-bold);
+  color: var(--text);
+}
+
+.ot-chip--active .ot-chip__num {
+  background: var(--accent-2);
+  color: #fff;
+}
+
+/* Buttons */
+.ot-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 13px 28px;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity var(--duration-fast), transform var(--duration-fast);
+}
+
+.ot-btn-primary:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.ot-btn-ghost {
+  display: block;
+  margin: 14px auto 0;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.ot-btn-ghost:hover {
+  color: var(--text);
+}
+
+/* ---- Step Tooltip ---- */
+.ot-tooltip {
+  position: fixed;
+  z-index: calc(var(--z-modal) + 1);
+  background: var(--card);
+  border: 2px solid var(--accent-2);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  width: min(320px, 85vw);
+  box-shadow: var(--shadow-2);
+}
+
+.ot-tooltip__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--accent-2);
+  border-radius: var(--radius-full);
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: var(--fw-bold);
+  margin-bottom: 10px;
+}
+
+.ot-tooltip__title {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold);
+  margin: 0 0 4px;
+}
+
+.ot-tooltip__desc {
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  margin: 0 0 16px;
+}
+
+.ot-tooltip__actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ot-tooltip__btns {
+  display: flex;
+  gap: 6px;
+}
+
+/* Dots */
+.ot-dots {
+  display: flex;
+  gap: 5px;
+}
+
+.ot-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--border);
+}
+
+.ot-dot--active {
+  background: var(--accent-2);
+}
+
+/* Small button */
+.ot-btn-sm {
+  background: var(--accent-2);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 7px 16px;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.ot-btn-sm--ghost {
+  background: var(--input-bg);
+  color: var(--text);
+}
+
+/* ---- Highlight Ring ---- */
+.ot-highlight {
+  position: fixed;
+  z-index: var(--z-modal);
+  border-radius: var(--radius-md);
+  pointer-events: none;
+}
+
+.ot-highlight::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  border: 2px solid var(--accent-2);
+  animation: ot-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes ot-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.03); }
+}

@@ -23,27 +23,30 @@ function MaterialBadge({ label, icon, hasContent, charCount }: {
 }) {
   return (
     <div
-      className="card"
       style={{
-        padding: "12px 16px",
+        padding: "14px 16px",
         display: "flex",
         alignItems: "center",
         gap: 12,
-        borderLeft: `3px solid ${hasContent ? "var(--success)" : "var(--muted)"}`,
+        borderLeft: `3px solid ${hasContent ? "var(--success)" : "var(--border)"}`,
+        background: hasContent ? "var(--success-soft)" : "var(--input-bg)",
+        borderRadius: "0 var(--radius-sm) var(--radius-sm) 0",
+        transition: "all 0.2s ease",
       }}
     >
-      <span style={{ fontSize: 24 }}>{icon}</span>
+      <span style={{ fontSize: 22 }}>{icon}</span>
       <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: 500, fontSize: 13 }}>{label}</div>
-        <div className="muted" style={{ fontSize: 11 }}>
+        <div style={{ fontWeight: 600, fontSize: "var(--fs-sm)" }}>{label}</div>
+        <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 1 }}>
           {hasContent
             ? `${charCount.toLocaleString()} ${t("wizard.chars")}`
             : t("wizard.notUploaded")}
         </div>
       </div>
       <span style={{
-        fontSize: 18,
+        fontSize: 16,
         color: hasContent ? "var(--success)" : "var(--muted)",
+        fontWeight: 700,
       }}>
         {hasContent ? "✓" : "—"}
       </span>
@@ -58,24 +61,31 @@ export default function SummaryStep({
   const fullTitle = weekNumber ? `Week ${weekNumber} - ${title}` : title;
 
   return (
-    <div style={{ maxWidth: 520, margin: "0 auto" }}>
-      <h3 className="h3" style={{ marginBottom: 4 }}>{t("wizard.summaryTitle")}</h3>
-      <p className="muted" style={{ marginBottom: 20, fontSize: 13 }}>
+    <div className="wizard-step-card">
+      <h3 className="wizard-step-card__title">{t("wizard.summaryTitle")}</h3>
+      <p className="wizard-step-card__desc">
         {t("wizard.summaryDesc2")}
       </p>
 
       {/* Lesson info summary */}
-      <div className="card" style={{ padding: "14px 18px", marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-          <span style={{ fontSize: 20 }}>📝</span>
-          <div>
-            <div style={{ fontWeight: 600, fontSize: 15 }}>{fullTitle}</div>
-            {course && (
-              <div className="muted" style={{ fontSize: 12 }}>
-                {course.code} — {course.name}
-              </div>
-            )}
-          </div>
+      <div style={{
+        padding: "16px 18px",
+        marginBottom: 20,
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        background: "var(--input-bg)",
+        borderRadius: "var(--radius-md)",
+        border: "1px solid var(--border)",
+      }}>
+        <span style={{ fontSize: 22 }}>📝</span>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: "var(--fs-md)" }}>{fullTitle}</div>
+          {course && (
+            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 1 }}>
+              {course.code} — {course.name}
+            </div>
+          )}
         </div>
       </div>
 
@@ -100,12 +110,13 @@ export default function SummaryStep({
         <div
           style={{
             background: "var(--ring)",
-            border: "1px solid var(--accent-2)",
-            borderRadius: 8,
+            border: "1px solid color-mix(in srgb, var(--accent-2) 25%, transparent)",
+            borderRadius: "var(--radius-sm)",
             padding: "12px 16px",
             marginBottom: 16,
             fontSize: 12,
             color: "var(--text)",
+            lineHeight: 1.5,
           }}
         >
           ✨ {t("wizard.aiInfo")}
@@ -115,9 +126,9 @@ export default function SummaryStep({
       {!canAnalyze && (
         <div
           style={{
-            background: "var(--danger-bg, var(--warning-bg))",
-            border: "1px solid var(--danger, var(--warning))",
-            borderRadius: 8,
+            background: "var(--warning-soft)",
+            border: "1px solid color-mix(in srgb, var(--warning) 25%, transparent)",
+            borderRadius: "var(--radius-sm)",
             padding: "12px 16px",
             marginBottom: 16,
             fontSize: 12,
@@ -127,7 +138,7 @@ export default function SummaryStep({
         </div>
       )}
 
-      {/* Streaming Overlay - shows during analysis */}
+      {/* Streaming Overlay */}
       {streaming?.isStreaming && (
         <StreamingOverlay
           isStreaming={streaming.isStreaming}
@@ -142,13 +153,13 @@ export default function SummaryStep({
       )}
 
       {error && !streaming?.isStreaming && (
-        <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 12 }}>
+        <div className="wizard-error">
           {error}
         </div>
       )}
 
       {!streaming?.isStreaming && (
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
+        <div className="wizard-actions">
           <button className="btn btn-ghost" onClick={onBack} type="button">{t("wizard.back")}</button>
           <button
             className="btn btn-primary"
@@ -156,7 +167,7 @@ export default function SummaryStep({
             disabled={!canAnalyze || isAnalyzing}
             type="button"
             style={{
-              background: canAnalyze ? "linear-gradient(135deg, #9C27B0, #7B1FA2)" : undefined,
+              background: canAnalyze ? "linear-gradient(135deg, #a855f7, #7c3aed)" : undefined,
             }}
           >
             {isAnalyzing ? t("wizard.analyzing") : t("wizard.analyze")}

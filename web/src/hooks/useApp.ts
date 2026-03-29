@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useUiStore } from "../stores/uiStore";
 import { useCourseStore } from "../stores/courseStore";
 import { useAuthStore } from "../stores/authStore";
@@ -6,6 +6,17 @@ import { useLesson } from "./useLesson";
 import { useTranscription } from "./useTranscription";
 import { notificationApi } from "../services/api";
 import type { ModeId } from "../types";
+
+export const MODE_KEY_MAP: Record<string, ModeId> = {
+  "1": "plan",
+  "2": "alignment",
+  "3": "lecturer-note",
+  "4": "quiz",
+  "5": "deep-dive",
+  "6": "history",
+  "8": "lo-study",
+  "9": "cheat-sheet",
+};
 
 export function useApp() {
   const lesson = useLesson();
@@ -26,6 +37,10 @@ export function useApp() {
     const sp = new URLSearchParams(window.location.search);
     return sp.get("share") || null;
   });
+
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const openShortcuts = useCallback(() => setShowShortcuts(true), []);
+  const closeShortcuts = useCallback(() => setShowShortcuts(false), []);
 
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth < 768 : false
@@ -66,21 +81,41 @@ export function useApp() {
       )
         return;
 
-      const map: Record<string, ModeId> = {
-        "1": "plan",
-        "2": "alignment",
-        "3": "lecturer-note",
-        "4": "quiz",
-        "5": "deep-dive",
-        "6": "history",
-        "8": "lo-study",
-        "9": "cheat-sheet",
-      };
-      if (map[e.key]) ui.setMode(map[e.key]);
+      // Alt/Option shortcuts (safe — no browser conflicts)
+      if (e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+        switch (e.code) {
+          case "KeyB":
+            e.preventDefault();
+            toggleLeftPanel();
+            return;
+          case "KeyT":
+            e.preventDefault();
+            ui.toggleTheme();
+            return;
+          case "KeyN":
+            e.preventDefault();
+            ui.setMode("create-lesson" as any);
+            return;
+          case "KeyE":
+            e.preventDefault();
+            {
+              const el = document.querySelector<HTMLElement>(".lc-plan-pane");
+              if (el) import("../utils/pdfExport").then(({ exportToPdf }) => exportToPdf(el, "lesson-export.pdf"));
+            }
+            return;
+        }
+      }
+
+      if (e.key === "?") {
+        setShowShortcuts((prev) => !prev);
+        return;
+      }
+
+      if (MODE_KEY_MAP[e.key]) ui.setMode(MODE_KEY_MAP[e.key]);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [ui]);
+  }, [ui.setMode, ui.toggleTheme, toggleLeftPanel]);
 
   const handleAudioUpload = async (
     e: React.ChangeEvent<HTMLInputElement>
@@ -143,6 +178,9 @@ export function useApp() {
     currentCourse,
     showSettings,
     setShowSettings,
+    showShortcuts,
+    openShortcuts,
+    closeShortcuts,
     shareId,
     isMobile,
     canSubmit,

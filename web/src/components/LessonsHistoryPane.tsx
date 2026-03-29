@@ -1,8 +1,11 @@
+import { motion } from "framer-motion";
 import { ModeId } from "../types";
 import { ConfirmModal } from "./ui/ConfirmModal";
+import { Input } from "./ui/Input";
 import PaneInfoBanner from "./ui/PaneInfoBanner";
 import { useLessonsHistory } from "../hooks/useLessonsHistory";
 import { NoLessonsEmpty } from "./ui/EmptyState";
+import { ListSkeleton } from "./ui/Skeleton";
 import LessonCard from "./lessons-history/LessonCard";
 import CourseGroup from "./lessons-history/CourseGroup";
 import SharedLessons from "./lessons-history/SharedLessons";
@@ -31,8 +34,15 @@ export default function LessonsHistoryPane({ setMode, setQuiz, onSelectLesson, c
     formatDate,
   } = useLessonsHistory({ currentLessonId, onLessonDeleted, lang });
 
+  const searchIcon = <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
+
   return (
-    <div className="history-pane">
+    <motion.div
+      className="history-pane"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+    >
       <ConfirmModal
         isOpen={showBulkConfirm}
         onConfirm={executeBulkDelete}
@@ -66,32 +76,17 @@ export default function LessonsHistoryPane({ setMode, setQuiz, onSelectLesson, c
         </div>
       </div>
 
-      <div style={{ position: "relative", marginBottom: "var(--space-4)" }}>
-        <input
-          style={{
-            width: "100%",
-            maxWidth: 320,
-            padding: "6px 10px 6px 32px",
-            fontSize: 13,
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius-md)",
-            background: "var(--input-bg)",
-            color: "var(--text)",
-            outline: "none",
-            transition: "border-color 0.15s, box-shadow 0.15s",
-          }}
-          onFocus={(e) => { e.currentTarget.style.borderColor = "var(--accent-2)"; e.currentTarget.style.boxShadow = "0 0 0 3px var(--accent-ring)"; }}
-          onBlur={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.boxShadow = "none"; }}
+      <div style={{ maxWidth: 320, marginBottom: "var(--space-4)" }}>
+        <Input
           placeholder={t.searchPlaceholder}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          leftIcon={searchIcon}
+          inputSize="sm"
         />
-        <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", opacity: 0.4, display: "flex" }}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        </span>
       </div>
 
-      {loading && <div className="p-4 text-center op-60">{t.loading}</div>}
+      {loading && <ListSkeleton count={3} />}
 
       <div className="grid-gap-12">
         {filtered.length === 0 && !loading && (
@@ -147,6 +142,6 @@ export default function LessonsHistoryPane({ setMode, setQuiz, onSelectLesson, c
           onCancel={() => setDeleteTarget(null)}
         />
       )}
-    </div>
+    </motion.div>
   );
 }

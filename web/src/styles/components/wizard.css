@@ -1,0 +1,387 @@
+/* =========================================
+   Lesson Wizard – Premium Stepper & Layout
+   ========================================= */
+
+:root {
+  --wizard-green: #22c55e;
+  --wizard-blue: #3b82f6;
+  --wizard-orange: #f59e0b;
+  --wizard-purple: #a855f7;
+}
+
+/* --- Wizard Container --- */
+.wizard-container {
+  min-height: 60vh;
+  padding: 0 12px;
+}
+
+.wizard-header {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.wizard-header__title {
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.3px;
+  margin: 0;
+}
+
+.wizard-header__subtitle {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* --- Premium Stepper --- */
+.wizard-stepper {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+  margin: 28px auto 36px;
+  max-width: 520px;
+  padding: 0 8px;
+}
+
+.wizard-stepper__step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  cursor: default;
+  z-index: 1;
+}
+
+.wizard-stepper__step--clickable {
+  cursor: pointer;
+}
+
+.wizard-stepper__step--clickable:hover .wizard-stepper__indicator {
+  transform: scale(1.08);
+}
+
+/* Step indicator circle */
+.wizard-stepper__indicator {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-base);
+  position: relative;
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 2;
+}
+
+/* Pending state */
+.wizard-stepper__step--pending .wizard-stepper__indicator {
+  background: var(--card-hover);
+  color: var(--muted);
+  border: 2px solid var(--border);
+}
+
+/* Completed state */
+.wizard-stepper__step--completed .wizard-stepper__indicator {
+  color: #fff;
+  border: 2px solid transparent;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Active state */
+.wizard-stepper__step--active .wizard-stepper__indicator {
+  color: #fff;
+  border: 2px solid transparent;
+  animation: wizard-pulse 2.5s ease-in-out infinite;
+}
+
+/* Active ring effect */
+.wizard-stepper__step--active .wizard-stepper__indicator::before {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  opacity: 0.25;
+  animation: wizard-ring-pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes wizard-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes wizard-ring-pulse {
+  0%, 100% { opacity: 0.25; transform: scale(1); }
+  50% { opacity: 0.12; transform: scale(1.12); }
+}
+
+/* Check icon for completed */
+.wizard-stepper__check {
+  width: 18px;
+  height: 18px;
+}
+
+/* Step label */
+.wizard-stepper__label {
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: var(--fw-medium);
+  color: var(--muted);
+  transition: color 0.3s ease;
+  white-space: nowrap;
+  letter-spacing: 0.1px;
+}
+
+.wizard-stepper__step--active .wizard-stepper__label {
+  font-weight: var(--fw-semibold);
+}
+
+.wizard-stepper__step--completed .wizard-stepper__label {
+  color: var(--text-secondary);
+}
+
+/* Connector line */
+.wizard-stepper__connector {
+  flex: 1;
+  height: 3px;
+  min-width: 32px;
+  max-width: 64px;
+  margin: 21px 0 0;
+  border-radius: 2px;
+  background: var(--border);
+  position: relative;
+  overflow: hidden;
+  align-self: flex-start;
+}
+
+.wizard-stepper__connector-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.wizard-stepper__connector--completed .wizard-stepper__connector-fill {
+  transform: scaleX(1);
+}
+
+.wizard-stepper__connector--active .wizard-stepper__connector-fill {
+  transform: scaleX(0.5);
+  opacity: 0.6;
+}
+
+/* Step color variants — set on the step element so children + sibling connectors inherit */
+.wizard-stepper__step[data-color="green"] {
+  --step-color: var(--wizard-green);
+}
+.wizard-stepper__step[data-color="blue"] {
+  --step-color: var(--wizard-blue);
+}
+.wizard-stepper__step[data-color="orange"] {
+  --step-color: var(--wizard-orange);
+}
+.wizard-stepper__step[data-color="purple"] {
+  --step-color: var(--wizard-purple);
+}
+
+.wizard-stepper__step--active .wizard-stepper__indicator,
+.wizard-stepper__step--completed .wizard-stepper__indicator {
+  background: var(--step-color);
+}
+
+.wizard-stepper__step--active .wizard-stepper__indicator {
+  box-shadow: 0 0 20px color-mix(in srgb, var(--step-color) 40%, transparent),
+              0 4px 12px color-mix(in srgb, var(--step-color) 25%, transparent);
+}
+
+.wizard-stepper__step--active .wizard-stepper__indicator::before {
+  border-color: var(--step-color);
+}
+
+.wizard-stepper__step--active .wizard-stepper__label {
+  color: var(--step-color);
+}
+
+/* --- Wizard Step Card --- */
+.wizard-step-card {
+  max-width: 520px;
+  margin: 0 auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 28px 32px;
+  box-shadow: var(--shadow-1);
+}
+
+.wizard-step-card__title {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold);
+  margin: 0 0 4px;
+  letter-spacing: -0.2px;
+}
+
+.wizard-step-card__desc {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  margin: 0 0 24px;
+  line-height: var(--lh-relaxed);
+}
+
+/* --- Form Fields --- */
+.wizard-field {
+  margin-bottom: 20px;
+}
+
+.wizard-field__label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-sm);
+  color: var(--text);
+  letter-spacing: 0.1px;
+}
+
+.wizard-field__label--optional {
+  color: var(--muted);
+  font-weight: var(--fw-regular);
+}
+
+.wizard-field__hint {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+/* Course badge */
+.wizard-course-badge {
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--success-soft);
+  border: 1px solid color-mix(in srgb, var(--success) 20%, transparent);
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease;
+}
+
+.wizard-course-badge__icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.wizard-course-badge__code {
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-base);
+}
+
+.wizard-course-badge__name {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Upload area */
+.wizard-upload-zone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-md);
+  padding: 44px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.wizard-upload-zone::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, var(--accent-2-soft) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.wizard-upload-zone:hover {
+  border-color: var(--accent-2);
+  background: var(--accent-2-soft);
+}
+
+.wizard-upload-zone:hover::before {
+  opacity: 1;
+}
+
+.wizard-upload-zone--dragging {
+  border-color: var(--accent-2);
+  background: var(--ring);
+  transform: scale(1.01);
+}
+
+.wizard-upload-zone__icon {
+  font-size: 32px;
+  margin-bottom: 10px;
+  display: block;
+}
+
+.wizard-upload-zone__title {
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-base);
+}
+
+.wizard-upload-zone__subtitle {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* Action footer */
+.wizard-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--hair);
+}
+
+/* Error message */
+.wizard-error {
+  color: var(--danger);
+  font-size: var(--fs-sm);
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: var(--danger-soft);
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--danger) 15%, transparent);
+}
+
+/* Mobile adjustments */
+@media (max-width: 480px) {
+  .wizard-stepper {
+    gap: 0;
+    padding: 0 4px;
+  }
+
+  .wizard-stepper__indicator {
+    width: 36px;
+    height: 36px;
+    font-size: 12px;
+  }
+
+  .wizard-stepper__connector {
+    min-width: 20px;
+    margin-top: 17px;
+  }
+
+  .wizard-stepper__label {
+    font-size: 10px;
+  }
+
+  .wizard-step-card {
+    padding: 20px 16px;
+  }
+}

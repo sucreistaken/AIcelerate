@@ -14,7 +14,7 @@ export default function LessonWizard() {
   const lessonStore = useLessonStore();
 
   return (
-    <div style={{ minHeight: "60vh", padding: "0 8px" }}>
+    <div className="wizard-container">
       {/* Header with back navigation */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
         <button
@@ -26,10 +26,10 @@ export default function LessonWizard() {
         </button>
       </div>
 
-      <div style={{ textAlign: "center", marginBottom: 4 }}>
-        <h2 className="h2" style={{ fontSize: 20 }}>{t("wizard.newLessonTitle")}</h2>
+      <div className="wizard-header">
+        <h2 className="wizard-header__title">{t("wizard.newLessonTitle")}</h2>
         {w.selectedCourse && (
-          <span className="muted" style={{ fontSize: 12 }}>
+          <span className="wizard-header__subtitle">
             {w.selectedCourse.code} — {w.selectedCourse.name}
           </span>
         )}
@@ -47,10 +47,10 @@ export default function LessonWizard() {
       <AnimatePresence mode="wait">
         <motion.div
           key={w.step}
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
-          transition={{ duration: 0.2 }}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
         >
           {w.step === 1 && (
             <LessonInfoStep

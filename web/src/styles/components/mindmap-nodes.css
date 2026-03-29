@@ -1,0 +1,94 @@
+/* =========================================
+   MindMap – Premium SVG Node Styling
+   Targets mermaid-generated SVG inside .mm-canvas
+   ========================================= */
+
+/* --- Base SVG --- */
+.mm-canvas svg {
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+}
+
+/* --- All node shapes: smooth transitions --- */
+.mm-canvas svg rect,
+.mm-canvas svg circle,
+.mm-canvas svg ellipse,
+.mm-canvas svg polygon {
+  transition: filter 0.2s ease, stroke 0.2s ease, opacity 0.2s ease;
+}
+
+/* --- Node rects: rounded pill shape --- */
+.mm-canvas svg rect {
+  rx: 14;
+  ry: 14;
+}
+
+/* --- Text: clean rendering --- */
+.mm-canvas svg text {
+  font-weight: 500;
+  paint-order: stroke fill;
+}
+
+/* --- Connector lines: organic --- */
+.mm-canvas svg path[class*="edge"],
+.mm-canvas svg .edge path,
+.mm-canvas svg line[class*="edge"] {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-opacity: 0.45;
+  stroke-width: 2;
+}
+
+/* --- Clickable node hover --- */
+.mm-canvas svg [data-node-name] {
+  cursor: pointer;
+}
+
+.mm-canvas svg [data-node-name]:hover rect {
+  filter:
+    drop-shadow(0 4px 12px rgba(99, 102, 241, 0.25))
+    brightness(1.15) !important;
+  stroke-opacity: 0.6 !important;
+}
+
+.mm-canvas svg [data-node-name]:hover circle,
+.mm-canvas svg [data-node-name]:hover ellipse {
+  filter:
+    drop-shadow(0 4px 16px rgba(99, 102, 241, 0.35))
+    brightness(1.15) !important;
+}
+
+/* --- Root node emphasis --- */
+.mm-canvas svg .section-root text {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+/* --- Learned nodes (green) --- */
+.mm-canvas svg [data-node-name] rect[fill="#00B894"],
+.mm-canvas svg [data-node-name] circle[fill="#00B894"],
+.mm-canvas svg [data-node-name] ellipse[fill="#00B894"] {
+  filter: drop-shadow(0 2px 8px rgba(0, 184, 148, 0.3)) !important;
+}
+
+/* --- Section-specific edge colors to match branch fills --- */
+.mm-canvas svg [class*="section-edge-0"] { stroke: #6366f1 !important; stroke-opacity: 0.4; }
+.mm-canvas svg [class*="section-edge-1"] { stroke: #0ea5e9 !important; stroke-opacity: 0.4; }
+.mm-canvas svg [class*="section-edge-2"] { stroke: #14b8a6 !important; stroke-opacity: 0.4; }
+.mm-canvas svg [class*="section-edge-3"] { stroke: #f59e0b !important; stroke-opacity: 0.4; }
+.mm-canvas svg [class*="section-edge-4"] { stroke: #f43f5e !important; stroke-opacity: 0.4; }
+.mm-canvas svg [class*="section-edge-5"] { stroke: #a855f7 !important; stroke-opacity: 0.4; }
+.mm-canvas svg [class*="section-edge-6"] { stroke: #22c55e !important; stroke-opacity: 0.4; }
+.mm-canvas svg [class*="section-edge-7"] { stroke: #ec4899 !important; stroke-opacity: 0.4; }
+
+/* --- Prevent mermaid default harsh borders --- */
+.mm-canvas svg .section-0 rect,
+.mm-canvas svg .section-1 rect,
+.mm-canvas svg .section-2 rect,
+.mm-canvas svg .section-3 rect,
+.mm-canvas svg .section-4 rect,
+.mm-canvas svg .section-5 rect,
+.mm-canvas svg .section-6 rect,
+.mm-canvas svg .section-7 rect {
+  stroke-width: 1.5;
+  stroke-opacity: 0.2;
+}

@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { ConfirmModal } from "./ui/ConfirmModal";
 import PaneInfoBanner from "./ui/PaneInfoBanner";
+import { NoNotesEmpty } from "./ui/EmptyState";
 import { useNotesPane } from "../hooks/useNotesPane";
 import NoteCreator from "./notes/NoteCreator";
 import NoteCard from "./notes/NoteCard";
@@ -89,17 +90,7 @@ export default function NotesPane() {
             />
 
             {notes.length === 0 && !showCreator && (
-                <div className="nt-empty">
-                    <div className="nt-empty-icon">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                    </div>
-                    <div className="nt-empty-title">{t("notes.noNotes")}</div>
-                    <div className="nt-empty-desc">{t("notes.noNotesDesc")}</div>
-                    <button className="nt-btn nt-btn--primary" onClick={() => setShowCreator(true)}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
-                        {t("notes.createFirst")}
-                    </button>
-                </div>
+                <NoNotesEmpty onAction={() => setShowCreator(true)} />
             )}
 
             {notes.length > 0 && filteredNotes.length === 0 && (

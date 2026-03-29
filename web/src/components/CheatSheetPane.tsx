@@ -1,13 +1,15 @@
 import { logger } from "../utils/logger";
 import React, { useState, useRef, useEffect } from "react";
+import { motion } from "framer-motion";
 import { CheatSheet } from "../types";
 import { exportToPdf } from "../utils/pdfExport";
-import { Card, CardHeader, CardBody } from "./ui/Card";
 import { Button } from "./ui/Button";
 import { Select } from "./ui/Select";
 import { Badge } from "./ui/Badge";
 import { ConfirmModal } from "./ui/ConfirmModal";
 import PaneInfoBanner from "./ui/PaneInfoBanner";
+import { NoCheatSheetEmpty } from "./ui/EmptyState";
+import { CardSkeleton } from "./ui/Skeleton";
 import { t as i18n } from "../utils/i18n";
 
 function timeAgo(dateStr: string, lang: 'tr' | 'en'): string {
@@ -76,7 +78,12 @@ export default function CheatSheetPane(props: {
   };
 
   return (
-    <Card padding="md">
+    <motion.div
+      className="lc-section"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+    >
       <ConfirmModal
         isOpen={showLangConfirm}
         onConfirm={() => { setShowLangConfirm(false); onGenerate(language); }}
@@ -93,16 +100,14 @@ export default function CheatSheetPane(props: {
         description={i18n("cheatSheet.bannerDesc")}
         tips={[i18n("cheatSheet.bannerTip1"), i18n("cheatSheet.bannerTip2"), i18n("cheatSheet.bannerTip3"), i18n("cheatSheet.bannerTip4")]}
       />
-      <CardHeader>
-        <div>
-          <div className="u-font-extrabold u-text-lg">{cs.title}</div>
-          <div className="muted-block u-text-sm u-mt-1-5">
-            {cs.subtitle}
-          </div>
-        </div>
 
-        <div className="u-flex u-items-center u-gap-2 u-flex-wrap">
-          <div className="u-flex u-items-center u-gap-1-5">
+      <div className="pane-header" style={{ marginBottom: 16 }}>
+        <div className="pane-header__info">
+          <div className="pane-header__title">{cs.title}</div>
+          <div className="pane-header__desc">{cs.subtitle}</div>
+        </div>
+        <div className="pane-header__actions">
+          <div className="u-flex u-items-center u-gap-2">
             <span className="u-text-sm u-text-muted">{cs.language}</span>
             <Select
               value={language}
@@ -114,103 +119,85 @@ export default function CheatSheetPane(props: {
               <option value="en">{i18n("cheatSheet.langEn")}</option>
             </Select>
           </div>
-
           <Button onClick={handleGenerate} loading={loading} size="md">
             {cs.generate}
           </Button>
-
           {cheatSheet && (
-            <Button
-              variant="secondary"
-              onClick={handleDownloadPdf}
-              loading={pdfLoading}
-              size="md"
-            >
+            <Button variant="secondary" onClick={handleDownloadPdf} loading={pdfLoading} size="md">
               {cs.downloadPdf}
             </Button>
           )}
         </div>
-      </CardHeader>
+      </div>
 
-      <CardBody>
-        {error && (
-          <div className="u-text-danger u-text-sm u-mt-3">
-            {error}
-          </div>
-        )}
+      {error && (
+        <div className="u-text-danger u-text-sm u-mb-3">{error}</div>
+      )}
 
-        {!cheatSheet && !loading && (
-          <div className="muted-block u-mt-3">
-            {cs.empty}
-          </div>
-        )}
+      {loading && (
+        <div style={{ display: 'grid', gap: 12, marginTop: 8 }}>
+          <CardSkeleton />
+          <CardSkeleton />
+        </div>
+      )}
 
-        {cheatSheet && (
-          <div ref={contentRef} className="u-mt-4 u-p-4 u-rounded-sm" style={{ backgroundColor: "var(--bg)" }}>
+      {!cheatSheet && !loading && !error && (
+        <NoCheatSheetEmpty onAction={handleGenerate} />
+      )}
+
+      {cheatSheet && (
+        <div ref={contentRef} className="grid-gap-12">
+          <div className="u-flex u-items-center u-justify-between">
             <div className="u-font-extrabold u-text-md">{cheatSheet.title}</div>
-            <div className="u-text-sm muted-block u-mt-1-5">
+            <div className="u-text-sm u-text-muted">
               {cs.lastUpdate} {timeAgo(cheatSheet.updatedAt, language)}
             </div>
-
-            <div className="u-grid u-gap-3 u-mt-3">
-              {cheatSheet.sections?.map((sec, i) => (
-                <div key={i} className="muted-block">
-                  <div className="u-font-bold u-mb-2">{sec.heading}</div>
-                  <ul className="u-m-0" style={{ paddingLeft: 18 }}>
-                    {(sec.bullets || []).map((b, k) => (
-                      <li key={k} className="u-text-sm u-mb-1">
-                        {b}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-
-              {!!cheatSheet.formulas?.length && (
-                <div className="muted-block">
-                  <div className="u-font-bold u-mb-2">
-                    <Badge variant="soft" size="sm">{cs.formulas}</Badge>
-                  </div>
-                  <ul className="u-m-0" style={{ paddingLeft: 18 }}>
-                    {cheatSheet.formulas.map((f, i) => (
-                      <li key={i} className="u-text-sm">{f}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {!!cheatSheet.pitfalls?.length && (
-                <div className="muted-block">
-                  <div className="u-font-bold u-mb-2">
-                    <Badge variant="warning" size="sm">{cs.pitfalls}</Badge>
-                  </div>
-                  <ul className="u-m-0" style={{ paddingLeft: 18 }}>
-                    {cheatSheet.pitfalls.map((p, i) => (
-                      <li key={i} className="u-text-sm">{p}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {!!cheatSheet.quickQuiz?.length && (
-                <div className="muted-block">
-                  <div className="u-font-bold u-mb-2">
-                    <Badge variant="primary" size="sm">{cs.quickQuiz}</Badge>
-                  </div>
-                  <ul className="u-m-0" style={{ paddingLeft: 18 }}>
-                    {cheatSheet.quickQuiz.map((qa, i) => (
-                      <li key={i} className="u-text-sm u-mb-2">
-                        <div><b>Q:</b> {qa.q}</div>
-                        <div><b>A:</b> {qa.a}</div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
           </div>
-        )}
-      </CardBody>
-    </Card>
+
+          {cheatSheet.sections?.map((sec, i) => (
+            <div key={i} className="muted-block">
+              <div className="u-font-bold u-mb-2">{sec.heading}</div>
+              <ul className="u-m-0" style={{ paddingLeft: 18 }}>
+                {(sec.bullets || []).map((b, k) => (
+                  <li key={k} className="u-text-sm u-mb-1">{b}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+
+          {!!cheatSheet.formulas?.length && (
+            <div className="muted-block">
+              <div className="u-font-bold u-mb-2"><Badge variant="soft" size="sm">{cs.formulas}</Badge></div>
+              <ul className="u-m-0" style={{ paddingLeft: 18 }}>
+                {cheatSheet.formulas.map((f, i) => <li key={i} className="u-text-sm">{f}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {!!cheatSheet.pitfalls?.length && (
+            <div className="muted-block">
+              <div className="u-font-bold u-mb-2"><Badge variant="warning" size="sm">{cs.pitfalls}</Badge></div>
+              <ul className="u-m-0" style={{ paddingLeft: 18 }}>
+                {cheatSheet.pitfalls.map((p, i) => <li key={i} className="u-text-sm">{p}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {!!cheatSheet.quickQuiz?.length && (
+            <div className="muted-block">
+              <div className="u-font-bold u-mb-2"><Badge variant="primary" size="sm">{cs.quickQuiz}</Badge></div>
+              <ul className="u-m-0" style={{ paddingLeft: 18 }}>
+                {cheatSheet.quickQuiz.map((qa, i) => (
+                  <li key={i} className="u-text-sm u-mb-2">
+                    <div><b>Q:</b> {qa.q}</div>
+                    <div><b>A:</b> {qa.a}</div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </motion.div>
   );
 }

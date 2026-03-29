@@ -35,7 +35,6 @@ export default function LessonInfoStep({
     if (!newCourseName.trim() || !newCourseCode.trim()) return;
     setCreatingCourse(true);
     try {
-      // Import courseStore dynamically to create course
       const { useCourseStore } = await import("../../stores/courseStore");
       const store = useCourseStore.getState();
       const course = await store.createCourse(newCourseCode.trim(), newCourseName.trim());
@@ -51,22 +50,22 @@ export default function LessonInfoStep({
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ maxWidth: 480, margin: "0 auto" }}>
-      <h3 className="h3" style={{ marginBottom: 4 }}>{t("wizard.lessonInfoTitle")}</h3>
-      <p className="muted" style={{ marginBottom: 20, fontSize: 13 }}>
+    <form onSubmit={handleSubmit} className="wizard-step-card">
+      <h3 className="wizard-step-card__title">{t("wizard.lessonInfoTitle")}</h3>
+      <p className="wizard-step-card__desc">
         {t("wizard.lessonInfoDesc2")}
       </p>
 
-      {/* Kurs Seçimi (Zorunlu) */}
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ display: "block", marginBottom: 6, fontWeight: 500, fontSize: 13 }}>
+      {/* Kurs Secimi */}
+      <div className="wizard-field">
+        <label className="wizard-field__label">
           {t("wizard.courseLabel")}
         </label>
         {!showNewCourse ? (
           <>
             <select
               className="input"
-              style={{ width: "100%", padding: "8px 12px" }}
+              style={{ width: "100%", padding: "10px 14px" }}
               value={selectedCourseId || ""}
               onChange={(e) => onCourseChange(e.target.value || null)}
             >
@@ -80,14 +79,14 @@ export default function LessonInfoStep({
             <button
               type="button"
               className="btn btn-ghost"
-              style={{ fontSize: 12, marginTop: 6, padding: "4px 8px" }}
+              style={{ fontSize: 12, marginTop: 8, padding: "4px 8px" }}
               onClick={() => setShowNewCourse(true)}
             >
               {t("wizard.createNewCourse2")}
             </button>
           </>
         ) : (
-          <div className="card" style={{ padding: 14, display: "grid", gap: 10 }}>
+          <div className="card" style={{ padding: 16, display: "grid", gap: 10, border: "1px solid var(--border)" }}>
             <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{t("wizard.newCourse")}</div>
             <input
               className="input"
@@ -127,22 +126,22 @@ export default function LessonInfoStep({
         )}
       </div>
 
-      {/* Seçili Kurs Badge */}
+      {/* Selected Course Badge */}
       {selectedCourseId && !showNewCourse && (() => {
         const course = courses.find((c) => c.id === selectedCourseId);
         return course ? (
-          <div className="card" style={{ padding: "10px 14px", marginBottom: 16, display: "flex", alignItems: "center", gap: 8, background: "var(--success-soft)" }}>
-            <span style={{ fontSize: 18 }}>📚</span>
+          <div className="wizard-course-badge">
+            <span className="wizard-course-badge__icon">📚</span>
             <div>
-              <div style={{ fontWeight: 600, fontSize: 13 }}>{course.code}</div>
-              <div className="muted" style={{ fontSize: 11 }}>{course.name}</div>
+              <div className="wizard-course-badge__code">{course.code}</div>
+              <div className="wizard-course-badge__name">{course.name}</div>
             </div>
           </div>
         ) : null;
       })()}
 
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ display: "block", marginBottom: 6, fontWeight: 500, fontSize: 13 }}>
+      <div className="wizard-field">
+        <label className="wizard-field__label">
           {t("wizard.titleLabel")}
         </label>
         <input
@@ -151,13 +150,13 @@ export default function LessonInfoStep({
           value={title}
           onChange={(e) => onTitleChange(e.target.value)}
           placeholder={t("wizard.titlePlaceholder")}
-          style={{ width: "100%" }}
+          style={{ width: "100%", padding: "10px 14px" }}
         />
       </div>
 
-      <div style={{ marginBottom: 24 }}>
-        <label style={{ display: "block", marginBottom: 6, fontWeight: 500, fontSize: 13 }}>
-          {t("wizard.weekNumberLabel")} <span className="muted">{t("wizard.optional")}</span>
+      <div className="wizard-field">
+        <label className="wizard-field__label">
+          {t("wizard.weekNumberLabel")} <span className="wizard-field__label--optional">{t("wizard.optional")}</span>
         </label>
         <input
           className="input"
@@ -167,20 +166,21 @@ export default function LessonInfoStep({
           value={weekNumber}
           onChange={(e) => onWeekChange(e.target.value)}
           placeholder={t("wizard.weekPlaceholder")}
-          style={{ width: 120 }}
+          style={{ width: 130, padding: "10px 14px" }}
         />
-        <p className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+        <p className="wizard-field__hint">
           {t("wizard.weekNoteHint")}
         </p>
       </div>
 
       {error && (
-        <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 12 }}>
+        <div className="wizard-error">
           {error}
         </div>
       )}
 
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+      <div className="wizard-actions">
+        <div />
         <button
           className="btn btn-primary"
           type="submit"

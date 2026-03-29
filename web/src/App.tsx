@@ -9,6 +9,8 @@ import ShareModal from "./components/ui/ShareModal";
 import AuthGuard from "./components/auth/AuthGuard";
 import AmbientBackground from "./components/ui/AmbientBackground";
 import CursorGlow from "./components/ui/CursorGlow";
+import { KeyboardShortcuts } from "./components/ui/KeyboardShortcuts";
+import { OnboardingTour } from "./components/ui/OnboardingTour";
 
 import NavigationChip from "./components/layout/NavigationChip";
 import PaneRouter from "./components/layout/PaneRouter";
@@ -29,6 +31,9 @@ export default function App() {
     currentCourse,
     showSettings,
     setShowSettings,
+    showShortcuts,
+    openShortcuts,
+    closeShortcuts,
     shareId,
     isMobile,
     canSubmit,
@@ -41,15 +46,16 @@ export default function App() {
 
   return (
     <AuthGuard>
-      <AmbientBackground />
-      <CursorGlow />
-      <div className="page" style={{ position: "relative", zIndex: 1 }}>
+      <div className="page" style={{ position: "relative" }}>
+        <AmbientBackground />
+        <CursorGlow />
         <AppNavbar
           language={ui.language}
           onToggleLanguage={() =>
             ui.setLanguage(ui.language === "tr" ? "en" : "tr")
           }
           onOpenSettings={() => setShowSettings(true)}
+          onOpenShortcuts={openShortcuts}
         />
 
         <div className="lc-container">
@@ -137,6 +143,9 @@ export default function App() {
             <SettingsPage onClose={() => setShowSettings(false)} />
           </Suspense>
         )}
+
+        <KeyboardShortcuts isOpen={showShortcuts} onClose={closeShortcuts} />
+        <OnboardingTour />
       </div>
     </AuthGuard>
   );

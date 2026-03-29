@@ -42,14 +42,14 @@ export default function AudioUploadStep({
   }, [onAudioUpload]);
 
   return (
-    <div style={{ maxWidth: 560, margin: "0 auto" }}>
-      <h3 className="h3" style={{ marginBottom: 4 }}>{t("wizard.recordingTitle")}</h3>
-      <p className="muted" style={{ marginBottom: 20, fontSize: 13 }}>
+    <div className="wizard-step-card" style={{ maxWidth: 560 }}>
+      <h3 className="wizard-step-card__title">{t("wizard.recordingTitle")}</h3>
+      <p className="wizard-step-card__desc">
         {t("wizard.recordingDesc")}
       </p>
 
       {/* Tab toggle */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
         <button
           className={`btn ${mode === "upload" ? "btn-primary" : "btn-ghost"}`}
           style={{ fontSize: 12 }}
@@ -71,53 +71,45 @@ export default function AudioUploadStep({
       {mode === "upload" && (
         <>
           <div
+            className={`wizard-upload-zone ${isDragging ? "wizard-upload-zone--dragging" : ""}`}
             onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
             onDragEnter={() => setIsDragging(true)}
             onDragLeave={() => setIsDragging(false)}
             onDrop={handleDrop}
             onClick={() => !isTranscribing && fileRef.current?.click()}
-            style={{
-              border: `2px dashed ${isDragging ? "var(--warning)" : "var(--border)"}`,
-              borderRadius: 12,
-              padding: "40px 24px",
-              textAlign: "center",
-              cursor: isTranscribing ? "default" : "pointer",
-              background: isDragging ? "var(--warning-soft)" : "transparent",
-              transition: "all 0.2s ease",
-              marginBottom: 16,
-            }}
+            style={{ cursor: isTranscribing ? "default" : undefined }}
           >
             {isTranscribing ? (
-              <div>
-                <div style={{ fontSize: 28, marginBottom: 8 }}>🎙️</div>
-                <div style={{ fontWeight: 500 }}>{t("wizard.transcribing")}</div>
-                <div style={{ marginTop: 8 }}>
+              <div style={{ position: "relative", zIndex: 1 }}>
+                <span className="wizard-upload-zone__icon">🎙️</span>
+                <div className="wizard-upload-zone__title">{t("wizard.transcribing")}</div>
+                <div style={{ marginTop: 12 }}>
                   <div style={{
                     background: "var(--card-hover)",
-                    borderRadius: 4,
+                    borderRadius: 6,
                     height: 8,
                     overflow: "hidden",
                   }}>
                     <div style={{
-                      background: "linear-gradient(90deg, #FF9800, #FF5722)",
+                      background: "linear-gradient(90deg, #f59e0b, #ef4444)",
                       width: `${stt.progress}%`,
                       height: "100%",
-                      borderRadius: 4,
+                      borderRadius: 6,
                       transition: "width 0.3s ease",
                     }} />
                   </div>
-                  <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+                  <div className="wizard-upload-zone__subtitle" style={{ marginTop: 6 }}>
                     {stt.status || `${stt.progress}%`}
                   </div>
                 </div>
               </div>
             ) : isDone ? (
-              <div>
-                <div style={{ fontSize: 28, marginBottom: 8 }}>✅</div>
-                <div style={{ fontWeight: 500, color: "var(--success)" }}>
+              <div style={{ position: "relative", zIndex: 1 }}>
+                <span className="wizard-upload-zone__icon">✅</span>
+                <div className="wizard-upload-zone__title" style={{ color: "var(--success)" }}>
                   {t("wizard.transcriptionDone")}
                 </div>
-                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                <div className="wizard-upload-zone__subtitle">
                   {lectureText.length.toLocaleString()} {t("wizard.chars")}
                 </div>
                 <button
@@ -130,10 +122,10 @@ export default function AudioUploadStep({
                 </button>
               </div>
             ) : (
-              <div>
-                <div style={{ fontSize: 28, marginBottom: 8 }}>🎙️</div>
-                <div style={{ fontWeight: 500 }}>{t("wizard.dragDropAudio")}</div>
-                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+              <div style={{ position: "relative", zIndex: 1 }}>
+                <span className="wizard-upload-zone__icon">🎙️</span>
+                <div className="wizard-upload-zone__title">{t("wizard.dragDropAudio")}</div>
+                <div className="wizard-upload-zone__subtitle">
                   {t("wizard.audioFormats")}
                 </div>
               </div>
@@ -144,17 +136,17 @@ export default function AudioUploadStep({
       )}
 
       {mode === "paste" && (
-        <div style={{ marginBottom: 16 }}>
+        <div className="wizard-field">
           <textarea
             className="input"
             value={lectureText}
             onChange={(e) => onLectureTextChange(e.target.value)}
             placeholder={t("wizard.pasteTranscript")}
             rows={10}
-            style={{ width: "100%", resize: "vertical", fontFamily: "inherit" }}
+            style={{ width: "100%", resize: "vertical", fontFamily: "inherit", padding: "12px 14px" }}
           />
           {lectureText && (
-            <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+            <div className="wizard-field__hint">
               {lectureText.length.toLocaleString()} {t("wizard.chars")}
             </div>
           )}
@@ -162,12 +154,12 @@ export default function AudioUploadStep({
       )}
 
       {error && (
-        <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 12 }}>
+        <div className="wizard-error">
           {error}
         </div>
       )}
 
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
+      <div className="wizard-actions">
         <button className="btn btn-ghost" onClick={onBack} type="button">{t("wizard.back")}</button>
         <button className="btn btn-primary" onClick={onNext} type="button" disabled={isTranscribing}>
           {lectureText ? t("wizard.next") : t("wizard.skip")}

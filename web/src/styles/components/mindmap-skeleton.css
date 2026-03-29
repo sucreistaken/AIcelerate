@@ -1,0 +1,192 @@
+/* =========================================
+   MindMap – Premium Skeleton Loading
+   ========================================= */
+
+.mindmap-skeleton {
+  width: 100%;
+  height: 100%;
+  min-height: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle radial background glow */
+.mindmap-skeleton::before {
+  content: '';
+  position: absolute;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--accent-2-soft) 0%, transparent 70%);
+  opacity: 0.5;
+  animation: mindmap-sk-bg-pulse 3s ease-in-out infinite;
+}
+
+@keyframes mindmap-sk-bg-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.05); }
+}
+
+/* SVG canvas for the skeleton mind map */
+.mindmap-skeleton__canvas {
+  position: relative;
+  width: 480px;
+  height: 320px;
+  max-width: 100%;
+}
+
+/* Central node */
+.mindmap-skeleton__center {
+  cx: 240;
+  cy: 160;
+}
+
+.mindmap-skeleton__center-outer {
+  fill: var(--skeleton-base);
+  animation: mindmap-sk-center-pulse 2s ease-in-out infinite;
+}
+
+.mindmap-skeleton__center-inner {
+  fill: var(--skeleton-shine);
+  animation: mindmap-sk-center-pulse 2s ease-in-out infinite 0.3s;
+}
+
+@keyframes mindmap-sk-center-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* Branch lines */
+.mindmap-skeleton__branch {
+  stroke: var(--skeleton-base);
+  stroke-width: 2.5;
+  fill: none;
+  stroke-linecap: round;
+}
+
+.mindmap-skeleton__branch--animated {
+  stroke-dasharray: 120;
+  stroke-dashoffset: 120;
+  animation: mindmap-sk-draw-line 1.5s ease-out forwards;
+}
+
+@keyframes mindmap-sk-draw-line {
+  to { stroke-dashoffset: 0; }
+}
+
+/* Leaf nodes */
+.mindmap-skeleton__node {
+  fill: var(--skeleton-base);
+  rx: 14;
+  ry: 14;
+  opacity: 0;
+  animation: mindmap-sk-node-appear 0.5s ease-out forwards;
+}
+
+@keyframes mindmap-sk-node-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Shimmer overlay on nodes */
+.mindmap-skeleton__shimmer {
+  fill: url(#mindmap-shimmer-gradient);
+  opacity: 0.5;
+}
+
+/* Sub-branch lines (from leaves) */
+.mindmap-skeleton__sub-branch {
+  stroke: var(--skeleton-base);
+  stroke-width: 1.5;
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: 80;
+  stroke-dashoffset: 80;
+  animation: mindmap-sk-draw-sub 1.2s ease-out forwards;
+}
+
+/* Sub-leaf nodes */
+.mindmap-skeleton__sub-node {
+  fill: var(--skeleton-base);
+  rx: 10;
+  ry: 10;
+  opacity: 0;
+  animation: mindmap-sk-node-appear 0.4s ease-out forwards;
+}
+
+@keyframes mindmap-sk-draw-sub {
+  to { stroke-dashoffset: 0; }
+}
+
+/* Loading text */
+.mindmap-skeleton__text {
+  margin-top: 24px;
+  text-align: center;
+  position: relative;
+  z-index: 1;
+}
+
+.mindmap-skeleton__text-label {
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.mindmap-skeleton__dots {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.mindmap-skeleton__dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent-2);
+  animation: mindmap-sk-dot-bounce 1.4s ease-in-out infinite;
+}
+
+.mindmap-skeleton__dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.mindmap-skeleton__dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes mindmap-sk-dot-bounce {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-4px); }
+}
+
+/* Floating particles */
+.mindmap-skeleton__particle {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--accent-2);
+  opacity: 0;
+  animation: mindmap-sk-particle 4s ease-in-out infinite;
+}
+
+@keyframes mindmap-sk-particle {
+  0% { opacity: 0; transform: translate(0, 0) scale(0); }
+  20% { opacity: 0.4; transform: scale(1); }
+  80% { opacity: 0.1; }
+  100% { opacity: 0; transform: translate(var(--dx, 30px), var(--dy, -30px)) scale(0); }
+}

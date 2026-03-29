@@ -24,6 +24,13 @@
 @import "./components/tabs.css";
 
 @import "./components/study-hub.css";
+@import "./components/keyboard-shortcuts.css";
+@import "./components/onboarding.css";
+@import "./components/empty-state.css";
+@import "./components/wizard.css";
+@import "./components/mindmap-skeleton.css";
+@import "./components/mindmap-page.css";
+@import "./components/mindmap-nodes.css";
 
 /* Legacy styles — everything existing continues to work */
 @import "../App.css";

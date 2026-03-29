@@ -47,6 +47,7 @@ export function useMindMap() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [zoom, setZoom] = useState(1);
+    const [pan, setPan] = useState({ x: 0, y: 0 });
     const [isFullscreen, setIsFullscreen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const svgContainerRef = useRef<HTMLDivElement>(null);
@@ -73,19 +74,71 @@ export function useMindMap() {
     const [nodeSearch, setNodeSearch] = useState('');
 
     useEffect(() => {
+        // --- Premium mind map color palette ---
+        // Harmonious, muted-vibrant colors that work on dark (#0c0c0e) backgrounds
+        // Each branch gets a distinct but cohesive color
+        const palette = {
+            root:     '#6366f1', // Indigo — central anchor
+            branch0:  '#6366f1', // Indigo
+            branch1:  '#0ea5e9', // Sky blue
+            branch2:  '#14b8a6', // Teal
+            branch3:  '#f59e0b', // Amber
+            branch4:  '#f43f5e', // Rose
+            branch5:  '#a855f7', // Purple
+            branch6:  '#22c55e', // Emerald
+            branch7:  '#ec4899', // Pink
+            connector: '#334155', // Slate-700 — subtle
+        };
+
         mermaid.initialize({
             startOnLoad: false,
             theme: 'base',
             themeVariables: {
-                fontFamily: 'Inter, system-ui, sans-serif',
-                fontSize: '14px',
-                primaryColor: '#6366f1',
-                primaryTextColor: '#fff',
-                primaryBorderColor: '#4f46e5',
-                lineColor: '#94a3b8',
-                secondaryColor: '#f1f5f9',
-                tertiaryColor: '#e0f2fe'
-            }
+                fontFamily: "'DM Sans', system-ui, -apple-system, sans-serif",
+                fontSize: '13px',
+
+                // Root node
+                primaryColor: palette.root,
+                primaryTextColor: '#ffffff',
+                primaryBorderColor: 'transparent',
+
+                // Connector lines
+                lineColor: palette.connector,
+
+                // Section colors (cScale0-7 = branch fill colors)
+                cScale0: palette.branch0,
+                cScale1: palette.branch1,
+                cScale2: palette.branch2,
+                cScale3: palette.branch3,
+                cScale4: palette.branch4,
+                cScale5: palette.branch5,
+                cScale6: palette.branch6,
+                cScale7: palette.branch7,
+
+                // All text white on colored backgrounds
+                cScaleLabel0: '#ffffff',
+                cScaleLabel1: '#ffffff',
+                cScaleLabel2: '#ffffff',
+                cScaleLabel3: '#ffffff',
+                cScaleLabel4: '#ffffff',
+                cScaleLabel5: '#ffffff',
+                cScaleLabel6: '#ffffff',
+                cScaleLabel7: '#ffffff',
+
+                // Peer colors (borders) — slightly darker than fill
+                cScalePeer0: '#4f46e5',
+                cScalePeer1: '#0284c7',
+                cScalePeer2: '#0d9488',
+                cScalePeer3: '#d97706',
+                cScalePeer4: '#e11d48',
+                cScalePeer5: '#9333ea',
+                cScalePeer6: '#16a34a',
+                cScalePeer7: '#db2777',
+            },
+            mindmap: {
+                padding: 18,
+                useMaxWidth: false,
+            },
         });
     }, []);
 
@@ -149,6 +202,15 @@ export function useMindMap() {
         setCode("");
         setMapTitle("Zihin Haritası");
         setIsFromCache(false);
+        setZoom(1);
+        setPan({ x: 0, y: 0 });
+        setAllNodes([]);
+        setSelectedNode(null);
+        setNodeDetail(null);
+        // Clear the rendered SVG from DOM
+        if (svgContainerRef.current) {
+            svgContainerRef.current.innerHTML = "";
+        }
     }, [currentLessonId, selectedModule]);
 
     const generate = async () => {
@@ -199,6 +261,10 @@ export function useMindMap() {
     }, [learnedNodes, currentLessonId]);
 
     useEffect(() => {
+        if (!code && svgContainerRef.current) {
+            svgContainerRef.current.innerHTML = "";
+            return;
+        }
         if (code && svgContainerRef.current) {
             svgContainerRef.current.innerHTML = "";
             const id = `mermaid-${Date.now()}`;
@@ -212,6 +278,62 @@ export function useMindMap() {
                                 svgEl.style.maxWidth = '100%';
                                 svgEl.style.height = 'auto';
                                 svgEl.style.minWidth = '800px';
+                                svgEl.style.overflow = 'visible';
+
+                                // --- Inject SVG defs for drop-shadow filters ---
+                                const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+                                defs.innerHTML = `
+                                    <filter id="mm-node-shadow" x="-8%" y="-8%" width="116%" height="130%">
+                                        <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="rgba(0,0,0,0.35)" flood-opacity="0.5"/>
+                                    </filter>
+                                    <filter id="mm-root-glow" x="-20%" y="-20%" width="140%" height="140%">
+                                        <feDropShadow dx="0" dy="2" stdDeviation="8" flood-color="#6366f1" flood-opacity="0.4"/>
+                                    </filter>
+                                `;
+                                svgEl.prepend(defs);
+
+                                // --- Node shape polish ---
+                                svgEl.querySelectorAll('rect').forEach(r => {
+                                    r.setAttribute('rx', '14');
+                                    r.setAttribute('ry', '14');
+                                    r.style.filter = 'url(#mm-node-shadow)';
+                                    // Remove harsh stroke — use subtle same-hue border
+                                    const stroke = r.getAttribute('stroke');
+                                    if (stroke) {
+                                        r.setAttribute('stroke-width', '1.5');
+                                        r.setAttribute('stroke-opacity', '0.3');
+                                    }
+                                });
+
+                                // Root circle — indigo glow
+                                svgEl.querySelectorAll('.section-root circle, .section-root ellipse').forEach(c => {
+                                    c.style.filter = 'url(#mm-root-glow)';
+                                    c.setAttribute('stroke', 'rgba(99,102,241,0.4)');
+                                    c.setAttribute('stroke-width', '2');
+                                });
+
+                                // --- Connector lines: organic, soft ---
+                                svgEl.querySelectorAll('path, line').forEach(el => {
+                                    const cls = el.getAttribute('class') || '';
+                                    // Target edge/connector paths (not node shapes)
+                                    if (cls.includes('edge') || el.parentElement?.getAttribute('class')?.includes('edge')) {
+                                        el.setAttribute('stroke-width', '2');
+                                        el.setAttribute('stroke-linecap', 'round');
+                                        el.setAttribute('stroke-linejoin', 'round');
+                                        el.setAttribute('stroke-opacity', '0.5');
+                                    }
+                                });
+
+                                // --- Text polish ---
+                                svgEl.querySelectorAll('text').forEach(t => {
+                                    t.setAttribute('font-weight', '500');
+                                    t.style.textShadow = '0 1px 2px rgba(0,0,0,0.3)';
+                                });
+                                // Root text bolder
+                                svgEl.querySelectorAll('.section-root text').forEach(t => {
+                                    t.setAttribute('font-weight', '700');
+                                    t.setAttribute('font-size', '15px');
+                                });
 
                                 const nodeElements = svgEl.querySelectorAll('.mindmap-node, .node, g[class*="node"]');
                                 const extractedNodes: string[] = [];
@@ -364,7 +486,83 @@ export function useMindMap() {
 
     const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.25, 3));
     const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.25, 0.25));
-    const handleZoomReset = () => setZoom(1);
+    const handleZoomReset = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
+
+    // --- Canvas interactions: wheel zoom/pan + click-drag pan ---
+    const isPanning = useRef(false);
+    const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+    const panRef = useRef({ x: 0, y: 0 }); // mirror of state for event handlers
+
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+
+        // Wheel: Ctrl/Cmd = zoom, plain scroll = pan
+        const onWheel = (e: WheelEvent) => {
+            e.preventDefault();
+            if (e.ctrlKey || e.metaKey) {
+                // Zoom — smooth, small increments
+                const delta = -e.deltaY * 0.003;
+                setZoom(prev => Math.min(Math.max(prev + delta, 0.2), 4));
+            } else {
+                // Pan — scroll to move around the canvas
+                setPan(prev => {
+                    const next = { x: prev.x - e.deltaX, y: prev.y - e.deltaY };
+                    panRef.current = next;
+                    return next;
+                });
+            }
+        };
+
+        // Pointer down: start drag pan
+        const onDown = (e: PointerEvent) => {
+            if (e.button !== 0) return;
+            // Don't start pan on interactive elements
+            if ((e.target as HTMLElement).closest('button, a, input, select')) return;
+
+            isPanning.current = true;
+            panStartRef.current = {
+                x: e.clientX,
+                y: e.clientY,
+                panX: panRef.current.x,
+                panY: panRef.current.y,
+            };
+            el.style.cursor = 'grabbing';
+            el.style.userSelect = 'none';
+        };
+
+        // Pointer move: drag to pan
+        const onMove = (e: PointerEvent) => {
+            if (!isPanning.current) return;
+            const dx = e.clientX - panStartRef.current.x;
+            const dy = e.clientY - panStartRef.current.y;
+            const next = {
+                x: panStartRef.current.panX + dx,
+                y: panStartRef.current.panY + dy,
+            };
+            panRef.current = next;
+            setPan(next);
+        };
+
+        // Pointer up: stop panning
+        const onUp = () => {
+            if (!isPanning.current) return;
+            isPanning.current = false;
+            el.style.cursor = '';
+            el.style.userSelect = '';
+        };
+
+        el.addEventListener('wheel', onWheel, { passive: false });
+        el.addEventListener('pointerdown', onDown);
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+        return () => {
+            el.removeEventListener('wheel', onWheel);
+            el.removeEventListener('pointerdown', onDown);
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+        };
+    }, []);
 
     const toggleFullscreen = () => {
         setIsFullscreen(!isFullscreen);
@@ -490,6 +688,7 @@ export function useMindMap() {
         loading,
         error,
         zoom,
+        pan,
         isFullscreen,
         containerRef,
         svgContainerRef,

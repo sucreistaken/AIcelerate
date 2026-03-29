@@ -1,6 +1,8 @@
 import React from "react";
 import { Emphasis, LoAlignment } from "../types";
 import { useLecturerNote } from "../hooks/useLecturerNote";
+import PaneInfoBanner from "./ui/PaneInfoBanner";
+import { t } from "../utils/i18n";
 import {
   LecturerNoteHeader,
   EmphasisCardGrid,
@@ -44,6 +46,12 @@ const LecturerNotePane: React.FC<Props> = ({
 
   return (
     <div className="lc-section ln-root">
+      <PaneInfoBanner
+        id="lecturer-note"
+        title={t("lecturerNote.bannerTitle")}
+        description={t("lecturerNote.bannerDesc")}
+        tips={[t("lecturerNote.tip1"), t("lecturerNote.tip2"), t("lecturerNote.tip3")]}
+      />
       <LecturerNoteHeader
         total={total}
         countLecture={countLecture}

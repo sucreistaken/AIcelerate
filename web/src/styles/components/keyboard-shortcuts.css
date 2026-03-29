@@ -1,0 +1,260 @@
+/* =========================================
+   KeyboardShortcuts Overlay
+   ========================================= */
+
+.ks-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.ks-modal {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  width: min(580px, 92vw);
+  max-height: 80vh;
+  overflow: hidden;
+  box-shadow: var(--shadow-2);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.ks-header {
+  padding: 24px 28px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.ks-title {
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-bold);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+
+.ks-header__right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.ks-close-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+}
+
+/* Platform toggle */
+.ks-platform-toggle {
+  display: flex;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.ks-platform-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  transition: background var(--duration-fast), color var(--duration-fast), box-shadow var(--duration-fast);
+  line-height: 1;
+}
+
+.ks-platform-btn:hover {
+  color: var(--text-secondary);
+}
+
+.ks-platform-btn--active {
+  background: var(--card);
+  color: var(--accent-2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Body */
+.ks-body {
+  padding: 20px 28px 28px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Search */
+.ks-search {
+  position: relative;
+  margin-bottom: 18px;
+}
+
+.ks-search__icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.ks-search__input {
+  width: 100%;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px 10px 38px;
+  font-size: var(--fs-base);
+  color: var(--text);
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
+}
+
+.ks-search__input:focus {
+  border-color: var(--accent-2);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.ks-search__input::placeholder {
+  color: var(--muted);
+}
+
+/* Group */
+.ks-group {
+  margin-bottom: 20px;
+}
+
+.ks-group:last-of-type {
+  margin-bottom: 0;
+}
+
+.ks-group__label {
+  font-size: 11px;
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--muted);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ks-group__label::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* Row */
+.ks-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--fs-base);
+  cursor: pointer;
+  transition: background var(--duration-fast);
+  margin-bottom: 2px;
+}
+
+.ks-row:hover {
+  background: var(--card-hover);
+}
+
+.ks-row__name {
+  font-weight: var(--fw-medium);
+}
+
+.ks-row__keys {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+/* Key chip */
+.ks-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 7px;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: var(--fw-bold);
+  color: var(--text-secondary);
+  box-shadow: 0 2px 0 var(--border);
+  font-family: inherit;
+  line-height: 1;
+}
+
+.ks-key--accent {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.25);
+  color: var(--accent-2);
+}
+
+.ks-plus {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: var(--fw-bold);
+}
+
+/* Empty */
+.ks-empty {
+  text-align: center;
+  padding: 24px;
+  color: var(--muted);
+  font-size: var(--fs-base);
+}
+
+/* Tip */
+.ks-tip {
+  background: rgba(59, 130, 246, 0.05);
+  border: 1px solid rgba(59, 130, 246, 0.12);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.ks-tip strong {
+  color: var(--accent-2);
+  flex-shrink: 0;
+}

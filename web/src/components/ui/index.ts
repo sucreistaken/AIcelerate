@@ -28,9 +28,11 @@ export { Skeleton, CardSkeleton, ListSkeleton, TableSkeleton, QuizSkeleton, Flas
 export { ProgressRing } from "./ProgressRing";
 export { StreakBadge } from "./StreakBadge";
 export { ProgressStepper } from "./ProgressStepper";
-export { EmptyState, NoPlanEmpty, NoQuizEmpty, NoLessonsEmpty, NoCheatSheetEmpty } from "./EmptyState";
+export { EmptyState, NoPlanEmpty, NoQuizEmpty, NoLessonsEmpty, NoCheatSheetEmpty, NoFlashcardsEmpty, NoNotesEmpty, NoMindMapEmpty, NoRoomsEmpty } from "./EmptyState";
 export { ThemeToggle } from "./ThemeToggle";
 export { ToastProvider } from "./Toast";
 export { ErrorBoundary, PaneErrorBoundary } from "./ErrorBoundary";
 export { ConfirmModal, useConfirmModal } from "./ConfirmModal";
 export type { ConfirmModalProps } from "./ConfirmModal";
+export { KeyboardShortcuts } from "./KeyboardShortcuts";
+export { OnboardingTour } from "./OnboardingTour";

@@ -2,6 +2,8 @@ import React from "react";
 import { Plan } from "../types";
 import { useQuizPane } from "../hooks/useQuizPane";
 import PaneInfoBanner from "./ui/PaneInfoBanner";
+import { NoQuizEmpty } from "./ui/EmptyState";
+import { QuizSkeleton } from "./ui/Skeleton";
 import { t } from "../utils/i18n";
 import QuizActionBar from "./quiz/QuizActionBar";
 import QuizDashboard from "./quiz/QuizDashboard";
@@ -81,7 +83,9 @@ export default function QuizPane({
 
         <div ref={quizContentRef}>
           <div className="lc-section pad-top-8 mt-4">
-            {quiz.length ? (
+            {loading ? (
+              <QuizSkeleton />
+            ) : quiz.length ? (
               <ol className="ol-reset">
                 {quiz.map((q, i) => (
                   <QuizQuestionItem
@@ -96,9 +100,7 @@ export default function QuizPane({
                 ))}
               </ol>
             ) : (
-              <div className="op-65 text-center p-8">
-                {t("quiz.noQuestions")}
-              </div>
+              <NoQuizEmpty onAction={hasPlan ? generateQuizFromPlan : undefined} />
             )}
           </div>
         </div>
