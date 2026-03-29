@@ -1,11 +1,26 @@
 /* =========================================
    MindMap – Premium SVG Node Styling
-   Targets mermaid-generated SVG inside .mm-canvas
+   Animations, color-matched effects, hover lift
    ========================================= */
+
+/* --- Entrance & life keyframes --- */
+@keyframes mm-node-entrance {
+    from { opacity: 0; transform: scale(0.7); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes mm-root-breathe {
+    0%, 100% { filter: drop-shadow(0 0 14px rgba(99,102,241,0.35)); }
+    50%      { filter: drop-shadow(0 0 26px rgba(99,102,241,0.55)) drop-shadow(0 0 8px rgba(99,102,241,0.2)); }
+}
+
+@keyframes mm-line-draw {
+    to { stroke-dashoffset: 0; }
+}
 
 /* --- Base SVG --- */
 .mm-canvas svg {
-  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+    font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
 }
 
 /* --- All node shapes: smooth transitions --- */
@@ -13,74 +28,79 @@
 .mm-canvas svg circle,
 .mm-canvas svg ellipse,
 .mm-canvas svg polygon {
-  transition: filter 0.2s ease, stroke 0.2s ease, opacity 0.2s ease;
+    transition:
+        filter 0.3s ease,
+        stroke 0.3s ease,
+        stroke-width 0.3s ease,
+        opacity 0.3s ease,
+        transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* --- Node rects: rounded pill shape --- */
-.mm-canvas svg rect {
-  rx: 14;
-  ry: 14;
+/* --- Node groups: clickable --- */
+.mm-canvas svg [data-node-name] {
+    cursor: pointer;
 }
 
-/* --- Text: clean rendering --- */
+/* --- Hover glow: rects (JS handles stroke, CSS handles glow only) --- */
+.mm-canvas svg [data-node-name]:hover rect {
+    filter: drop-shadow(0 4px 14px rgba(99, 102, 241, 0.25)) brightness(1.08) !important;
+}
+
+/* --- Hover glow: circles/ellipses --- */
+.mm-canvas svg [data-node-name]:hover circle,
+.mm-canvas svg [data-node-name]:hover ellipse {
+    filter: drop-shadow(0 4px 18px rgba(99, 102, 241, 0.3)) brightness(1.08) !important;
+}
+
+/* --- Text rendering --- */
 .mm-canvas svg text {
-  font-weight: 500;
-  paint-order: stroke fill;
+    font-weight: 600;
+    paint-order: stroke fill;
+    transition: opacity 0.2s ease;
+}
+
+/* --- Node rects: pill shape --- */
+.mm-canvas svg rect {
+    rx: 16;
+    ry: 16;
 }
 
 /* --- Connector lines: organic --- */
 .mm-canvas svg path[class*="edge"],
 .mm-canvas svg .edge path,
 .mm-canvas svg line[class*="edge"] {
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-opacity: 0.45;
-  stroke-width: 2;
-}
-
-/* --- Clickable node hover --- */
-.mm-canvas svg [data-node-name] {
-  cursor: pointer;
-}
-
-.mm-canvas svg [data-node-name]:hover rect {
-  filter:
-    drop-shadow(0 4px 12px rgba(99, 102, 241, 0.25))
-    brightness(1.15) !important;
-  stroke-opacity: 0.6 !important;
-}
-
-.mm-canvas svg [data-node-name]:hover circle,
-.mm-canvas svg [data-node-name]:hover ellipse {
-  filter:
-    drop-shadow(0 4px 16px rgba(99, 102, 241, 0.35))
-    brightness(1.15) !important;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-opacity: 0.5;
+    stroke-width: 2.5;
+    transition: stroke-opacity 0.3s ease, stroke-width 0.3s ease;
 }
 
 /* --- Root node emphasis --- */
 .mm-canvas svg .section-root text {
-  font-weight: 700;
-  font-size: 15px;
+    font-weight: 800;
+    font-size: 16px;
+    letter-spacing: -0.02em;
 }
 
-/* --- Learned nodes (green) --- */
+/* --- Learned nodes (green glow) --- */
 .mm-canvas svg [data-node-name] rect[fill="#00B894"],
 .mm-canvas svg [data-node-name] circle[fill="#00B894"],
 .mm-canvas svg [data-node-name] ellipse[fill="#00B894"] {
-  filter: drop-shadow(0 2px 8px rgba(0, 184, 148, 0.3)) !important;
+    filter: drop-shadow(0 3px 12px rgba(0, 184, 148, 0.35)) !important;
 }
 
-/* --- Section-specific edge colors to match branch fills --- */
-.mm-canvas svg [class*="section-edge-0"] { stroke: #6366f1 !important; stroke-opacity: 0.4; }
-.mm-canvas svg [class*="section-edge-1"] { stroke: #0ea5e9 !important; stroke-opacity: 0.4; }
-.mm-canvas svg [class*="section-edge-2"] { stroke: #14b8a6 !important; stroke-opacity: 0.4; }
-.mm-canvas svg [class*="section-edge-3"] { stroke: #f59e0b !important; stroke-opacity: 0.4; }
-.mm-canvas svg [class*="section-edge-4"] { stroke: #f43f5e !important; stroke-opacity: 0.4; }
-.mm-canvas svg [class*="section-edge-5"] { stroke: #a855f7 !important; stroke-opacity: 0.4; }
-.mm-canvas svg [class*="section-edge-6"] { stroke: #22c55e !important; stroke-opacity: 0.4; }
-.mm-canvas svg [class*="section-edge-7"] { stroke: #ec4899 !important; stroke-opacity: 0.4; }
+/* --- Section-specific edge colors --- */
+.mm-canvas svg [class*="section-edge-0"] { stroke: #6366f1 !important; stroke-opacity: 0.6; }
+.mm-canvas svg [class*="section-edge-1"] { stroke: #0ea5e9 !important; stroke-opacity: 0.6; }
+.mm-canvas svg [class*="section-edge-2"] { stroke: #14b8a6 !important; stroke-opacity: 0.6; }
+.mm-canvas svg [class*="section-edge-3"] { stroke: #f59e0b !important; stroke-opacity: 0.6; }
+.mm-canvas svg [class*="section-edge-4"] { stroke: #f43f5e !important; stroke-opacity: 0.6; }
+.mm-canvas svg [class*="section-edge-5"] { stroke: #a855f7 !important; stroke-opacity: 0.6; }
+.mm-canvas svg [class*="section-edge-6"] { stroke: #22c55e !important; stroke-opacity: 0.6; }
+.mm-canvas svg [class*="section-edge-7"] { stroke: #ec4899 !important; stroke-opacity: 0.6; }
 
-/* --- Prevent mermaid default harsh borders --- */
+/* --- Prevent mermaid harsh borders --- */
 .mm-canvas svg .section-0 rect,
 .mm-canvas svg .section-1 rect,
 .mm-canvas svg .section-2 rect,
@@ -89,6 +109,17 @@
 .mm-canvas svg .section-5 rect,
 .mm-canvas svg .section-6 rect,
 .mm-canvas svg .section-7 rect {
-  stroke-width: 1.5;
-  stroke-opacity: 0.2;
+    stroke-width: 1;
+    stroke-opacity: 0.15;
+}
+
+/* --- Accessibility: respect reduced motion --- */
+@media (prefers-reduced-motion: reduce) {
+    .mm-canvas svg *,
+    .mm-canvas svg *::before,
+    .mm-canvas svg *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }
