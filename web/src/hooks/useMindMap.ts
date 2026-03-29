@@ -52,6 +52,8 @@ export function useMindMap() {
     const containerRef = useRef<HTMLDivElement>(null);
     const svgContainerRef = useRef<HTMLDivElement>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
+    const codeRef = useRef(code);
+    codeRef.current = code;
 
     const [modules, setModules] = useState<ModuleInfo[]>([]);
     const [selectedModule, setSelectedModule] = useState<number>(-1);
@@ -505,6 +507,7 @@ export function useMindMap() {
 
         // Wheel: Ctrl/Cmd = zoom, plain scroll = pan
         const onWheel = (e: WheelEvent) => {
+            if (!codeRef.current) return; // empty state — allow normal page scroll
             e.preventDefault();
             if (e.ctrlKey || e.metaKey) {
                 // Zoom — smooth, small increments
