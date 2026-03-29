@@ -14,6 +14,7 @@ export const MODE_KEY_MAP: Record<string, ModeId> = {
   "4": "quiz",
   "5": "deep-dive",
   "6": "history",
+  "7": "mindmap",
   "8": "lo-study",
   "9": "cheat-sheet",
 };

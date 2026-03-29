@@ -24,6 +24,7 @@ const MODE_LABEL_MAP: Record<string, string> = {
   quiz: "mode.quiz",
   "deep-dive": "mode.deepDive",
   history: "mode.history",
+  mindmap: "mode.mindmap",
   "lo-study": "mode.loStudy",
   "cheat-sheet": "mode.cheatSheet",
 };
