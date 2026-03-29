@@ -106,6 +106,18 @@ export default function MindMapPane() {
                 className={`mm-canvas${!code && !loading && !error ? " mm-canvas--empty" : ""}`}
                 style={code ? { cursor: 'grab' } : undefined}
             >
+                {code && !loading && !error && (
+                    <button
+                        className="mm-center-btn"
+                        onClick={handleZoomReset}
+                        title={t("mindmap.centerMap")}
+                    >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="3" /><path d="M12 2v4m0 12v4M2 12h4m12 0h4" />
+                        </svg>
+                    </button>
+                )}
+
                 {loading && <MindMapSkeleton />}
 
                 {!loading && !code && !error && (

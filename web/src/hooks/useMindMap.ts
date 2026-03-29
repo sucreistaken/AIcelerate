@@ -205,13 +205,15 @@ export function useMindMap() {
     useEffect(() => {
         if (!code && svgContainerRef.current) {
             svgContainerRef.current.innerHTML = "";
+            prevAnimCodeRef.current = ''; // reset so next code always triggers render
             return;
         }
         if (!code || !svgContainerRef.current) return;
 
-        const isNewMap = code !== prevAnimCodeRef.current;
+        const svgGone = !svgContainerRef.current.querySelector('svg');
+        const isNewMap = code !== prevAnimCodeRef.current || svgGone;
 
-        // Only re-render SVG when code changes (not on learnedNodes toggle)
+        // Re-render SVG when code changes OR DOM was externally cleared (e.g. generate())
         if (isNewMap) {
             prevAnimCodeRef.current = code;
             try {
@@ -356,7 +358,7 @@ export function useMindMap() {
 
     const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.25, 3));
     const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.25, 0.25));
-    const handleZoomReset = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
+    const handleZoomReset = () => { setZoom(1); setPan({ x: 0, y: 0 }); panRef.current = { x: 0, y: 0 }; };
 
     // --- Canvas interactions: wheel zoom/pan + click-drag pan ---
     const isPanning = useRef(false);
