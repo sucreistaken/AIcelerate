@@ -219,7 +219,13 @@ export function useMindMap() {
         setError(null);
         setCode("");
         setZoom(1);
+        setPan({ x: 0, y: 0 });
         setIsFromCache(false);
+        setAllNodes([]);
+        // Clear old SVG so skeleton is visible
+        if (svgContainerRef.current) {
+            svgContainerRef.current.innerHTML = "";
+        }
 
         const res = selectedModule === -1
             ? await deepDiveApi.generateMindMap(currentLessonId)
