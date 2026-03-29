@@ -4,8 +4,11 @@ import toast from "react-hot-toast";
 import { useFlashcardStore } from "../../stores/flashcardStore";
 import { useLessonStore } from "../../stores/lessonStore";
 import { getDifficultyFromEF } from "./flashcardUtils";
+import { t } from "../../utils/i18n";
+import { useUiStore } from "../../stores/uiStore";
 
 function FlashcardBrowseMode() {
+  useUiStore((s) => s.language);
   const { cards, fetchAll, deleteCard, loading } = useFlashcardStore();
   const currentLessonId = useLessonStore((s) => s.currentLessonId);
   const [filter, setFilter] = useState<string>("all");
@@ -20,26 +23,26 @@ function FlashcardBrowseMode() {
       const { flashcardApi } = await import('../../services/api');
       const res = await flashcardApi.update(editingCard.id, editingCard.front, editingCard.back);
       if (res.ok) {
-        toast.success("Kart guncellendi");
+        toast.success(t('flashcard.cardUpdated'));
         setEditingCard(null);
         fetchAll(currentLessonId || undefined);
       } else {
-        toast.error(res.error || "Guncelleme basarisiz");
+        toast.error(res.error || t('flashcard.updateFailed'));
       }
-    } catch { toast.error("Guncelleme hatasi"); }
+    } catch { toast.error(t('flashcard.updateError')); }
     setEditSaving(false);
   }, [editingCard, fetchAll, currentLessonId]);
 
   const handleDelete = useCallback((cardId: string) => {
     setPendingDeleteId(cardId);
-    const toastId = toast((t) => (
+    const toastId = toast((toastT) => (
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <span>Kart silindi.</span>
+        <span>{t('flashcard.cardDeleted')}</span>
         <button
           style={{ background: "var(--accent-2)", color: "#fff", border: "none", borderRadius: 6, padding: "4px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
-          onClick={() => { toast.dismiss(t.id); setPendingDeleteId(null); }}
+          onClick={() => { toast.dismiss(toastT.id); setPendingDeleteId(null); }}
         >
-          Geri Al
+          {t('flashcard.undo')}
         </button>
       </div>
     ), { duration: 5000 });
@@ -71,28 +74,37 @@ function FlashcardBrowseMode() {
   return (
     <div>
       <div className="view-toggle" style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        {["all", "new", "learning", "review", "graduated"].map((f) => (
-          <button
-            key={f}
-            className={`view-toggle__btn${filter === f ? " view-toggle__btn--active" : ""}`}
-            onClick={() => setFilter(f)}
-          >
-            {f.charAt(0).toUpperCase() + f.slice(1)}
-            {f !== "all" ? ` (${cards.filter((c) => c.state === f).length})` : ""}
-          </button>
-        ))}
+        {["all", "new", "learning", "review", "graduated"].map((f) => {
+          const labelMap: Record<string, string> = {
+            all: t('flashcard.filterAll'),
+            new: t('flashcard.statNew'),
+            learning: t('flashcard.statLearning'),
+            review: t('flashcard.statReview'),
+            graduated: t('flashcard.statGraduated'),
+          };
+          return (
+            <button
+              key={f}
+              className={`view-toggle__btn${filter === f ? " view-toggle__btn--active" : ""}`}
+              onClick={() => setFilter(f)}
+            >
+              {labelMap[f]}
+              {f !== "all" ? ` (${cards.filter((c) => c.state === f).length})` : ""}
+            </button>
+          );
+        })}
       </div>
 
       {loading ? (
         <div className="pane-empty" style={{ padding: 24 }}>
-          <div className="pane-empty__desc">Loading cards...</div>
+          <div className="pane-empty__desc">{t('flashcard.loadingCards')}</div>
         </div>
       ) : filtered.length === 0 ? (
         <div className="pane-empty">
           <div className="pane-empty__icon">F</div>
-          <div className="pane-empty__title">No cards found</div>
+          <div className="pane-empty__title">{t('flashcard.noCardsFound')}</div>
           <div className="pane-empty__desc">
-            Generate flashcards from a lesson first.
+            {t('flashcard.generateFromLesson')}
           </div>
         </div>
       ) : (
@@ -116,16 +128,16 @@ function FlashcardBrowseMode() {
               <div className="fc-browse-card">
                 <div className="fc-browse-header">
                   <span className={`status-badge ${stateStyle[card.state] || "status-badge--muted"}`}>
-                    {card.state}
+                    {({new: t('flashcard.statNew'), learning: t('flashcard.statLearning'), review: t('flashcard.statReview'), graduated: t('flashcard.statGraduated')} as Record<string, string>)[card.state] || card.state}
                   </span>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button className="fc-delete-btn" style={{ color: 'var(--accent-2)' }}
                       onClick={() => setEditingCard({ id: card.id, front: card.front, back: card.back })}>
-                      Edit
+                      {t('flashcard.edit')}
                     </button>
                     <button className="fc-delete-btn" onClick={() => handleDelete(card.id)}
                       disabled={pendingDeleteId === card.id}>
-                      {pendingDeleteId === card.id ? "Siliniyor..." : "Delete"}
+                      {pendingDeleteId === card.id ? t('flashcard.deleting') : t('flashcard.delete')}
                     </button>
                   </div>
                 </div>
@@ -135,21 +147,21 @@ function FlashcardBrowseMode() {
                       style={{ padding: 8, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--input-bg)', color: 'var(--text)', fontSize: 13 }}
                       value={editingCard.front}
                       onChange={e => setEditingCard({ ...editingCard, front: e.target.value })}
-                      placeholder="Front"
+                      placeholder={t('flashcard.front')}
                     />
                     <textarea
                       style={{ padding: 8, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--input-bg)', color: 'var(--text)', fontSize: 13, resize: 'vertical' }}
                       value={editingCard.back}
                       onChange={e => setEditingCard({ ...editingCard, back: e.target.value })}
                       rows={3}
-                      placeholder="Back"
+                      placeholder={t('flashcard.back')}
                     />
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button className="btn btn-primary" style={{ fontSize: 12, padding: '4px 12px' }} onClick={saveCardEdit} disabled={editSaving}>
-                        {editSaving ? '...' : 'Kaydet'}
+                        {editSaving ? '...' : t('flashcard.save')}
                       </button>
                       <button className="btn btn-ghost" style={{ fontSize: 12, padding: '4px 12px' }} onClick={() => setEditingCard(null)}>
-                        Iptal
+                        {t('flashcard.cancel')}
                       </button>
                     </div>
                   </div>
@@ -170,7 +182,7 @@ function FlashcardBrowseMode() {
                     {getDifficultyFromEF(card.easeFactor).label}
                   </span>
                   <span className="fc-card__meta-sep" />
-                  <span>Interval: {card.interval}d</span>
+                  <span>{t('flashcard.interval')}: {card.interval}d</span>
                 </div>
               </div>
             </motion.div>
