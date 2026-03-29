@@ -18,6 +18,7 @@ export default function NotificationBell() {
   const store = useNotificationStore();
   const setMode = useUiStore((s) => s.setMode);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const bellRef = useRef<HTMLButtonElement>(null);
 
   // Socket listeners
   useEffect(() => {
@@ -26,6 +27,10 @@ export default function NotificationBell() {
     const handleNewNotif = (notif: AppNotification) => {
       store.prependNotification(notif);
       store.setUnreadCount(store.unreadCount + 1);
+      // Shake bell on new notification
+      bellRef.current?.classList.remove("notification-bell__btn--shake");
+      void bellRef.current?.offsetWidth; // force reflow
+      bellRef.current?.classList.add("notification-bell__btn--shake");
     };
 
     const handleBadgeUpdate = (data: { count: number }) => {
@@ -78,6 +83,7 @@ export default function NotificationBell() {
   return (
     <div className="notification-bell" ref={dropdownRef}>
       <button
+        ref={bellRef}
         className="notification-bell__btn"
         onClick={() => store.toggleDropdown()}
         aria-label={`Notifications${store.unreadCount > 0 ? ` (${store.unreadCount} unread)` : ""}`}
@@ -108,15 +114,28 @@ export default function NotificationBell() {
                 <span className="notification-bell__dropdown-count">{store.unreadCount} {t("common.unread")}</span>
               )}
             </div>
-            <div className="notification-bell__dropdown-list">
+            <motion.div
+              className="notification-bell__dropdown-list"
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: {},
+                visible: { transition: { staggerChildren: 0.04 } },
+              }}
+            >
               {displayNotifs.length === 0 && (
                 <div className="notification-bell__empty">{t("common.noNotifications")}</div>
               )}
               {displayNotifs.map((notif) => (
-                <div
+                <motion.div
                   key={notif.id}
                   className={`notification-bell__item${!notif.dismissed ? " notification-bell__item--unread" : ""}`}
                   onClick={() => handleClick(notif)}
+                  variants={{
+                    hidden: { opacity: 0, y: 8 },
+                    visible: { opacity: 1, y: 0 },
+                  }}
+                  transition={{ duration: 0.18, ease: [0.25, 0.46, 0.45, 0.94] }}
                 >
                   <div
                     className="notification-bell__item-title"
@@ -126,9 +145,9 @@ export default function NotificationBell() {
                   </div>
                   <div className="notification-bell__item-message">{notif.message}</div>
                   <div className="notification-bell__item-time">{timeAgo(notif.createdAt)}</div>
-                </div>
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

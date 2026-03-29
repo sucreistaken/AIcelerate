@@ -96,6 +96,12 @@
   box-shadow: var(--shadow-md);
 }
 
+/* --- Active press --- */
+.lc-button:active:not(:disabled) {
+  transform: scale(0.97);
+  transition-duration: 80ms;
+}
+
 /* --- States --- */
 .lc-button:disabled,
 .lc-button--disabled {
