@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { motion, LayoutGroup } from "framer-motion";
 import type { ModeId } from "../types";
 import { t } from "../utils/i18n";
 
@@ -74,45 +75,64 @@ export default function ModeRibbon({ mode, setMode }: { mode: ModeId; setMode: (
   const activeGroup = GROUPS[activeGroupIndex];
 
   return (
-    <div className="mr" role="tablist" aria-label="Study modes">
-      {/* Tier 1: Group Segments */}
-      <div className="mr-segments">
-        {GROUPS.map((group, i) => (
-          <button
-            key={group.label}
-            className={`mr-seg${activeGroupIndex === i ? " mr-seg--active" : ""}`}
-            onClick={() => {
-              if (!group.tabs.some((tab) => tab.id === mode)) {
-                setMode(group.tabs[0].id);
-              }
-            }}
-          >
-            {t(group.label)}
-          </button>
-        ))}
-      </div>
-
-      {/* Tier 2: Child Tabs (hide if only 1 tab) */}
-      {activeGroup.tabs.length > 1 && (
-        <div className="mr-children">
-          {activeGroup.tabs.map((tab) => {
-            const isActive = mode === tab.id;
+    <LayoutGroup>
+      <div className="mr" role="tablist" aria-label="Study modes">
+        {/* Tier 1: Group Segments */}
+        <div className="mr-segments">
+          {GROUPS.map((group, i) => {
+            const isActive = activeGroupIndex === i;
             return (
               <button
-                key={tab.id}
-                role="tab"
-                aria-selected={isActive}
-                onClick={() => setMode(tab.id)}
-                className={`mr-tab${isActive ? " mr-tab--active" : ""}`}
-                title={t(tab.label)}
+                key={group.label}
+                className={`mr-seg${isActive ? " mr-seg--active" : ""}`}
+                onClick={() => {
+                  if (!group.tabs.some((tab) => tab.id === mode)) {
+                    setMode(group.tabs[0].id);
+                  }
+                }}
               >
-                <span className="mr-tab__icon">{tab.icon}</span>
-                <span className="mr-tab__label">{t(tab.label)}</span>
+                {t(group.label)}
+                {isActive && (
+                  <motion.span
+                    className="mr-seg__indicator"
+                    layoutId="mr-seg-indicator"
+                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                  />
+                )}
               </button>
             );
           })}
         </div>
-      )}
-    </div>
+
+        {/* Tier 2: Child Tabs (hide if only 1 tab) */}
+        {activeGroup.tabs.length > 1 && (
+          <div className="mr-children">
+            {activeGroup.tabs.map((tab) => {
+              const isActive = mode === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => setMode(tab.id)}
+                  className={`mr-tab${isActive ? " mr-tab--active" : ""}`}
+                  title={t(tab.label)}
+                >
+                  <span className="mr-tab__icon">{tab.icon}</span>
+                  <span className="mr-tab__label">{t(tab.label)}</span>
+                  {isActive && (
+                    <motion.span
+                      className="mr-tab__indicator"
+                      layoutId="mr-tab-indicator"
+                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </LayoutGroup>
   );
 }

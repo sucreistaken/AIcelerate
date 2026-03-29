@@ -1,4 +1,5 @@
 import { useCourseDashboard } from "../hooks/useCourseDashboard";
+import { motion, AnimatePresence } from "framer-motion";
 import { ConfirmModal } from "./ui/ConfirmModal";
 import {
   CourseListView,
@@ -118,40 +119,66 @@ export default function CourseDashboard() {
 
       <CourseTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
-      {activeTab === "overview" && (
-        <OverviewTab
-          course={course}
-          courseLessons={courseLessons}
-          onAddLesson={() => setShowAssignModal(true)}
-          onCreateLesson={createLesson}
-          onRemoveLesson={(courseId, lessonId) => {
-            const lesson = courseLessons.find(l => l.id === lessonId);
-            setConfirmDetach({ courseId, lessonId, title: lesson?.title || 'Ders' });
-          }}
-          onGoToLesson={goToLesson}
-          isSelectionMode={isSelectionMode}
-          selectedLessonIds={selectedLessonIds}
-          onEnterSelectionMode={enterSelectionMode}
-          onExitSelectionMode={exitSelectionMode}
-          onToggleLesson={toggleLesson}
-          onSelectAll={handleSelectAll}
-          onClearAll={clearSelection}
-          onStudySelected={studySelected}
-        />
-      )}
+      <AnimatePresence mode="wait">
+        {activeTab === "overview" && (
+          <motion.div
+            key="overview"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+          >
+            <OverviewTab
+              course={course}
+              courseLessons={courseLessons}
+              onAddLesson={() => setShowAssignModal(true)}
+              onCreateLesson={createLesson}
+              onRemoveLesson={(courseId, lessonId) => {
+                const lesson = courseLessons.find(l => l.id === lessonId);
+                setConfirmDetach({ courseId, lessonId, title: lesson?.title || 'Ders' });
+              }}
+              onGoToLesson={goToLesson}
+              isSelectionMode={isSelectionMode}
+              selectedLessonIds={selectedLessonIds}
+              onEnterSelectionMode={enterSelectionMode}
+              onExitSelectionMode={exitSelectionMode}
+              onToggleLesson={toggleLesson}
+              onSelectAll={handleSelectAll}
+              onClearAll={clearSelection}
+              onStudySelected={studySelected}
+            />
+          </motion.div>
+        )}
 
-      {activeTab === "progress" && (
-        <ProgressTab progressLoading={progressLoading} courseProgress={courseProgress} />
-      )}
+        {activeTab === "progress" && (
+          <motion.div
+            key="progress"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+          >
+            <ProgressTab progressLoading={progressLoading} courseProgress={courseProgress} />
+          </motion.div>
+        )}
 
-      {activeTab === "schedule" && (
-        <ScheduleTab
-          course={course}
-          weeklySchedule={weeklySchedule}
-          scheduleLoading={scheduleLoading}
-          onGenerate={generateWeeklySchedule}
-        />
-      )}
+        {activeTab === "schedule" && (
+          <motion.div
+            key="schedule"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+          >
+            <ScheduleTab
+              course={course}
+              weeklySchedule={weeklySchedule}
+              scheduleLoading={scheduleLoading}
+              onGenerate={generateWeeklySchedule}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <CourseChat
         chatHistory={chatHistory}

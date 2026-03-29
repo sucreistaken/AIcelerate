@@ -1,4 +1,5 @@
 import type { ActiveTab } from "../../hooks/useCourseDashboard";
+import { Tabs, TabsList, TabsTrigger } from "../ui/Tabs";
 import { t } from "../../utils/i18n";
 
 const TABS: Array<{ id: ActiveTab; label: string }> = [
@@ -14,22 +15,14 @@ interface CourseTabsProps {
 
 export function CourseTabs({ activeTab, onTabChange }: CourseTabsProps) {
   return (
-    <div style={{ display: "flex", gap: 4, marginBottom: 16, borderBottom: "1px solid var(--border)", paddingBottom: 4 }}>
-      {TABS.map((tab) => (
-        <button
-          key={tab.id}
-          onClick={() => onTabChange(tab.id)}
-          style={{
-            padding: "8px 16px", fontSize: 13, fontWeight: 600,
-            background: activeTab === tab.id ? "var(--accent-2)" : "transparent",
-            color: activeTab === tab.id ? "white" : "var(--text)",
-            border: "none", borderRadius: 8, cursor: "pointer",
-            transition: "all 0.15s",
-          }}
-        >
-          {t(tab.label)}
-        </button>
-      ))}
-    </div>
+    <Tabs value={activeTab} onValueChange={(v) => onTabChange(v as ActiveTab)}>
+      <TabsList>
+        {TABS.map((tab) => (
+          <TabsTrigger key={tab.id} value={tab.id}>
+            {t(tab.label)}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </Tabs>
   );
 }

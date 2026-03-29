@@ -10221,11 +10221,25 @@ body, .page, .lc-section, .nav, .card, .lc-sidebar-drawer, .mr {
   color: var(--text);
 }
 
+.mr-seg {
+  position: relative;
+}
+
 .mr-seg--active {
-  background: var(--card);
+  background: transparent;
   color: var(--text);
   font-weight: 600;
+  box-shadow: none;
+}
+
+/* Animated segment background */
+.mr-seg__indicator {
+  position: absolute;
+  inset: 0;
+  background: var(--card);
   box-shadow: var(--shadow-sm);
+  border-radius: inherit;
+  z-index: -1;
 }
 
 /* Tier 2: Child Tabs */
@@ -10263,7 +10277,18 @@ body, .page, .lc-section, .nav, .card, .lc-sidebar-drawer, .mr {
 .mr-tab--active {
   color: var(--accent-2);
   font-weight: 600;
-  border-bottom-color: var(--accent-2);
+  border-bottom-color: transparent;
+}
+
+/* Animated tab underline */
+.mr-tab__indicator {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent-2);
+  border-radius: 1px;
 }
 
 .mr-tab__icon {
