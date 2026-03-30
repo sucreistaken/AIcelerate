@@ -14,6 +14,7 @@ import collabRoutes from "./collabRoutes";
 import authRoutes from "./authRoutes";
 import roomRoutes from "./roomRoutes";
 import gamificationRoutes from "./gamificationRoutes";
+import adminRoutes from "./adminRoutes";
 
 const router = Router();
 
@@ -64,5 +65,8 @@ router.use("/api", roomRoutes);
 
 // Gamification (XP, streak)
 router.use("/api", gamificationRoutes);
+
+// Admin panel
+router.use("/api/admin", adminRoutes);
 
 export default router;

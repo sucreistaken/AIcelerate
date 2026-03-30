@@ -19,8 +19,17 @@ import AppNavbar from "./components/layout/AppNavbar";
 import AppLeftPanel from "./components/layout/AppLeftPanel";
 
 const SettingsPage = lazy(() => import("./components/settings/SettingsPage"));
+const AdminApp = lazy(() => import("./admin/AdminApp"));
 
 export default function App() {
+  if (window.location.pathname.startsWith("/admin")) {
+    return (
+      <Suspense fallback={null}>
+        <AdminApp />
+      </Suspense>
+    );
+  }
+
   const {
     lesson,
     transcription,

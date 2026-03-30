@@ -52,6 +52,12 @@
   --tracking-normal: 0;
   --tracking-wide: 0.2px;
 
+  /* --- Semantic Color Aliases --- */
+  --text-primary: var(--text);
+  --text-tertiary: var(--muted);
+  --color-danger: var(--danger, #ef4444);
+  --color-success: #22c55e;
+
   /* --- Surface Hierarchy --- */
   --surface-2: var(--input-bg);
   --surface-3: #ececee;
@@ -136,6 +142,10 @@
 }
 
 .dark {
+  --text-primary: var(--text);
+  --text-tertiary: var(--muted);
+  --color-danger: var(--danger, #f87171);
+  --color-success: #4ade80;
   --nb-shadow-color: rgba(255, 255, 255, 0.2);
   --surface-3: #27272a;
   --accent-soft: rgba(59, 130, 246, 0.1);
