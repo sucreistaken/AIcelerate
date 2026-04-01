@@ -3,9 +3,11 @@ import {
   channelToolRepo,
   QuizQuestion,
 } from "../repositories/channelToolRepo";
-import { getModel, stripCodeFences } from "./aiService";
+import { getModel, stripCodeFences, getTemperature } from "./aiService";
+import { SCHEMAS } from "../prompts/schemas";
 import { generateId } from "../utils/idGenerator";
 import { buildToolContext } from "./channelContextBuilder";
+import { getLangDirective, type SupportedLang } from "../utils/langDirective";
 
 // ── Quiz: generate ──────────────────────────────────────────────────────────
 export async function generateQuiz(
@@ -13,7 +15,8 @@ export async function generateQuiz(
   topic: string,
   serverName: string,
   count: number = 10,
-  options?: { difficulty?: 'easy' | 'medium' | 'hard'; includeTrueFalse?: boolean }
+  options?: { difficulty?: 'easy' | 'medium' | 'hard'; includeTrueFalse?: boolean },
+  lang?: SupportedLang
 ) {
   const data = channelToolRepo.load(channelId);
   const difficulty = options?.difficulty || 'medium';
@@ -36,7 +39,7 @@ export async function generateQuiz(
       ? `Based on the following lecture material, generate questions that test understanding of the actual content:\n\n${toolCtx.context}\n\n`
       : '';
 
-    const prompt = `${contextBlock}Generate exactly ${count} quiz questions about '${topic}' for a university study group '${serverName}'.
+    const prompt = `${getLangDirective(lang)}\n\n${contextBlock}Generate exactly ${count} quiz questions about '${topic}' for a university study group '${serverName}'.
 
 DIFFICULTY: ${difficulty.toUpperCase()}
 ${difficultyGuide}
@@ -65,11 +68,11 @@ ${toolCtx ? `- Questions MUST be based on the provided lecture material
 
     const result = await getModel().generateContent({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 3000 },
+      generationConfig: { maxOutputTokens: 3000, temperature: getTemperature("balanced"), responseMimeType: "application/json", responseSchema: SCHEMAS.CHANNEL_QUIZ } as any,
     });
     const text = result.response.text();
     logger.info(`[AI] CHANNEL_QUIZ | ~${Math.ceil(prompt.length / 4)} in, ~${Math.ceil(text.length / 4)} out | max=3000`);
-    const parsed = JSON.parse(stripCodeFences(text));
+    const parsed = JSON.parse(text);
 
     const questions: QuizQuestion[] = (Array.isArray(parsed) ? parsed : []).map((q: any) => ({
       id: generateId(),

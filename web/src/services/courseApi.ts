@@ -4,7 +4,7 @@
 import { logger } from "../utils/logger";
 import { t } from "../utils/i18n";
 import { API_BASE } from './httpClient';
-import { Course, CourseKnowledgeIndex, CourseProgress, WeeklySchedule, CourseExport, LoAlignment, LoStudyModule } from '../types';
+import { Course, CourseKnowledgeIndex, CourseProgress, WeeklySchedule, CourseExport, LoAlignment, LoStudyModule, KnowledgeGraph, AdaptiveQuizSessionState, AdaptiveQuizSummary, LODashboardData, LOProgress } from '../types';
 
 // ============ Course API ============
 export const courseApi = {
@@ -165,5 +165,97 @@ export const loApi = {
             method: 'POST',
         });
         return await res.json();
+    },
+};
+
+// ============ Knowledge Graph API ============
+export const knowledgeGraphApi = {
+    async get(courseId: string): Promise<{ ok: boolean; graph?: KnowledgeGraph | null; error?: string }> {
+        try {
+            const res = await fetch(`${API_BASE}/api/courses/${courseId}/knowledge-graph`);
+            return await res.json();
+        } catch {
+            return { ok: false, error: "Failed to fetch knowledge graph" };
+        }
+    },
+    async rebuild(courseId: string): Promise<{ ok: boolean; graph?: KnowledgeGraph; error?: string }> {
+        try {
+            const res = await fetch(`${API_BASE}/api/courses/${courseId}/knowledge-graph/rebuild`, { method: "POST" });
+            return await res.json();
+        } catch {
+            return { ok: false, error: "Failed to rebuild knowledge graph" };
+        }
+    },
+};
+
+// ============ Adaptive Quiz API ============
+export const adaptiveQuizApi = {
+    async start(courseId: string, lessonIds?: string[]): Promise<{ ok: boolean } & Partial<AdaptiveQuizSessionState>> {
+        try {
+            const res = await fetch(`${API_BASE}/api/adaptive-quiz/start`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ courseId, lessonIds }),
+            });
+            return await res.json();
+        } catch {
+            return { ok: false };
+        }
+    },
+    async getSession(sessionId: string): Promise<{ ok: boolean } & Partial<AdaptiveQuizSessionState>> {
+        try {
+            const res = await fetch(`${API_BASE}/api/adaptive-quiz/${sessionId}`);
+            return await res.json();
+        } catch {
+            return { ok: false };
+        }
+    },
+    async submitAnswer(sessionId: string, itemId: string, answer: string): Promise<{ ok: boolean; grade?: string } & Partial<AdaptiveQuizSessionState>> {
+        try {
+            const res = await fetch(`${API_BASE}/api/adaptive-quiz/${sessionId}/answer`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ itemId, answer }),
+            });
+            return await res.json();
+        } catch {
+            return { ok: false };
+        }
+    },
+    async endSession(sessionId: string): Promise<{ ok: boolean; summary?: AdaptiveQuizSummary; error?: string }> {
+        try {
+            const res = await fetch(`${API_BASE}/api/adaptive-quiz/${sessionId}/end`, { method: "POST" });
+            return await res.json();
+        } catch {
+            return { ok: false, error: "Failed to end session" };
+        }
+    },
+};
+
+// ============ LO Progress API ============
+export const loProgressApi = {
+    async get(courseId: string): Promise<{ ok: boolean } & Partial<LODashboardData>> {
+        try {
+            const res = await fetch(`${API_BASE}/api/courses/${courseId}/lo-progress`);
+            return await res.json();
+        } catch {
+            return { ok: false };
+        }
+    },
+    async getDetail(courseId: string, loId: string): Promise<{ ok: boolean } & Partial<LOProgress>> {
+        try {
+            const res = await fetch(`${API_BASE}/api/courses/${courseId}/lo-progress/${loId}`);
+            return await res.json();
+        } catch {
+            return { ok: false };
+        }
+    },
+    async refresh(courseId: string): Promise<{ ok: boolean } & Partial<LODashboardData>> {
+        try {
+            const res = await fetch(`${API_BASE}/api/courses/${courseId}/lo-progress/refresh`, { method: "POST" });
+            return await res.json();
+        } catch {
+            return { ok: false };
+        }
     },
 };

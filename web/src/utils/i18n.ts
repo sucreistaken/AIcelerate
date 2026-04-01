@@ -58,6 +58,56 @@ const translations: Record<Lang, Record<string, string>> = {
     'mode.dashboard': 'Dashboard',
     'mode.myNotes': 'Notlarım',
     'mode.lessons': 'Dersler',
+    'mode.knowledgeGraph': 'Bilgi Grafiği',
+    'mode.adaptiveQuiz': 'Adaptif Quiz',
+    'mode.loProgress': 'ÖÇ İlerleme',
+
+    // Confidence Scoring
+    'confidence.title': 'Güven Puanı',
+    'confidence.coverage': 'Kapsam',
+    'confidence.accuracy': 'Doğruluk',
+    'confidence.completeness': 'Tamlık',
+    'confidence.flags': 'Uyarılar',
+    'confidence.noScore': 'Henüz puanlanmadı',
+
+    // Knowledge Graph
+    'knowledgeGraph.title': 'Bilgi Grafiği',
+    'knowledgeGraph.rebuild': 'Grafiği Yeniden Oluştur',
+    'knowledgeGraph.empty': 'Henüz grafik oluşturulmadı',
+    'knowledgeGraph.nodes': 'Kavramlar',
+    'knowledgeGraph.edges': 'İlişkiler',
+    'knowledgeGraph.prerequisite': 'Ön koşul',
+    'knowledgeGraph.extends': 'Genişletir',
+    'knowledgeGraph.applies': 'Uygular',
+    'knowledgeGraph.example_of': 'Örneği',
+
+    // Adaptive Quiz
+    'adaptiveQuiz.title': 'Adaptif Quiz',
+    'adaptiveQuiz.start': 'Quize Başla',
+    'adaptiveQuiz.ability': 'Yetenek Seviyesi',
+    'adaptiveQuiz.questionOf': 'Soru',
+    'adaptiveQuiz.submit': 'Cevabı Gönder',
+    'adaptiveQuiz.complete': 'Quiz Tamamlandı',
+    'adaptiveQuiz.correct': 'Doğru',
+    'adaptiveQuiz.partial': 'Kısmi',
+    'adaptiveQuiz.incorrect': 'Yanlış',
+    'adaptiveQuiz.topicBreakdown': 'Konu Analizi',
+    'adaptiveQuiz.converged': 'Seviye belirlendi',
+    'adaptiveQuiz.maxReached': 'Maksimum soru sayısına ulaşıldı',
+
+    // LO Progress
+    'loProgress.title': 'ÖÇ İlerleme',
+    'loProgress.overallMastery': 'Genel Hakimiyet',
+    'loProgress.studyPriority': 'Çalışma Önceliği',
+    'loProgress.not_started': 'Başlanmadı',
+    'loProgress.beginning': 'Başlangıç',
+    'loProgress.developing': 'Gelişiyor',
+    'loProgress.proficient': 'Yetkin',
+    'loProgress.mastered': 'Uzman',
+    'loProgress.refresh': 'Yenile',
+    'loProgress.recommendation': 'Öneri',
+    'loProgress.quizScores': 'Quiz Puanları',
+    'loProgress.flashcardMastery': 'Flashcard Hakimiyeti',
 
     // Plan
     'plan.title': 'Öğrenme Planı Nedir?',
@@ -931,6 +981,56 @@ const translations: Record<Lang, Record<string, string>> = {
     'mode.dashboard': 'Dashboard',
     'mode.myNotes': 'My Notes',
     'mode.lessons': 'Lessons',
+    'mode.knowledgeGraph': 'Knowledge Graph',
+    'mode.adaptiveQuiz': 'Adaptive Quiz',
+    'mode.loProgress': 'LO Progress',
+
+    // Confidence Scoring
+    'confidence.title': 'Confidence Score',
+    'confidence.coverage': 'Coverage',
+    'confidence.accuracy': 'Accuracy',
+    'confidence.completeness': 'Completeness',
+    'confidence.flags': 'Warnings',
+    'confidence.noScore': 'Not scored yet',
+
+    // Knowledge Graph
+    'knowledgeGraph.title': 'Knowledge Graph',
+    'knowledgeGraph.rebuild': 'Rebuild Graph',
+    'knowledgeGraph.empty': 'No graph built yet',
+    'knowledgeGraph.nodes': 'Concepts',
+    'knowledgeGraph.edges': 'Relationships',
+    'knowledgeGraph.prerequisite': 'Prerequisite',
+    'knowledgeGraph.extends': 'Extends',
+    'knowledgeGraph.applies': 'Applies',
+    'knowledgeGraph.example_of': 'Example of',
+
+    // Adaptive Quiz
+    'adaptiveQuiz.title': 'Adaptive Quiz',
+    'adaptiveQuiz.start': 'Start Quiz',
+    'adaptiveQuiz.ability': 'Ability Level',
+    'adaptiveQuiz.questionOf': 'Question',
+    'adaptiveQuiz.submit': 'Submit Answer',
+    'adaptiveQuiz.complete': 'Quiz Complete',
+    'adaptiveQuiz.correct': 'Correct',
+    'adaptiveQuiz.partial': 'Partial',
+    'adaptiveQuiz.incorrect': 'Incorrect',
+    'adaptiveQuiz.topicBreakdown': 'Topic Breakdown',
+    'adaptiveQuiz.converged': 'Level determined',
+    'adaptiveQuiz.maxReached': 'Maximum questions reached',
+
+    // LO Progress
+    'loProgress.title': 'LO Progress',
+    'loProgress.overallMastery': 'Overall Mastery',
+    'loProgress.studyPriority': 'Study Priority',
+    'loProgress.not_started': 'Not Started',
+    'loProgress.beginning': 'Beginning',
+    'loProgress.developing': 'Developing',
+    'loProgress.proficient': 'Proficient',
+    'loProgress.mastered': 'Mastered',
+    'loProgress.refresh': 'Refresh',
+    'loProgress.recommendation': 'Recommendation',
+    'loProgress.quizScores': 'Quiz Scores',
+    'loProgress.flashcardMastery': 'Flashcard Mastery',
 
     // Plan
     'plan.title': 'What is Learning Plan?',

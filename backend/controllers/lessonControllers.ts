@@ -77,6 +77,10 @@ export type Lesson = {
 
   // Compact AI digest (generated after plan creation)
   digest?: import("../services/lessonDigestService").LessonDigest;
+
+  // Confidence scores for AI-generated artifacts (OPT-15)
+  planConfidence?: import("../types").ConfidenceScore;
+  cheatSheetConfidence?: import("../types").ConfidenceScore;
 };
 
 type GlobalMemory = {

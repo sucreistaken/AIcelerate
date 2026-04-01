@@ -16,7 +16,7 @@ export { quizApi } from './quizApi';
 export { flashcardApi } from './flashcardApi';
 
 // Course and Learning Objectives APIs
-export { courseApi, loApi } from './courseApi';
+export { courseApi, loApi, knowledgeGraphApi, adaptiveQuizApi, loProgressApi } from './courseApi';
 
 // Scheduler, Notification, and Gamification APIs
 export { schedulerApi, notificationApi, gamificationApi } from './schedulerApi';

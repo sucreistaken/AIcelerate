@@ -1,5 +1,5 @@
 import { logger } from "../utils/logger";
-import { getModel, stripCodeFences, tryParseJSON } from "./aiService";
+import { getModel, stripCodeFences, tryParseJSON, getTemperature } from "./aiService";
 import { SCHEMAS } from "../prompts/schemas";
 import {
   buildQuizFromPlanPrompt,
@@ -7,6 +7,7 @@ import {
   buildQuizEvalPrompt,
   buildQuizEvalBatchPrompt,
 } from "../prompts/lessonPrompts";
+import type { SupportedLang } from "../utils/langDirective";
 import { getDigestOrFallback } from "./lessonDigestService";
 import { assembleCourseContext } from "../controllers/contextAssembler";
 
@@ -34,7 +35,7 @@ function resolveContextBlock(
 }
 
 export async function generateQuizFromPlan(
-  plan: any, lessonId?: string
+  plan: any, lessonId?: string, lang?: SupportedLang
 ): Promise<string[]> {
   let crossLessonHint = "";
   if (lessonId) {
@@ -42,10 +43,10 @@ export async function generateQuizFromPlan(
     if (ctx.crossLessonBlock) crossLessonHint = `\n\nRELATED LESSONS:\n${ctx.crossLessonBlock}`;
   }
 
-  const prompt = buildQuizFromPlanPrompt(JSON.stringify(plan).slice(0, 8000), crossLessonHint);
+  const prompt = buildQuizFromPlanPrompt(JSON.stringify(plan).slice(0, 8000), crossLessonHint, lang);
   const result = await getModel().generateContent({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: 2500 },
+    generationConfig: { maxOutputTokens: 2500, temperature: getTemperature("balanced") },
   });
   const text = (result.response.text() || "").replace(/```/g, "").trim();
   logAI("QUIZ_FROM_PLAN", prompt.length, text.length, 2500);
@@ -80,6 +81,7 @@ export async function generateQuizAnswers(
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: {
       maxOutputTokens: 4000,
+      temperature: getTemperature("structured"),
       responseMimeType: "application/json",
       responseSchema: SCHEMAS.QUIZ_ANSWERS,
     } as any,
@@ -93,16 +95,17 @@ export async function generateQuizAnswers(
 
 export async function evaluateQuizAnswer(
   question: string, studentAnswer: string,
-  lectureText?: string, slidesText?: string, lessonId?: string
+  lectureText?: string, slidesText?: string, lessonId?: string, lang?: SupportedLang
 ): Promise<any> {
   const contextBlock = resolveContextBlock(lessonId, lectureText, slidesText, 14000);
   if (!contextBlock) throw new Error("lessonId or lectureText+slidesText required");
 
-  const prompt = buildQuizEvalPrompt(contextBlock, question, studentAnswer);
+  const prompt = buildQuizEvalPrompt(contextBlock, question, studentAnswer, lang);
   const result = await getModel().generateContent({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: {
       maxOutputTokens: 1000,
+      temperature: getTemperature("structured"),
       responseMimeType: "application/json",
       responseSchema: SCHEMAS.QUIZ_EVAL,
     } as any,
@@ -116,17 +119,18 @@ export async function evaluateQuizAnswer(
 
 export async function evaluateQuizBatch(
   items: Array<{ q: string; student_answer: string }>,
-  lectureText?: string, slidesText?: string, lessonId?: string
+  lectureText?: string, slidesText?: string, lessonId?: string, lang?: SupportedLang
 ): Promise<any[]> {
   const contextBlock = resolveContextBlock(lessonId, lectureText, slidesText, 14000);
   if (!contextBlock) throw new Error("lessonId or lectureText+slidesText required");
 
   const questionsBlock = items.slice(0, 20).map((item, i) => `Q${i + 1}: ${item.q}\nA${i + 1}: ${item.student_answer}`).join("\n\n");
-  const prompt = buildQuizEvalBatchPrompt(contextBlock, questionsBlock);
+  const prompt = buildQuizEvalBatchPrompt(contextBlock, questionsBlock, lang);
   const result = await getModel().generateContent({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: {
       maxOutputTokens: 4000,
+      temperature: getTemperature("structured"),
       responseMimeType: "application/json",
       responseSchema: SCHEMAS.QUIZ_EVAL_BATCH,
     } as any,

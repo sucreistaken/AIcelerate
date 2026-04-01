@@ -1,14 +1,16 @@
 import { logger } from "../utils/logger";
-import { getModel } from "./aiService";
+import { getModel, getTemperature } from "./aiService";
 import { getCourse, getCourseProgress } from "../controllers/courseController";
 import { assembleCourseWideContext } from "../controllers/contextAssembler";
 import { SCHEMAS } from "../prompts/schemas";
 import { notFound } from "../middleware/errorHandler";
+import { getLangDirective, type SupportedLang } from "../utils/langDirective";
 
 export async function generateCourseChatResponse(
   courseId: string,
   message: string,
-  history?: Array<{ role: string; content: string }>
+  history?: Array<{ role: string; content: string }>,
+  lang?: SupportedLang
 ): Promise<{ text: string; suggestions: string[] }> {
   const course = getCourse(courseId);
   if (!course) throw notFound("Course not found");
@@ -19,10 +21,10 @@ export async function generateCourseChatResponse(
       role: h.role === 'user' ? 'user' : 'model',
       parts: [{ text: h.content }],
     })) || [],
-    generationConfig: { maxOutputTokens: 2500 },
+    generationConfig: { maxOutputTokens: 2500, temperature: getTemperature("creative") },
   });
 
-  const prompt = `
+  const prompt = `${getLangDirective(lang)}
 === YOUR ROLE ===
 You are an EXPERT AI TUTOR for: ${course.code} - ${course.name}.
 
@@ -75,6 +77,7 @@ Return JSON: { "days": [{ "day": "Monday", "slots": [{ "time": "Morning", "activ
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: {
       maxOutputTokens: 2000,
+      temperature: getTemperature("structured"),
       responseMimeType: "application/json",
       responseSchema: SCHEMAS.STUDY_SCHEDULE,
     } as any,

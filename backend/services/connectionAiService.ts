@@ -1,12 +1,14 @@
 import { logger } from "../utils/logger";
-import { getModel } from "./aiService";
+import { getModel, getTemperature } from "./aiService";
 import { listLessons } from "../controllers/lessonControllers";
 import { badRequest } from "../middleware/errorHandler";
+import { getLangDirective, type SupportedLang } from "../utils/langDirective";
 
 export async function generateConnectionDeepDive(
   concept: string,
   lessonTitles: string[],
-  relatedConcepts: string[]
+  relatedConcepts: string[],
+  lang?: SupportedLang
 ): Promise<string> {
   if (!concept) throw badRequest("concept is required");
 
@@ -27,7 +29,7 @@ export async function generateConnectionDeepDive(
     })
     .join("\n");
 
-  const prompt = `You are an expert educational AI tutor. Provide a detailed 3-5 paragraph analysis of how the concept "${concept}" evolves and connects across multiple lessons.
+  const prompt = `${getLangDirective(lang)}\n\nYou are an expert educational AI tutor. Provide a detailed 3-5 paragraph analysis of how the concept "${concept}" evolves and connects across multiple lessons.
 
 Context about the lessons:
 ${lessonContext}
@@ -44,7 +46,7 @@ Write in a clear, educational tone. Use paragraphs, not bullet points.`;
 
   const result = await getModel().generateContent({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: 2000 },
+    generationConfig: { maxOutputTokens: 2000, temperature: getTemperature("creative") },
   });
   const analysis = result.response.text();
   logger.info(`[AI] CONNECTION_DEEP_DIVE | concept=${concept} | ~${Math.ceil(prompt.length / 4)} in, ~${Math.ceil(analysis.length / 4)} out`);

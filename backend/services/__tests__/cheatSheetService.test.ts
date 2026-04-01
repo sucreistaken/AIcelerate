@@ -23,7 +23,7 @@ describe("buildCheatSheetPrompt", () => {
       slideText: "slides",
       language: "tr",
     });
-    expect(prompt).toContain("TURKISH");
+    expect(prompt).toContain("TÜRKÇE");
   });
 
   it("includes English language directive when language is en", () => {

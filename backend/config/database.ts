@@ -12,7 +12,7 @@ export async function connectDB(): Promise<void> {
       logger.info(`MongoDB connected: ${mongoose.connection.host}`);
       return;
     } catch (err) {
-      logger.error(`MongoDB connection attempt ${attempt}/${MAX_RETRIES} failed:`, (err as Error).message);
+      logger.error({ err }, `MongoDB connection attempt ${attempt}/${MAX_RETRIES} failed`);
       if (attempt === MAX_RETRIES) {
         logger.warn("Could not connect to MongoDB. Server will start without MongoDB (JSON storage still works).");
         return;
@@ -23,7 +23,7 @@ export async function connectDB(): Promise<void> {
 }
 
 mongoose.connection.on("error", (err) => {
-  logger.error("MongoDB connection error:", err);
+  logger.error({ err }, "MongoDB connection error");
 });
 
 mongoose.connection.on("disconnected", () => {

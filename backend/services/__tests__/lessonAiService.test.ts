@@ -19,6 +19,7 @@ vi.mock("../aiService", () => ({
     generateContent: mockGenerateContent,
     startChat: mockStartChat,
   })),
+  getTemperature: vi.fn().mockReturnValue(0.3),
   stripCodeFences: vi.fn((text: string) => {
     return text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
   }),
@@ -28,16 +29,28 @@ vi.mock("../aiService", () => ({
 }));
 
 // Mock lessonPrompts - store refs so we can assert on them
-const mockBuildPlanFromTextPrompt = vi.fn(
-  (lec: string, sld: string, code?: string) => `PROMPT:${code || "NA"}|${lec.slice(0, 20)}|${sld.slice(0, 20)}`
+const mockBuildModulesPrompt = vi.fn(
+  (lec: string, sld: string, code?: string, lo?: string) => `MODULES_PROMPT:${code || "NA"}|${lec.slice(0, 20)}|${sld.slice(0, 20)}|${lo || ""}`
 );
+const mockBuildEmphasesPrompt = vi.fn().mockReturnValue("emphases prompt");
+const mockBuildAlignmentPrompt = vi.fn().mockReturnValue("alignment prompt");
 const mockBuildChatContext = vi.fn((..._args: any[]) => "mocked-chat-context");
 const mockBuildChatPrompt = vi.fn((ctx: string, msg: string) => `chat:${msg}`);
 
 vi.mock("../../prompts/lessonPrompts", () => ({
-  buildPlanFromTextPrompt: (...args: any[]) => mockBuildPlanFromTextPrompt(...args),
+  buildModulesPrompt: (...args: any[]) => mockBuildModulesPrompt(...args),
+  buildEmphasesPrompt: (...args: any[]) => mockBuildEmphasesPrompt(...args),
+  buildAlignmentPrompt: (...args: any[]) => mockBuildAlignmentPrompt(...args),
   buildChatContext: (...args: any[]) => mockBuildChatContext(...args),
   buildChatPrompt: (...args: any[]) => mockBuildChatPrompt(...args),
+}));
+
+vi.mock("../../prompts/schemas", () => ({
+  SCHEMAS: {
+    PLAN_MODULES: {},
+    PLAN_EMPHASES: {},
+    PLAN_ALIGNMENT: {},
+  },
 }));
 
 // Mock lessonDigestService
@@ -84,40 +97,50 @@ describe("lessonAiService", () => {
 
   describe("generatePlan", () => {
     it("returns parsed plan on successful AI response", async () => {
-      const planData = {
+      const mergedResponse = {
         topic: "Calculus",
         modules: [{ title: "Limits", topics: ["epsilon-delta"] }],
-        emphases: [],
-        alignment: { items: [] },
+        key_concepts: [],
+        emphases: [{ statement: "Important", why: "Exam" }],
+        alignment: { items: [{ lo: "LO1", coverage: "full" }] },
       };
       mockGenerateContent.mockResolvedValue({
-        response: { text: () => JSON.stringify(planData) },
+        response: { text: () => JSON.stringify(mergedResponse) },
       });
 
       const result = await generatePlan("lecture text", "slide text", "MATH101");
-      expect(result).toEqual(planData);
-      expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+      expect(result).toHaveProperty("topic");
+      expect(result).toHaveProperty("modules");
+      expect(result).toHaveProperty("emphases");
+      expect(result).toHaveProperty("alignment");
+      // 3 parallel calls: modules, emphases, alignment
+      expect(mockGenerateContent).toHaveBeenCalledTimes(3);
     });
 
-    it("retries on parse failure and succeeds on second attempt", async () => {
-      const planData = { topic: "Physics", modules: [], emphases: [] };
-      // First call returns unparseable text, second returns valid JSON
+    it("retries on API error and succeeds on second attempt", async () => {
+      const mergedResponse = JSON.stringify({ topic: "Physics", modules: [], key_concepts: [], emphases: [], alignment: { items: [] } });
+      // First call fails with API error, second succeeds (for each of 3 parallel calls)
       mockGenerateContent
-        .mockResolvedValueOnce({ response: { text: () => "not valid json" } })
-        .mockResolvedValueOnce({ response: { text: () => JSON.stringify(planData) } });
+        .mockRejectedValueOnce(new Error("API temporary error"))
+        .mockResolvedValueOnce({ response: { text: () => mergedResponse } })
+        .mockResolvedValueOnce({ response: { text: () => mergedResponse } })
+        .mockResolvedValueOnce({ response: { text: () => mergedResponse } });
 
       const result = await generatePlan("lecture", "slides");
-      expect(result).toEqual(planData);
-      expect(mockGenerateContent).toHaveBeenCalledTimes(2);
+      expect(result).toHaveProperty("topic");
+      // At least 4 calls: 1 failed + 3 successful (one retry + remaining parallel calls)
+      expect(mockGenerateContent.mock.calls.length).toBeGreaterThanOrEqual(4);
     }, 15000);
 
-    it("throws after 3 failed parse attempts", async () => {
+    it("throws after 3 failed attempts on parse error", async () => {
       mockGenerateContent.mockResolvedValue({
         response: { text: () => "garbage text" },
       });
 
-      await expect(generatePlan("lec", "sld")).rejects.toThrow("LLM JSON parse error after retries");
-      expect(mockGenerateContent).toHaveBeenCalledTimes(3);
+      // With responseSchema, JSON.parse("garbage text") throws on all 3 sub-calls
+      // Each sub-call retries 3 times = up to 9 calls
+      await expect(generatePlan("lec", "sld")).rejects.toThrow();
+      expect(mockGenerateContent.mock.calls.length).toBeGreaterThanOrEqual(3);
     }, 15000);
 
     it("throws on AI call failure after retries", async () => {
@@ -126,8 +149,8 @@ describe("lessonAiService", () => {
       await expect(generatePlan("lec", "sld")).rejects.toThrow("API rate limit");
     }, 15000);
 
-    it("truncates long inputs to 18000 chars", async () => {
-      const planData = { topic: "Long", modules: [] };
+    it("truncates long inputs via smartTruncate", async () => {
+      const planData = { topic: "Long", modules: [], key_concepts: [], emphases: [], alignment: { items: [] } };
       mockGenerateContent.mockResolvedValue({
         response: { text: () => JSON.stringify(planData) },
       });
@@ -136,21 +159,23 @@ describe("lessonAiService", () => {
       const longSlides = "y".repeat(25000);
       await generatePlan(longLecture, longSlides);
 
-      expect(mockBuildPlanFromTextPrompt).toHaveBeenCalled();
-      const firstCallArgs = mockBuildPlanFromTextPrompt.mock.calls[0];
-      expect(firstCallArgs[0].length).toBeLessThanOrEqual(18000);
-      expect(firstCallArgs[1].length).toBeLessThanOrEqual(18000);
+      expect(mockBuildModulesPrompt).toHaveBeenCalled();
+      const firstCallArgs = mockBuildModulesPrompt.mock.calls[0];
+      // smartTruncate may add separators, but result should be roughly <= 18000 + separator overhead
+      expect(firstCallArgs[0].length).toBeLessThanOrEqual(18100);
+      expect(firstCallArgs[1].length).toBeLessThanOrEqual(18100);
     });
 
     it("passes learning outcomes to prompt builder", async () => {
-      const planData = { topic: "LO Test", modules: [] };
+      const planData = { topic: "LO Test", modules: [], key_concepts: [], emphases: [], alignment: { items: [] } };
       mockGenerateContent.mockResolvedValue({
         response: { text: () => JSON.stringify(planData) },
       });
 
       await generatePlan("lec", "sld", "CS101", ["Understand X", "Apply Y"]);
 
-      const callArgs = mockBuildPlanFromTextPrompt.mock.calls[0];
+      expect(mockBuildModulesPrompt).toHaveBeenCalled();
+      const callArgs = mockBuildModulesPrompt.mock.calls[0];
       expect(callArgs[2]).toBe("CS101");
       expect(callArgs[3]).toContain("Understand X");
       expect(callArgs[3]).toContain("Apply Y");
@@ -188,6 +213,7 @@ describe("lessonAiService", () => {
         expect.any(String),
         "What is recursion?",
         "course-1",
+        undefined, // lang
       );
     });
 

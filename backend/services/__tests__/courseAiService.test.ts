@@ -36,6 +36,7 @@ vi.mock("../aiService", () => ({
       },
     })),
   })),
+  getTemperature: vi.fn().mockReturnValue(0.3),
 }));
 
 // Mock schemas

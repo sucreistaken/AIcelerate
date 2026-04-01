@@ -27,6 +27,9 @@ import {
   quizFromPlanSchema, quizAnswersSchema, quizEvalSchema, quizEvalBatchSchema,
 } from "../validators/quizSchemas";
 import type { PlanModule, AlignmentItem } from "../types";
+import type { SupportedLang } from "../utils/langDirective";
+import { logger } from "../utils/logger";
+import { scoreArtifact } from "../services/confidenceService";
 
 const router = Router();
 
@@ -66,10 +69,20 @@ router.get("/memory", (_req, res) => res.json(getMemory()));
 // ---- Cheat Sheet ----
 router.post("/lessons/:id/cheat-sheet", validate(cheatSheetSchema), asyncHandler(async (req, res) => {
   const { language, courseWide } = req.body;
+  const lessonId = req.params.id;
   const { cheatSheet, cached } = await generateCheatSheet(
-    req.params.id, language, courseWide, req.query.force === 'true'
+    lessonId, language, courseWide, req.query.force === 'true'
   );
-  res.json({ ok: true, lessonId: req.params.id, cheatSheet, cached });
+
+  // Score cheat sheet confidence in background (OPT-15) — only for fresh generation
+  if (!cached) {
+    const lesson = getLesson(lessonId);
+    scoreArtifact("cheatSheet", JSON.stringify(cheatSheet), `${lesson?.transcript?.slice(0, 1500) || ""}\n${lesson?.slideText?.slice(0, 1000) || ""}`)
+      .then(score => upsertLesson({ id: lessonId, cheatSheetConfidence: score }))
+      .catch(err => logger.warn(`[CONFIDENCE] CheatSheet scoring failed for ${lessonId}: ${err?.message}`));
+  }
+
+  res.json({ ok: true, lessonId, cheatSheet, cached });
 }));
 
 // ---- LO Modules ----
@@ -127,7 +140,11 @@ router.post("/plan-from-text/stream", async (req, res) => {
   req.on("close", () => { aborted = true; });
 
   try {
-    const plan = await generatePlanStream(res, lectureText, slidesText, courseCode, learningOutcomes);
+    // Resolve language from course
+    const course = reqLessonId ? getCourseForLesson(reqLessonId) : null;
+    const lang = (course?.settings?.language as SupportedLang) || "tr";
+
+    const plan = await generatePlanStream(res, lectureText, slidesText, courseCode, learningOutcomes, lang);
 
     // Save lesson (same logic as non-streaming endpoint)
     const lId = reqLessonId || `lec-${Date.now()}`;
@@ -156,6 +173,16 @@ router.post("/plan-from-text/stream", async (req, res) => {
 
     // Generate digest in background
     generateDigest(lId, lectureText, slidesText, plan).catch(() => {});
+
+    // Pre-generate cheat sheet in background (OPT-8)
+    generateCheatSheet(lId, lang, false, false).catch(err => {
+      logger.warn(`[PRE-GEN] CheatSheet failed for ${lId}: ${err?.message}`);
+    });
+
+    // Score plan confidence in background (OPT-15)
+    scoreArtifact("plan", JSON.stringify(plan), `${lectureText?.slice(0, 1500) || ""}\n${slidesText?.slice(0, 1000) || ""}`)
+      .then(score => upsertLesson({ id: lId, planConfidence: score }))
+      .catch(err => logger.warn(`[CONFIDENCE] Plan scoring failed for ${lId}: ${err?.message}`));
 
     // Send final done event — always attempt even if client appears disconnected
     // (the plan is already saved, frontend needs the lessonId to navigate)
@@ -194,7 +221,11 @@ router.post("/plan-from-text", validate(planFromTextSchema), asyncHandler(async 
     return res.json({ ok: true, plan, lessonId: saved.id });
   }
 
-  let plan = await generatePlan(lectureText, slidesText, courseCode, learningOutcomes);
+  // Resolve language from course
+  const courseForLang = lessonId ? getCourseForLesson(lessonId) : null;
+  const lang = (courseForLang?.settings?.language as SupportedLang) || "tr";
+
+  let plan = await generatePlan(lectureText, slidesText, courseCode, learningOutcomes, lang);
   if (!hasAlignment(plan)) {
     try { const alignment = await generateAlignmentOnly(lectureText, slidesText); plan = { ...plan, alignment }; }
     catch { /* alignment fallback failed, continue without */ }
@@ -216,6 +247,16 @@ router.post("/plan-from-text", validate(planFromTextSchema), asyncHandler(async 
   const lessonCourse = getCourseForLesson(saved.id);
   if (lessonCourse) rebuildKnowledgeIndex(lessonCourse.id);
   generateDigest(saved.id, lectureText, slidesText, plan).catch(() => {});
+
+  // Pre-generate cheat sheet in background (OPT-8)
+  generateCheatSheet(saved.id, lang, false, false).catch(err => {
+    logger.warn(`[PRE-GEN] CheatSheet failed for ${saved.id}: ${err?.message}`);
+  });
+
+  // Score plan confidence in background (OPT-15)
+  scoreArtifact("plan", JSON.stringify(plan), `${lectureText?.slice(0, 1500) || ""}\n${slidesText?.slice(0, 1000) || ""}`)
+    .then(score => upsertLesson({ id: saved.id, planConfidence: score }))
+    .catch(err => logger.warn(`[CONFIDENCE] Plan scoring failed for ${saved.id}: ${err?.message}`));
 
   res.json({ ok: true, plan, lessonId: saved.id });
 }));

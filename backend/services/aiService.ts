@@ -11,6 +11,35 @@ export function getModel(): GenerativeModel {
   return _model;
 }
 
+// ── Temperature profiles ──────────────────────────────────────────────────────
+export type ModelProfile = "structured" | "creative" | "balanced";
+
+const TEMPERATURE_MAP: Record<ModelProfile, number> = {
+  structured: 0.1, // Quiz eval, LO alignment, digest
+  creative:   0.7, // Chat, deep-dive, connection
+  balanced:   0.3, // Plan, quiz creation, cheat sheet
+};
+
+export function getTemperature(profile: ModelProfile): number {
+  return TEMPERATURE_MAP[profile];
+}
+
+// ── AI Call Tracking (OPT-14) ────────────────────────────────────────────────
+import { logger } from "../utils/logger";
+
+export interface AiCallMetrics {
+  endpoint: string;
+  inputTokensEst: number;
+  outputTokensEst: number;
+  latencyMs: number;
+  success: boolean;
+  retryCount?: number;
+}
+
+export function trackAiCall(metrics: AiCallMetrics) {
+  logger.info({ ai: metrics }, `AI call: ${metrics.endpoint}`);
+}
+
 export const stripCodeFences = (s: string) =>
   s.replace(/```json/gi, "").replace(/```/g, "").trim();
 

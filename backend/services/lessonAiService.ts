@@ -3,67 +3,114 @@
 // Handles model calls, retry logic, response parsing.
 
 import { logger } from "../utils/logger";
-import { getModel, stripCodeFences, tryParseJSON } from "./aiService";
+import { getModel, getTemperature, tryParseJSON, stripCodeFences } from "./aiService";
 import {
-  buildPlanFromTextPrompt,
+  buildModulesPrompt,
+  buildEmphasesPrompt,
+  buildAlignmentPrompt,
   buildChatContext,
   buildChatPrompt,
 } from "../prompts/lessonPrompts";
+import { SCHEMAS } from "../prompts/schemas";
 // Re-export domain services for backward-compatible imports
 export { generateMindmap, generateMindmapModule, generateMindmapNodeDetail } from "./mindmapAiService";
 export { generateQuizFromPlan, generateQuizAnswers, evaluateQuizAnswer, evaluateQuizBatch } from "./quizAiService";
 import { getDigestOrFallback } from "./lessonDigestService";
 import { assembleCourseContext } from "../controllers/contextAssembler";
 import type { Lesson } from "../controllers/lessonControllers";
+import { smartTruncate } from "../utils/smartTruncate";
+import { getLangDirective } from "../utils/langDirective";
 import type { LessonPlan, ChatMessage } from "../types";
+import type { SupportedLang } from "../utils/langDirective";
 
 function logAI(label: string, inputLen: number, outputLen: number, maxTokens: number) {
   logger.info(`[AI] ${label} | ~${Math.ceil(inputLen / 4)} in, ~${Math.ceil(outputLen / 4)} out | max=${maxTokens}`);
 }
 
-// ---- Plan Generation ----
-export async function generatePlan(
-  lectureText: string, slidesText: string,
-  courseCode?: string, learningOutcomes?: string[]
-): Promise<LessonPlan> {
-  const LEC = lectureText.slice(0, 18000);
-  const SLD = slidesText.slice(0, 18000);
-  const LO_BLOCK = Array.isArray(learningOutcomes) && learningOutcomes.length
-    ? learningOutcomes.map((lo, i) => `${i + 1}. ${String(lo || "").trim()}`).join("\n")
-    : "—";
-
-  const prompt = buildPlanFromTextPrompt(LEC, SLD, courseCode, LO_BLOCK);
-
-  let plan: LessonPlan | null = null;
+// ---- Retry Helper ----
+async function callWithRetry<T>(
+  fn: () => Promise<T>,
+  label: string,
+  maxAttempts = 3
+): Promise<T> {
   let lastError = "";
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       if (attempt > 0) {
         const delay = 2000 * Math.pow(2, attempt - 1);
         await new Promise(r => setTimeout(r, delay));
-        logger.warn(`[PLAN] Retry attempt ${attempt + 1}...`);
+        logger.warn(`[${label}] Retry attempt ${attempt + 1}...`);
       }
-      const result = await getModel().generateContent({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 16000 },
-      });
-      const rawText = result.response.text() || "";
-      logAI("PLAN_FROM_TEXT", prompt.length, rawText.length, 16000);
-      const cleaned = stripCodeFences(rawText);
-      plan = tryParseJSON(cleaned);
-      if (plan) break;
-      lastError = cleaned.slice(0, 2000);
-      logger.error(`[Parse FAIL attempt ${attempt + 1}]:`, lastError.slice(0, 500));
-    } catch (retryErr: unknown) {
-      lastError = retryErr instanceof Error ? retryErr.message : "AI call failed";
-      logger.error(`[PLAN attempt ${attempt + 1} error]:`, lastError);
-      if (attempt === 2) throw retryErr;
+      return await fn();
+    } catch (err: unknown) {
+      lastError = err instanceof Error ? err.message : "AI call failed";
+      logger.error(`[${label} attempt ${attempt + 1} error]:`, lastError);
+      if (attempt === maxAttempts - 1) throw err;
     }
   }
-  if (!plan) {
-    throw Object.assign(new Error("LLM JSON parse error after retries"), { llmText: lastError });
+  throw new Error(`${label}: all ${maxAttempts} attempts failed`);
+}
+
+// ---- Plan Sub-Call (single focused AI call with schema) ----
+async function planSubCall(
+  prompt: string, schema: any, maxTokens: number, label: string
+): Promise<any> {
+  const result = await getModel().generateContent({
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    generationConfig: {
+      maxOutputTokens: maxTokens,
+      temperature: getTemperature("balanced"),
+      responseMimeType: "application/json",
+      responseSchema: schema,
+    } as any,
+  });
+  const rawText = result.response.text() || "";
+  logAI(label, prompt.length, rawText.length, maxTokens);
+
+  // Truncation detection
+  const estimatedTokens = Math.ceil(rawText.length / 4);
+  if (estimatedTokens > maxTokens * 0.85) {
+    logger.warn(`[${label}] Near token limit: ~${estimatedTokens}/${maxTokens}`);
   }
-  return plan;
+
+  // Safe JSON parse with fallback
+  const parsed = tryParseJSON(rawText) ?? tryParseJSON(stripCodeFences(rawText));
+  if (!parsed) {
+    throw new Error(`${label}: invalid JSON (output ~${estimatedTokens} tokens, limit=${maxTokens})`);
+  }
+  return parsed;
+}
+
+// ---- Plan Generation (3 parallel calls) ----
+export async function generatePlan(
+  lectureText: string, slidesText: string,
+  courseCode?: string, learningOutcomes?: string[],
+  lang?: SupportedLang
+): Promise<LessonPlan> {
+  const LEC = smartTruncate(lectureText, 18000);
+  const SLD = smartTruncate(slidesText, 18000);
+  const LO_BLOCK = Array.isArray(learningOutcomes) && learningOutcomes.length
+    ? learningOutcomes.map((lo, i) => `${i + 1}. ${String(lo || "").trim()}`).join("\n")
+    : "—";
+  const langDir = getLangDirective(lang);
+
+  const modulesPrompt = buildModulesPrompt(LEC, SLD, courseCode, LO_BLOCK, langDir);
+  const emphasesPrompt = buildEmphasesPrompt(LEC, SLD, langDir);
+  const alignmentPrompt = buildAlignmentPrompt(LEC, SLD, langDir);
+
+  // Fire all 3 in parallel
+  const [modulesResult, emphasesResult, alignmentResult] = await Promise.all([
+    callWithRetry(() => planSubCall(modulesPrompt, SCHEMAS.PLAN_MODULES, 10000, "PLAN_MODULES"), "PLAN_MODULES"),
+    callWithRetry(() => planSubCall(emphasesPrompt, SCHEMAS.PLAN_EMPHASES, 5000, "PLAN_EMPHASES"), "PLAN_EMPHASES"),
+    callWithRetry(() => planSubCall(alignmentPrompt, SCHEMAS.PLAN_ALIGNMENT, 6000, "PLAN_ALIGNMENT"), "PLAN_ALIGNMENT"),
+  ]);
+
+  // Merge into unified LessonPlan
+  return {
+    ...modulesResult,
+    emphases: emphasesResult.emphases,
+    alignment: alignmentResult.alignment,
+  };
 }
 
 export async function generatePlanStream(
@@ -71,108 +118,81 @@ export async function generatePlanStream(
   lectureText: string,
   slidesText: string,
   courseCode?: string,
-  learningOutcomes?: string[]
+  learningOutcomes?: string[],
+  lang?: SupportedLang
 ): Promise<LessonPlan> {
-  const LEC = lectureText.slice(0, 18000);
-  const SLD = slidesText.slice(0, 18000);
+  const LEC = smartTruncate(lectureText, 18000);
+  const SLD = smartTruncate(slidesText, 18000);
   const LO_BLOCK = learningOutcomes?.length
-    ? `\n\nLearning Outcomes:\n${learningOutcomes.map((lo, i) => `${i + 1}. ${lo}`).join("\n")}`
-    : "";
-  const prompt = buildPlanFromTextPrompt(LEC, SLD, courseCode, LO_BLOCK);
+    ? learningOutcomes.map((lo, i) => `${i + 1}. ${lo}`).join("\n")
+    : "—";
+  const langDir = getLangDirective(lang);
 
-  // Phase 1: Started
   const sendEvent = (data: Record<string, unknown>) => {
-    res.write(`data: ${JSON.stringify(data)}\n\n`);
+    try { res.write(`data: ${JSON.stringify(data)}\n\n`); } catch { /* client gone */ }
   };
 
   sendEvent({ type: "phase", phase: "analyzing", message: "Analyzing lesson content..." });
 
-  let rawText = "";
-  let plan: LessonPlan | null = null;
-  let lastError = "";
+  const modulesPrompt = buildModulesPrompt(LEC, SLD, courseCode, LO_BLOCK, langDir);
+  const emphasesPrompt = buildEmphasesPrompt(LEC, SLD, langDir);
+  const alignmentPrompt = buildAlignmentPrompt(LEC, SLD, langDir);
 
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      if (attempt > 0) {
-        const delay = 2000 * Math.pow(2, attempt - 1);
-        await new Promise(r => setTimeout(r, delay));
-        sendEvent({ type: "phase", phase: "retrying", message: `Retry attempt ${attempt + 1}...` });
-      }
+  // Fire all 3 in parallel
+  sendEvent({ type: "phase", phase: "generating", message: "Creating learning plan..." });
 
-      sendEvent({ type: "phase", phase: "generating", message: "Creating learning plan..." });
+  let modulesData: any, emphasesData: any, alignmentData: any;
 
-      // Use streaming API
-      const result = await getModel().generateContentStream({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 16000 },
-      });
-
-      rawText = "";
-      let tokenCount = 0;
-      let lastProgressSent = 0;
-
-      for await (const chunk of result.stream) {
-        const chunkText = chunk.text() || "";
-        rawText += chunkText;
-        tokenCount += chunkText.split(/\s+/).length;
-
-        // Send progress every ~100 words
-        if (tokenCount - lastProgressSent >= 100) {
-          lastProgressSent = tokenCount;
-          sendEvent({ type: "progress", tokens: tokenCount, message: "Generating..." });
-        }
-      }
-
-      logAI("PLAN_FROM_TEXT_STREAM", prompt.length, rawText.length, 16000);
-
-      sendEvent({ type: "phase", phase: "parsing", message: "Structuring content..." });
-
-      const cleaned = stripCodeFences(rawText);
-      plan = tryParseJSON(cleaned);
-
-      if (plan) {
-        // Send modules progressively
-        if (plan.modules?.length) {
-          for (let i = 0; i < plan.modules.length; i++) {
-            await new Promise(r => setTimeout(r, 50)); // slight delay for animation
-            sendEvent({ type: "module", index: i, total: plan.modules.length, data: plan.modules[i] });
-          }
-        }
-
-        // Send emphases progressively
-        if (plan.emphases?.length) {
-          sendEvent({ type: "phase", phase: "emphases", message: "Extracting key insights..." });
-          for (let i = 0; i < plan.emphases.length; i++) {
-            await new Promise(r => setTimeout(r, 30));
-            sendEvent({ type: "emphasis", index: i, total: plan.emphases.length, data: plan.emphases[i] });
-          }
-        }
-
-        break; // success
-      }
-
-      lastError = cleaned.slice(0, 2000);
-      logger.error(`[Stream Parse FAIL attempt ${attempt + 1}]`);
-    } catch (retryErr: unknown) {
-      lastError = retryErr instanceof Error ? retryErr.message : "AI call failed";
-      logger.error(`[Stream PLAN attempt ${attempt + 1} error]:`, lastError);
-      if (attempt === 2) {
-        sendEvent({ type: "error", message: lastError });
-        throw retryErr;
+  const modulesP = callWithRetry(
+    () => planSubCall(modulesPrompt, SCHEMAS.PLAN_MODULES, 10000, "PLAN_MODULES"), "PLAN_MODULES"
+  ).then(result => {
+    modulesData = result;
+    // Stream modules progressively as they arrive
+    if (result.modules?.length) {
+      for (let i = 0; i < result.modules.length; i++) {
+        sendEvent({ type: "module", index: i, total: result.modules.length, data: result.modules[i] });
       }
     }
+    sendEvent({ type: "progress", tokens: 0, message: "Modules ready" });
+  });
+
+  const emphasesP = callWithRetry(
+    () => planSubCall(emphasesPrompt, SCHEMAS.PLAN_EMPHASES, 5000, "PLAN_EMPHASES"), "PLAN_EMPHASES"
+  ).then(result => {
+    emphasesData = result;
+    sendEvent({ type: "phase", phase: "emphases", message: "Extracting key insights..." });
+    if (result.emphases?.length) {
+      for (let i = 0; i < result.emphases.length; i++) {
+        sendEvent({ type: "emphasis", index: i, total: result.emphases.length, data: result.emphases[i] });
+      }
+    }
+  });
+
+  const alignmentP = callWithRetry(
+    () => planSubCall(alignmentPrompt, SCHEMAS.PLAN_ALIGNMENT, 6000, "PLAN_ALIGNMENT"), "PLAN_ALIGNMENT"
+  ).then(result => {
+    alignmentData = result;
+  });
+
+  try {
+    await Promise.all([modulesP, emphasesP, alignmentP]);
+  } catch (err: any) {
+    sendEvent({ type: "error", message: err?.message || "Plan generation failed" });
+    throw err;
   }
 
-  if (!plan) {
-    sendEvent({ type: "error", message: "Failed to generate plan after retries" });
-    throw Object.assign(new Error("LLM JSON parse error after retries"), { llmText: lastError });
-  }
+  // Merge into unified LessonPlan
+  const plan: LessonPlan = {
+    ...modulesData,
+    emphases: emphasesData.emphases,
+    alignment: alignmentData.alignment,
+  };
 
   return plan;
 }
 
 // ---- Chat ----
-export function buildChatContextForLesson(lesson: Lesson, lessonId: string, message: string, history?: ChatMessage[]) {
+export function buildChatContextForLesson(lesson: Lesson, lessonId: string, message: string, history?: ChatMessage[], lang?: SupportedLang) {
   const plan = lesson.plan;
   const modules = plan?.modules || [];
   const emphases = lesson.professorEmphases || plan?.emphases || [];
@@ -189,13 +209,13 @@ export function buildChatContextForLesson(lesson: Lesson, lessonId: string, mess
   const isFirstMessage = !history || history.length === 0;
   let lessonContentBlock: string;
   if (isFirstMessage) {
-    lessonContentBlock = `=== TRANSCRIPT EXCERPT ===\n${(lesson.transcript || "").slice(0, 8000)}\n\n=== SLIDE CONTENT EXCERPT ===\n${(lesson.slideText || "").slice(0, 5000)}`;
+    lessonContentBlock = `=== TRANSCRIPT EXCERPT ===\n${smartTruncate(lesson.transcript || "", 8000)}\n\n=== SLIDE CONTENT EXCERPT ===\n${smartTruncate(lesson.slideText || "", 5000)}`;
   } else {
     const { context: digestCtx, isDigest } = getDigestOrFallback(lessonId);
     if (isDigest) {
       lessonContentBlock = `=== LESSON DIGEST ===\n${digestCtx}`;
     } else {
-      lessonContentBlock = `=== TRANSCRIPT EXCERPT ===\n${(lesson.transcript || "").slice(0, 4000)}\n\n=== SLIDE CONTENT EXCERPT ===\n${(lesson.slideText || "").slice(0, 2000)}`;
+      lessonContentBlock = `=== TRANSCRIPT EXCERPT ===\n${smartTruncate(lesson.transcript || "", 4000)}\n\n=== SLIDE CONTENT EXCERPT ===\n${smartTruncate(lesson.slideText || "", 2000)}`;
     }
   }
 
@@ -208,7 +228,7 @@ export function buildChatContextForLesson(lesson: Lesson, lessonId: string, mess
     lessonContentBlock, courseCtx.crossLessonBlock, courseCtx.progressBlock
   );
 
-  const prompt = buildChatPrompt(context, message, courseCtx.courseId);
+  const prompt = buildChatPrompt(context, message, courseCtx.courseId, lang);
   return { prompt, history: history || [], courseCtx };
 }
 
@@ -231,7 +251,7 @@ export async function generateChatResponseStream(
         ...(history.map((h) => ({ role: h.role === 'user' ? 'user' as const : 'model' as const, parts: [{ text: h.content }] }))),
         { role: 'user', parts: [{ text: prompt }] },
       ],
-      generationConfig: { maxOutputTokens: 2500 },
+      generationConfig: { maxOutputTokens: 2500, temperature: getTemperature("creative") },
     }),
     timeoutPromise,
   ]);
@@ -260,7 +280,7 @@ export async function generateChatResponseSync(
 
   const chat = getModel().startChat({
     history: history.map((h) => ({ role: h.role === 'user' ? 'user' as const : 'model' as const, parts: [{ text: h.content }] })),
-    generationConfig: { maxOutputTokens: 2500 },
+    generationConfig: { maxOutputTokens: 2500, temperature: getTemperature("creative") },
   });
 
   const result = await Promise.race([chat.sendMessage(prompt), timeoutPromise]);

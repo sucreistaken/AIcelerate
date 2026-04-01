@@ -1,0 +1,126 @@
+// services/knowledgeGraphService.ts
+// Extracts concept relationships from course lessons to build a knowledge graph.
+
+import { getModel, getTemperature } from "./aiService";
+import { SCHEMAS } from "../prompts/schemas";
+import { smartTruncate } from "../utils/smartTruncate";
+import { logger } from "../utils/logger";
+import { getLesson } from "../controllers/lessonControllers";
+import { getCourse, updateCourse } from "../controllers/courseController";
+import type { KnowledgeGraph, ConceptNode, ConceptEdge } from "../types/knowledgeGraph";
+
+function buildGraphPrompt(conceptsByLesson: string): string {
+  return `You are an educational knowledge engineer. Analyze concepts from multiple lessons and extract a concept relationship graph.
+
+For each concept:
+- Assign a kebab-case id (e.g., "newtons-second-law")
+- Classify its type: concept, principle, formula, technique, or definition
+- Name it clearly
+
+For relationships between concepts, identify:
+- prerequisite: A must be understood before B
+- extends: B builds on or deepens A
+- applies: A is used/applied in B
+- example_of: A illustrates B
+
+Only include relationships you are confident about (confidence > 0.6).
+Include a brief evidence string explaining why the relationship exists.
+
+[CONCEPTS BY LESSON]
+${conceptsByLesson}
+
+Return a knowledge graph with nodes and edges.`.trim();
+}
+
+/**
+ * Extract a knowledge graph from all lessons in a course.
+ * Collects key_concepts, emphases, and module topics from each lesson,
+ * then asks the AI to identify relationships between concepts.
+ */
+export async function extractGraphFromLessons(courseId: string): Promise<KnowledgeGraph> {
+  const course = getCourse(courseId);
+  if (!course) throw new Error("Course not found");
+
+  const lessonIds = course.lessonIds || [];
+  const conceptsByLesson: string[] = [];
+
+  for (const lid of lessonIds) {
+    const lesson = getLesson(lid);
+    if (!lesson?.plan) continue;
+
+    const plan = lesson.plan;
+    const concepts = plan.key_concepts || [];
+    const emphases = (plan.emphases || []).map((e: any) => e.statement).filter(Boolean);
+    const modules = (plan.modules || []).map((m: any) => m.title).filter(Boolean);
+
+    if (concepts.length || emphases.length) {
+      conceptsByLesson.push(
+        `Lesson "${lesson.title}":\n  Concepts: ${concepts.join(", ")}\n  Emphases: ${emphases.slice(0, 5).join("; ")}\n  Modules: ${modules.join(", ")}`
+      );
+    }
+  }
+
+  if (conceptsByLesson.length === 0) {
+    return { nodes: [], edges: [], builtAt: new Date().toISOString(), version: 1 };
+  }
+
+  const prompt = buildGraphPrompt(smartTruncate(conceptsByLesson.join("\n\n"), 6000));
+
+  const result = await getModel().generateContent({
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    generationConfig: {
+      maxOutputTokens: 4000,
+      temperature: getTemperature("structured"),
+      responseMimeType: "application/json",
+      responseSchema: SCHEMAS.KNOWLEDGE_GRAPH,
+    } as any,
+  });
+
+  const rawText = result.response.text() || "";
+  const parsed = JSON.parse(rawText);
+
+  logger.info(`[KNOWLEDGE_GRAPH] courseId=${courseId} | nodes=${parsed.nodes?.length || 0} edges=${parsed.edges?.length || 0}`);
+
+  // Post-process: assign lessonIds to each node based on which lessons mention the concept
+  const nodes: ConceptNode[] = (parsed.nodes || []).map((n: any) => {
+    const matchingLessons: string[] = [];
+    for (const lid of lessonIds) {
+      const lesson = getLesson(lid);
+      if (!lesson?.plan) continue;
+      const allTerms = [
+        ...(lesson.plan.key_concepts || []),
+        ...(lesson.plan.modules || []).map((m: any) => m.title),
+      ].map((t: string) => t.toLowerCase());
+      if (allTerms.some(t => t.includes(n.name.toLowerCase()) || n.name.toLowerCase().includes(t))) {
+        matchingLessons.push(lid);
+      }
+    }
+    return {
+      ...n,
+      lessonIds: matchingLessons,
+      strength: lessonIds.length > 0 ? matchingLessons.length / lessonIds.length : 0,
+    };
+  });
+
+  const edges: ConceptEdge[] = (parsed.edges || []).filter(
+    (e: any) => e.confidence >= 0.5
+  );
+
+  const graph: KnowledgeGraph = {
+    nodes,
+    edges,
+    builtAt: new Date().toISOString(),
+    version: (course as any).knowledgeGraph?.version ? (course as any).knowledgeGraph.version + 1 : 1,
+  };
+
+  // Persist on course
+  updateCourse(courseId, { knowledgeGraph: graph } as any);
+
+  return graph;
+}
+
+/** Get cached knowledge graph for a course */
+export function getKnowledgeGraph(courseId: string): KnowledgeGraph | null {
+  const course = getCourse(courseId) as any;
+  return course?.knowledgeGraph || null;
+}

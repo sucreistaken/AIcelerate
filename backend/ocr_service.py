@@ -5,6 +5,8 @@ import pytesseract
 import numpy as np
 from PIL import Image
 import tempfile
+import hashlib
+from collections import Counter
 from pdf2image import convert_from_path
 
 # --- CONFIGURATION ---
@@ -173,60 +175,89 @@ class LectureOCR:
             try:
                 import fitz  # PyMuPDF
                 doc = fitz.open(file_path)
-                print(f"[*] Analyzing PDF page by page ({len(doc)} pages)...")
-                
+                total_pages = len(doc)
+                print(f"[*] Analyzing PDF page by page ({total_pages} pages)...")
+
+                # --- PASS 1: Count xref frequency across pages (template detection) ---
+                xref_page_count = Counter()
+                for page in doc:
+                    for img in page.get_images(full=True):
+                        xref_page_count[img[0]] += 1
+
+                template_threshold = max(int(total_pages * 0.5), 3)
+                template_xrefs = {x for x, c in xref_page_count.items() if c > template_threshold}
+                if template_xrefs:
+                    print(f"[*] Detected {len(template_xrefs)} template images (appear on >{template_threshold} pages), skipping.")
+
+                # --- PASS 2: Extract text + unique content images ---
+                seen_xrefs = set()
+                seen_hashes = set()
+
                 with tempfile.TemporaryDirectory() as temp_dir:
                     for i, page in enumerate(doc):
                         # A. STRUCTURAL TEXT EXTRACTION
-                        # We use the new smart extractor first to check for content
                         structured_text = self.extract_text_with_structure(page)
-                        
-                        # Decide on text source (Digital vs OCR) based on raw text length
-                        plain_text = page.get_text("text").strip() # Quick check length
-                        
+
+                        plain_text = page.get_text("text").strip()
+
                         if len(plain_text) > 50:
                             print(f"    Page {i+1}: Digital text found ({len(plain_text)} chars).")
                             full_text.append(f"--- Slide {i+1} (Extracted) ---\n{structured_text}\n")
                         else:
-                            print(f"    Page {i+1}: Low text ({len(plain_text)} chars). Applying OCR...")
-                            pix = page.get_pixmap(dpi=300)
-                            page_image_path = os.path.join(temp_dir, f"page_{i}.png")
-                            pix.save(page_image_path)
-                            ocr_text = self.extract_text_from_image(page_image_path, config=r'-l eng --psm 3')
-                            full_text.append(f"--- Slide {i+1} (OCR) ---\n{ocr_text}\n")
+                            print(f"    Page {i+1}: Low text ({len(plain_text)} chars). Marking for AI OCR...")
+                            pix = page.get_pixmap(dpi=200)
+                            ocr_img_path = os.path.join(temp_img_dir, f"ocr_page_{i+1}_{os.getpid()}.png")
+                            pix.save(ocr_img_path)
+                            full_text.append(f"\n[[[OCR_REQUIRED:slide_{i+1}:{ocr_img_path}]]]\n")
 
                         # B. IMAGE EXTRACTION (For AI Analysis)
-                        # Extract images associated with this page
                         image_list = page.get_images(full=True)
                         for img_index, img in enumerate(image_list):
                             xref = img[0]
                             width = img[2]
                             height = img[3]
-                            
-                            # FILTER 1: Dimensions
-                            # Ignore small icons, bullets, logos, footer elements
-                            # Diagrams are usually at least 200x200
+
+                            # FILTER 1: Skip template/repeated images (logos, backgrounds)
+                            if xref in template_xrefs:
+                                continue
+
+                            # FILTER 2: Skip already-processed xrefs (deduplication)
+                            if xref in seen_xrefs:
+                                continue
+
+                            # FILTER 3: Dimensions — diagrams are usually at least 200x200
                             if width < 200 or height < 200:
                                 continue
 
                             base_image = doc.extract_image(xref)
                             image_bytes = base_image["image"]
-                            
-                            # FILTER 2: File Size
-                            # Ignore tiny files (even if dimensions are artificially large)
-                            # Threshold: 15KB
+
+                            # FILTER 4: File Size — ignore tiny files (15KB threshold)
                             if len(image_bytes) < 15360:
+                                seen_xrefs.add(xref)
                                 continue
+
+                            # FILTER 5: Content hash dedup (different xref, same bytes)
+                            img_hash = hashlib.md5(image_bytes).hexdigest()
+                            if img_hash in seen_hashes:
+                                seen_xrefs.add(xref)
+                                continue
+
+                            seen_xrefs.add(xref)
+                            seen_hashes.add(img_hash)
 
                             image_ext = base_image["ext"]
                             img_filename = f"slide_{i+1}_img_{img_index}_{os.getpid()}.{image_ext}"
                             img_path = os.path.join(temp_img_dir, img_filename)
-                            
+
                             with open(img_path, "wb") as f_out:
                                 f_out.write(image_bytes)
-                            
-                            # Insert marker for backend to process
+
                             full_text.append(f"\n[[[IMAGE_ANALYSIS_REQUIRED:{img_path}]]]\n")
+
+                unique_count = len(seen_hashes)
+                skipped = sum(xref_page_count.values()) - unique_count
+                print(f"[*] Image summary: {unique_count} unique content images extracted, {skipped} duplicates/templates skipped.")
 
             except ImportError:
                 print("[!] PyMuPDF failed. Falling back to full OCR.")

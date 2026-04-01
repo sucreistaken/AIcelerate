@@ -25,6 +25,9 @@ const CourseDashboard = lazy(() => import("../CourseDashboard"));
 const StudyHub = lazy(() => import("../collab/layout/StudyHub"));
 const WelcomeGuide = lazy(() => import("../ui/WelcomeGuide"));
 const LessonWizard = lazy(() => import("../lesson-wizard/LessonWizard"));
+const KnowledgeGraphPane = lazy(() => import("../KnowledgeGraphPane"));
+const AdaptiveQuizPane = lazy(() => import("../AdaptiveQuizPane"));
+const LOProgressPane = lazy(() => import("../LOProgressPane"));
 
 interface PaneRouterProps {
   mode: ModeId;
@@ -69,7 +72,7 @@ function PaneRouter({ mode, lesson, ui }: PaneRouterProps) {
             transition={{ duration: 0.2 }}
           >
             {mode === "plan" && (
-              lesson.plan ? <PlanPane plan={lesson.plan} /> : (lesson.currentLessonId ? <NoPlanEmpty /> : <WelcomeGuide />)
+              lesson.plan ? <PlanPane plan={lesson.plan} confidence={(lesson as any).planConfidence} /> : (lesson.currentLessonId ? <NoPlanEmpty /> : <WelcomeGuide />)
             )}
 
             {mode === "alignment" && (
@@ -143,6 +146,9 @@ function PaneRouter({ mode, lesson, ui }: PaneRouterProps) {
             {mode === "study-hub" && <StudyHub />}
             {mode === "course-dashboard" && <CourseDashboard />}
             {mode === "create-lesson" && <LessonWizard />}
+            {mode === "knowledge-graph" && <KnowledgeGraphPane />}
+            {mode === "adaptive-quiz" && <AdaptiveQuizPane />}
+            {mode === "lo-progress" && <LOProgressPane />}
           </motion.div>
         </AnimatePresence>
       </Suspense>

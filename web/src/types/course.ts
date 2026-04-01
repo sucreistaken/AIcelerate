@@ -100,3 +100,86 @@ export interface CourseExport {
   flashcards: Flashcard[];
   weakTopics: string[];
 }
+
+// ── Confidence Scoring (OPT-15) ──
+export interface ConfidenceScore {
+  coverage: number;
+  accuracy: number;
+  completeness: number;
+  flags: string[];
+  scoredAt: string;
+}
+
+// ── Knowledge Graph (OPT-12) ──
+export interface ConceptNode {
+  id: string;
+  name: string;
+  type: "concept" | "principle" | "formula" | "technique" | "definition";
+  lessonIds: string[];
+  strength: number;
+}
+
+export interface ConceptEdge {
+  from: string;
+  to: string;
+  relationship: "prerequisite" | "extends" | "applies" | "example_of";
+  confidence: number;
+  evidence?: string;
+}
+
+export interface KnowledgeGraph {
+  nodes: ConceptNode[];
+  edges: ConceptEdge[];
+  builtAt: string;
+  version: number;
+}
+
+// ── Adaptive Quiz (OPT-13) ──
+export interface AdaptiveQuizQuestion {
+  id: string;
+  question: string;
+  topicName: string;
+}
+
+export interface AdaptiveQuizSessionState {
+  sessionId: string;
+  currentTheta: number;
+  questionsAsked: number;
+  isComplete: boolean;
+  stoppingReason?: string;
+  nextQuestion: AdaptiveQuizQuestion | null;
+  poolSize?: number;
+}
+
+export interface AdaptiveQuizSummary {
+  sessionId: string;
+  finalTheta: number;
+  totalQuestions: number;
+  correct: number;
+  partial: number;
+  incorrect: number;
+  stoppingReason: string;
+  topicBreakdown: Array<{ topicName: string; correct: number; total: number }>;
+}
+
+// ── LO Progress (OPT-11) ──
+export interface LOProgress {
+  loId: string;
+  loTitle: string;
+  lessonsContributing: string[];
+  quizScores: number[];
+  flashcardMastery: { total: number; graduated: number; learning: number; new: number };
+  overallConfidence: number;
+  masteryLevel: "not_started" | "beginning" | "developing" | "proficient" | "mastered";
+  recommendedNext: string;
+}
+
+export interface LODashboardData {
+  courseId: string;
+  courseName: string;
+  totalLOs: number;
+  loProgress: LOProgress[];
+  overallMastery: number;
+  studyPriority: string[];
+  generatedAt: string;
+}

@@ -1,7 +1,7 @@
 // src/stores/lessonStore.ts
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Plan, CheatSheet, LoAlignment, LoStudyModule, Emphasis } from '../types';
+import { Plan, CheatSheet, LoAlignment, LoStudyModule, Emphasis, ConfidenceScore } from '../types';
 
 export interface Lesson {
   id: string;
@@ -39,6 +39,10 @@ interface LessonState {
 
   // Deviation analizi
   deviation: unknown | null;
+
+  // Confidence scores (OPT-15)
+  planConfidence: ConfidenceScore | null;
+  cheatSheetConfidence: ConfidenceScore | null;
 
   // Error state
   error: string | null;
@@ -79,6 +83,8 @@ export const useLessonStore = create<LessonState>()(
       loModules: null,
       cheatSheet: null,
       deviation: null,
+      planConfidence: null,
+      cheatSheetConfidence: null,
       error: null,
 
       // Actions
@@ -109,6 +115,8 @@ export const useLessonStore = create<LessonState>()(
           loModules: null,
           cheatSheet: null,
           deviation: null,
+          planConfidence: null,
+          cheatSheetConfidence: null,
           error: null,
         }),
 
@@ -125,6 +133,8 @@ export const useLessonStore = create<LessonState>()(
             ? lesson.loModules
             : ((lesson.loModules as any)?.modules ?? null),
           cheatSheet: lesson.cheatSheet ?? null,
+          planConfidence: (lesson as any).planConfidence ?? null,
+          cheatSheetConfidence: (lesson as any).cheatSheetConfidence ?? null,
         }),
     }),
     {

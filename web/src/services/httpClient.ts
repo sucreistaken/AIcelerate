@@ -25,6 +25,8 @@ export interface LessonData {
     loAlignment?: import('../types').LoAlignment;
     loModules?: { modules: import('../types').LoStudyModule[] };
     cheatSheet?: import('../types').CheatSheet;
+    planConfidence?: import('../types').ConfidenceScore;
+    cheatSheetConfidence?: import('../types').ConfidenceScore;
 }
 
 export interface PlanResponse {

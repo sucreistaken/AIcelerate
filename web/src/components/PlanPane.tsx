@@ -1,8 +1,9 @@
 import { logger } from "../utils/logger";
 import React, { useState, useRef } from "react";
-import { Plan, ModuleT ,LearningOutcome} from "../types";
+import { Plan, ModuleT, LearningOutcome, ConfidenceScore } from "../types";
 import { exportToPdf } from "../utils/pdfExport";
 import PaneInfoBanner from "./ui/PaneInfoBanner";
+import { ConfidenceBadge } from "./ui/ConfidenceBadge";
 import { t } from "../utils/i18n";
 
 /** Yardımcı fonksiyon: Dakikayı okunabilir formata çevirir */
@@ -21,7 +22,7 @@ const diffConfig: Record<string, { labelKey: string; style: React.CSSProperties 
   Advanced: { labelKey: "plan.diffAdvanced", style: { backgroundColor: "var(--danger-bg)", color: "var(--danger)", border: "1px solid var(--danger)" } }
 };
 
-export default function PlanPane({ plan }: { plan: Plan }) {
+export default function PlanPane({ plan, confidence }: { plan: Plan; confidence?: ConfidenceScore | null }) {
   const diffKey = plan.difficulty || "Intermediate";
   const diff = diffConfig[diffKey] || diffConfig.Intermediate;
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -60,6 +61,7 @@ export default function PlanPane({ plan }: { plan: Plan }) {
                   {t(diff.labelKey)}
                 </span>
               )}
+              <ConfidenceBadge score={confidence} compact />
             </div>
             <div className="plan-meta">
               {plan.duration_weeks ? `${plan.duration_weeks} hafta` : "Süre: belirtilmedi"}

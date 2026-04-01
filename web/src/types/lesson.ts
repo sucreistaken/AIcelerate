@@ -115,7 +115,10 @@ export type ModeId =
   | "connections"
   | "study-hub"
   | "course-dashboard"
-  | "create-lesson";
+  | "create-lesson"
+  | "knowledge-graph"
+  | "adaptive-quiz"
+  | "lo-progress";
 
 export type CheatSheet = {
   title: string;

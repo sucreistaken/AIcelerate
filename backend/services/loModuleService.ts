@@ -1,15 +1,18 @@
 import { logger } from "../utils/logger";
-import { getModel, stripCodeFences, tryParseJSON } from "./aiService";
+import { getModel, stripCodeFences, tryParseJSON, getTemperature } from "./aiService";
 import { LoLink, LoAlignedSegment, LoAlignment } from "../types";
+import { smartTruncate } from "../utils/smartTruncate";
+import { getLangDirective, type SupportedLang } from "../utils/langDirective";
 import { getLesson, upsertLesson } from "../controllers/lessonControllers";
 import { notFound, badRequest, AppError } from "../middleware/errorHandler";
+import { SCHEMAS } from "../prompts/schemas";
 
 export function buildCondensedContext(lesson: any): { lecContext: string; sldContext: string } {
   const plan = lesson.plan;
   if (!plan) {
     return {
-      lecContext: (lesson.transcript || "").slice(0, 18000),
-      sldContext: (lesson.slideText || "").slice(0, 18000),
+      lecContext: smartTruncate(lesson.transcript || "", 18000),
+      sldContext: smartTruncate(lesson.slideText || "", 18000),
     };
   }
   const parts: string[] = [];
@@ -24,9 +27,9 @@ export function buildCondensedContext(lesson: any): { lecContext: string; sldCon
     parts.push(`Professor emphases:\n${emphSummary}`);
   }
   const condensedPlan = parts.join("\n\n");
-  const transcriptExcerpt = (lesson.transcript || "").slice(0, 4000);
+  const transcriptExcerpt = smartTruncate(lesson.transcript || "", 4000);
   const lecContext = `${condensedPlan}\n\n--- Transcript excerpt ---\n${transcriptExcerpt}`;
-  const sldContext = (lesson.slideText || "").slice(0, 4000);
+  const sldContext = smartTruncate(lesson.slideText || "", 4000);
   return { lecContext, sldContext };
 }
 
@@ -52,16 +55,18 @@ export const hasAlignment = (plan: any) =>
 
 export function buildLoModulesPrompt(input: {
   transcript: string; slideText: string; learningOutcomes: string[];
-  loAlignment?: LoAlignment; plan?: any;
+  loAlignment?: LoAlignment; plan?: any; lang?: SupportedLang;
 }): string {
-  const LEC = input.transcript.slice(0, 16000);
-  const SLD = input.slideText.slice(0, 8000);
+  const LEC = smartTruncate(input.transcript, 16000);
+  const SLD = smartTruncate(input.slideText, 8000);
   const LO_LIST = input.learningOutcomes.map((lo, i) => `LO${i + 1}: ${lo}`).join("\n");
   const ALIGN_SNIPPET = input.loAlignment ? JSON.stringify(input.loAlignment).slice(0, 8000) : "—";
   const PLAN_SNIPPET = input.plan ? JSON.stringify(input.plan).slice(0, 6000) : "—";
 
   return `
 You are an expert learning designer and exam coach.
+
+${getLangDirective(input.lang)}
 
 GOAL:
 Transform the raw transcript and slides into SMALL, HIGH-RECALL learning modules,
@@ -114,7 +119,8 @@ RULES:
 }
 
 export async function generateLoAlignmentForLesson(
-  lectureText: string, slidesText: string, learningOutcomes: string[]
+  lectureText: string, slidesText: string, learningOutcomes: string[],
+  lang?: SupportedLang
 ): Promise<LoAlignment> {
   const model = getModel();
   const baseSegments = segmentTranscript(lectureText);
@@ -122,11 +128,13 @@ export async function generateLoAlignmentForLesson(
   const LOs = (learningOutcomes || []).map((t) => String(t || "").trim()).filter(Boolean);
   if (!LOs.length) throw new Error("Learning Outcomes list is empty.");
   const LO_LIST = LOs.map((lo, i) => `LO${i + 1}: ${lo}`).join("\n");
-  const SEGMENTS_JSON = JSON.stringify(baseSegments.map((s) => ({ index: s.index, text: s.text }))).slice(0, 12000);
-  const SLD = (slidesText || "").slice(0, 4000);
+  const SEGMENTS_JSON = smartTruncate(JSON.stringify(baseSegments.map((s) => ({ index: s.index, text: s.text }))), 12000);
+  const SLD = smartTruncate(slidesText || "", 4000);
 
   const prompt = `
 You are an instructional designer. Below you see the official Learning Outcomes and pre-segmented transcript blocks.
+
+${getLangDirective(lang)}
 
 Task: For each transcript segment, link it to 0–3 LOs.
 
@@ -154,11 +162,9 @@ ${SLD || "—"}
 
   const result = await model.generateContent({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: 4000 },
+    generationConfig: { maxOutputTokens: 4000, temperature: getTemperature("structured"), responseMimeType: "application/json", responseSchema: SCHEMAS.LO_ALIGNMENT } as any,
   });
-  const rawText = result.response.text() || "";
-  const cleaned = stripCodeFences(rawText);
-  const parsed = tryParseJSON(cleaned);
+  const parsed = JSON.parse(result.response.text());
   if (!parsed?.segments || !Array.isArray(parsed.segments)) throw new Error("LO alignment JSON parse/schema error");
 
   const linksByIndex = new Map<number, LoLink[]>();
@@ -184,7 +190,8 @@ ${SLD || "—"}
 
 export async function generateLoModules(
   lessonId: string,
-  forceRegen: boolean = false
+  forceRegen: boolean = false,
+  lang?: SupportedLang
 ): Promise<{ modules: any[]; cached: boolean }> {
   const lesson = getLesson(lessonId);
   if (!lesson) throw notFound("Lesson not found");
@@ -198,15 +205,13 @@ export async function generateLoModules(
 
   const prompt = buildLoModulesPrompt({
     transcript: lesson.transcript, slideText: lesson.slideText || "",
-    learningOutcomes: lesson.learningOutcomes!, loAlignment: lesson.loAlignment, plan: lesson.plan,
+    learningOutcomes: lesson.learningOutcomes!, loAlignment: lesson.loAlignment, plan: lesson.plan, lang,
   });
   const result = await getModel().generateContent({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: 6000 },
+    generationConfig: { maxOutputTokens: 6000, temperature: getTemperature("balanced"), responseMimeType: "application/json", responseSchema: SCHEMAS.LO_MODULES } as any,
   });
-  const raw = result.response.text() || "";
-  const cleaned = stripCodeFences(raw);
-  const j = tryParseJSON(cleaned);
+  const j = JSON.parse(result.response.text());
   if (!j?.modules || !Array.isArray(j.modules)) {
     throw new AppError(500, "LO modules JSON/schema error", "LLM_PARSE_ERROR");
   }
@@ -217,10 +222,10 @@ export async function generateLoModules(
   return { modules: loModules.modules, cached: false };
 }
 
-export async function generateAlignmentOnly(lectureText: string, slidesText: string) {
+export async function generateAlignmentOnly(lectureText: string, slidesText: string, lang?: SupportedLang) {
   const model = getModel();
-  const LEC = lectureText.slice(0, 18000);
-  const SLD = slidesText.slice(0, 18000);
+  const LEC = smartTruncate(lectureText, 18000);
+  const SLD = smartTruncate(slidesText, 18000);
 
   const prompt = `
 Compare the two texts and return ONLY the following JSON, nothing else.
@@ -252,11 +257,9 @@ ${SLD}
 
   const result = await model.generateContent({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: 4000 },
+    generationConfig: { maxOutputTokens: 4000, temperature: getTemperature("structured"), responseMimeType: "application/json", responseSchema: SCHEMAS.PLAN_ALIGNMENT } as any,
   });
-  const rawText = result.response.text() || "";
-  const cleaned = stripCodeFences(rawText);
-  const j = tryParseJSON(cleaned);
+  const j = JSON.parse(result.response.text());
   if (!j) throw new Error("Alignment JSON parse error");
   return j;
 }

@@ -1,23 +1,24 @@
 import { logger } from "../utils/logger";
-import { getModel, stripCodeFences, tryParseJSON } from "./aiService";
+import { getModel, stripCodeFences, tryParseJSON, getTemperature } from "./aiService";
 import { getLesson, upsertLesson } from "../controllers/lessonControllers";
 import { assembleCourseContext } from "../controllers/contextAssembler";
 import { buildCondensedContext } from "./loModuleService";
+import { smartTruncate } from "../utils/smartTruncate";
+import { getLangDirective } from "../utils/langDirective";
 import { notFound, badRequest, AppError } from "../middleware/errorHandler";
+import { SCHEMAS } from "../prompts/schemas";
 import type { PlanEmphasis, CheatSheet } from "../types";
 
 export function buildCheatSheetPrompt(input: {
   title: string; transcript: string; slideText: string;
   learningOutcomes?: string[]; emphases?: PlanEmphasis[]; language?: 'tr' | 'en';
 }): string {
-  const LEC = (input.transcript || "").slice(0, 18000);
-  const SLD = (input.slideText || "").slice(0, 12000);
+  const LEC = smartTruncate(input.transcript || "", 18000);
+  const SLD = smartTruncate(input.slideText || "", 12000);
   const LOS = (input.learningOutcomes || []).map((x, i) => `LO${i + 1}: ${String(x || "").trim()}`).join("\n");
   const EMPH = input.emphases ? JSON.stringify(input.emphases).slice(0, 6000) : "—";
   const lang = input.language || 'tr';
-  const langDirective = lang === 'tr'
-    ? 'IMPORTANT: Write ALL content (title, headings, bullets, formulas, pitfalls, quickQuiz) in TURKISH. Use Turkish language only.'
-    : 'IMPORTANT: Write ALL content (title, headings, bullets, formulas, pitfalls, quickQuiz) in ENGLISH. Use English language only.';
+  const langDirective = getLangDirective(lang);
 
   return `
 You are an exam-focused teaching assistant.
@@ -99,11 +100,9 @@ export async function generateCheatSheet(
 
   const result = await getModel().generateContent({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: 3000 },
+    generationConfig: { maxOutputTokens: 3000, temperature: getTemperature("balanced"), responseMimeType: "application/json", responseSchema: SCHEMAS.CHEAT_SHEET } as any,
   });
-  const raw = (result.response.text() || "").trim();
-  const cleaned = stripCodeFences(raw);
-  const j = tryParseJSON(cleaned);
+  const j = JSON.parse(result.response.text());
   if (!j?.sections || !Array.isArray(j.sections)) {
     throw new AppError(500, "Cheat sheet JSON/schema error", "LLM_PARSE_ERROR");
   }

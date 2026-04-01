@@ -1,12 +1,18 @@
 // prompts/lessonPrompts.ts
 // All AI prompt templates for lesson-related features.
 
+import { smartTruncate } from "../utils/smartTruncate";
+import { getLangDirective, type SupportedLang } from "../utils/langDirective";
+
+/** @deprecated Use buildModulesPrompt + buildEmphasesPrompt + buildAlignmentPrompt instead */
 export function buildPlanFromTextPrompt(
   LEC: string, SLD: string, courseCode: string | undefined,
-  LO_BLOCK: string
+  LO_BLOCK: string, lang?: SupportedLang
 ): string {
   return `
 You are an instructional designer. Analyze the following teacher speech transcript (LEC) and slide text (SLIDE) together.
+
+${getLangDirective(lang)}
 
 PRIORITY:
 - First, build a clear, practical learning plan (modules + lessons) that a student can follow.
@@ -49,8 +55,114 @@ ${SLD}
 `.trim();
 }
 
-export function buildQuizFromPlanPrompt(planJson: string, crossLessonHint: string): string {
+// ── Split plan prompts (OPT-1) ───────────────────────────────────────────────
+
+export function buildModulesPrompt(
+  LEC: string, SLD: string, courseCode: string | undefined,
+  LO_BLOCK: string, langDirective: string
+): string {
+  return `
+You are an instructional designer. Create a structured learning plan from the lecture transcript and slides.
+
+${langDirective}
+
+[COURSE CODE]
+${courseCode || "—"}
+
+[OFFICIAL LEARNING OUTCOMES]
+${LO_BLOCK}
+
+Create a PRACTICAL LEARNING PLAN with 2–6 modules, each with 1–6 lessons.
+Each lesson should have clear objectives, study time, activities, and a mini quiz.
+
+OUTPUT: ONLY VALID JSON.
+
+RULES:
+- Activities must reference specific content from the lecture/slides.
+- Mini quiz questions must be answerable from the provided content.
+- Include key concepts and estimated study duration.
+
+[LEC]
+${LEC}
+
+[SLIDE]
+${SLD}
+`.trim();
+}
+
+export function buildEmphasesPrompt(
+  LEC: string, SLD: string, langDirective: string
+): string {
+  return `
+You are an educational analyst. Extract teacher emphases from the lecture transcript.
+
+${langDirective}
+
+Look for:
+- Topics the teacher REPEATS multiple times
+- Concepts explained with EXAMPLES or ANALOGIES
+- Phrases like "this is important", "pay attention", "remember this"
+- Topics where the teacher spends significantly more time
+- Warnings about common mistakes
+
+For each emphasis, provide:
+- The statement itself
+- WHY the teacher emphasized it
+- Whether it appears in the slides
+- Direct evidence (quotes from transcript)
+- Source: "lecture", "slides", or "both"
+
+OUTPUT: ONLY VALID JSON.
+
+RULES:
+- At least 5 emphases, ideally 8-12.
+- Include direct transcript quotes as evidence.
+- Do NOT hallucinate — only extract what is actually in the content.
+
+[LEC]
+${LEC}
+
+[SLIDE]
+${SLD}
+`.trim();
+}
+
+export function buildAlignmentPrompt(
+  LEC: string, SLD: string, langDirective: string
+): string {
+  return `
+You are an educational content analyst. Compare the lecture transcript with the slide text.
+
+${langDirective}
+
+For each topic covered, determine:
+- Whether it appears in both lecture and slides, or only one
+- The emphasis level (high/medium/low)
+- Direct quotes from the lecture
+- Slide references
+- Estimated time spent on the topic
+- Confidence level (0-1)
+
+Also write a brief summary comparing how the lecture and slides relate.
+
+OUTPUT: ONLY VALID JSON.
+
+RULES:
+- At least 5 alignment items.
+- Be specific with quotes and references.
+
+[LEC]
+${LEC}
+
+[SLIDE]
+${SLD}
+`.trim();
+}
+
+export function buildQuizFromPlanPrompt(planJson: string, crossLessonHint: string, lang?: SupportedLang): string {
   return `You are an expert academic quiz generator. Generate exactly 10 quiz questions based on the plan below.
+
+${getLangDirective(lang)}
 
 RULES:
 - Difficulty distribution: 3 Easy (factual recall), 4 Medium (understanding/application), 3 Hard (analysis/evaluation)
@@ -79,9 +191,11 @@ export function buildQuizAnswersPrompt(
 }
 
 export function buildQuizEvalPrompt(
-  contextBlock: string, question: string, studentAnswer: string
+  contextBlock: string, question: string, studentAnswer: string, lang?: SupportedLang
 ): string {
   return `Act as a strict but fair academic exam grader. Grade the student's answer based ONLY on the lesson context provided.
+
+${getLangDirective(lang)}
 
 GRADING RUBRIC:
 - "correct": All key concepts covered with accurate reasoning. Minor wording differences are acceptable.
@@ -106,9 +220,11 @@ ${studentAnswer}`.trim();
 }
 
 export function buildQuizEvalBatchPrompt(
-  contextBlock: string, questionsBlock: string
+  contextBlock: string, questionsBlock: string, lang?: SupportedLang
 ): string {
   return `Act as a strict but fair academic exam grader. Grade ALL student answers based ONLY on the lesson context.
+
+${getLangDirective(lang)}
 
 GRADING RUBRIC (apply to each answer):
 - "correct": All key concepts covered with accurate reasoning
@@ -154,12 +270,12 @@ ${progressBlock ? `\n=== STUDENT PROGRESS ===\n${progressBlock}\n` : ''}`;
 }
 
 export function buildChatPrompt(
-  context: string, message: string, courseId: string | undefined
+  context: string, message: string, courseId: string | undefined, lang?: SupportedLang
 ): string {
   return `
 === CRITICAL RULES ===
 1. INSTRUCTION FOLLOWING: Do exactly what the user asks.
-2. LANGUAGE: Always respond in English.
+2. LANGUAGE: ${getLangDirective(lang)}
 3. CONTEXT-BASED ANSWERS: Base answers on the LESSON CONTEXT.
 4. ACCURACY: If info is not available, say so.
 
@@ -190,10 +306,12 @@ ${message}
 export function buildMindmapPrompt(
   title: string, moduleNames: string[], keyPoints: string[],
   concepts: string[], transcript: string, slides: string,
-  crossLessonBlock: string | undefined
+  crossLessonBlock: string | undefined, lang?: SupportedLang
 ): string {
   return `
 You are a MASTER EDUCATOR creating a STUDY GUIDE mindmap.
+
+${getLangDirective(lang)}
 
 === MERMAID SYNTAX (STRICT) ===
 - Start with: mindmap
@@ -217,19 +335,21 @@ Key points: ${keyPoints.slice(0, 4).join(" | ") || "Important concepts"}
 Terms: ${concepts.slice(0, 6).join(", ") || "vocabulary"}
 
 === LECTURE CONTENT ===
-${transcript.substring(0, 1000) || "No transcript"}
+${smartTruncate(transcript, 1000) || "No transcript"}
 
 === SLIDE CONTENT ===
-${slides.substring(0, 800) || "No slides"}
+${smartTruncate(slides, 800) || "No slides"}
 
 ${crossLessonBlock ? `=== CONNECTIONS ===\n${crossLessonBlock}\n` : ''}
 Create a STUDY GUIDE mindmap for "${title}". OUTPUT ONLY mermaid code.
 `;
 }
 
-export function buildMindmapModulePrompt(targetTitle: string, targetContent: string): string {
+export function buildMindmapModulePrompt(targetTitle: string, targetContent: string, lang?: SupportedLang): string {
   return `
 You are a MASTER EDUCATOR creating a STUDY GUIDE mindmap for a specific module.
+
+${getLangDirective(lang)}
 
 === MERMAID SYNTAX (STRICT) ===
 - Start with: mindmap
@@ -240,27 +360,28 @@ You are a MASTER EDUCATOR creating a STUDY GUIDE mindmap for a specific module.
 
 === MODULE DATA ===
 Module Title: ${targetTitle}
-Module Content: ${targetContent.substring(0, 1000)}
+Module Content: ${smartTruncate(targetContent, 1000)}
 
 OUTPUT ONLY mermaid code for "${targetTitle}".
 `;
 }
 
 export function buildMindmapNodeDetailPrompt(
-  nodeName: string, lessonTitle: string, transcript: string, action: string
+  nodeName: string, lessonTitle: string, transcript: string, action: string, lang?: SupportedLang
 ): string {
+  const langDir = getLangDirective(lang);
   if (action === "all") {
-    return `For the concept "${nodeName}" from "${lessonTitle}", provide an explanation, a real-world example, and a quiz question.
+    return `${langDir}\n\nFor the concept "${nodeName}" from "${lessonTitle}", provide an explanation, a real-world example, and a quiz question.
 
 Context:
-${transcript.substring(0, 1500)}`;
+${smartTruncate(transcript, 1500)}`;
   }
   if (action === "explain") {
-    return `Explain "${nodeName}" VERY BRIEFLY.\n\nContext:\n${transcript.substring(0, 1000)}\n\nReturn ONLY JSON:\n{ "title": "${nodeName}", "explanation": "2-3 sentences", "keyPoints": ["point"], "relatedConcepts": ["concept"] }`;
+    return `${langDir}\n\nExplain "${nodeName}" VERY BRIEFLY.\n\nContext:\n${smartTruncate(transcript, 1000)}\n\nReturn ONLY JSON:\n{ "title": "${nodeName}", "explanation": "2-3 sentences", "keyPoints": ["point"], "relatedConcepts": ["concept"] }`;
   }
   if (action === "example") {
-    return `Give ONE simple example for "${nodeName}".\n\nContext:\n${transcript.substring(0, 1000)}\n\nReturn ONLY JSON:\n{ "title": "${nodeName}", "example": { "scenario": "1 sentence", "explanation": "1 sentence", "takeaway": "5-8 words" } }`;
+    return `${langDir}\n\nGive ONE simple example for "${nodeName}".\n\nContext:\n${smartTruncate(transcript, 1000)}\n\nReturn ONLY JSON:\n{ "title": "${nodeName}", "example": { "scenario": "1 sentence", "explanation": "1 sentence", "takeaway": "5-8 words" } }`;
   }
   // quiz
-  return `Create a quiz question about "${nodeName}" from "${lessonTitle}".\n\nContext:\n${transcript.substring(0, 1500)}\n\nReturn ONLY JSON:\n{ "title": "${nodeName}", "quiz": { "question": "?", "options": ["A)", "B)", "C)", "D)"], "correctAnswer": "A", "explanation": "why" } }`;
+  return `${langDir}\n\nCreate a quiz question about "${nodeName}" from "${lessonTitle}".\n\nContext:\n${smartTruncate(transcript, 1500)}\n\nReturn ONLY JSON:\n{ "title": "${nodeName}", "quiz": { "question": "?", "options": ["A)", "B)", "C)", "D)"], "correctAnswer": "A", "explanation": "why" } }`;
 }

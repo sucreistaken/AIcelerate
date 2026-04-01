@@ -1,15 +1,17 @@
 import { logger } from "../utils/logger";
 import { channelToolRepo } from "../repositories/channelToolRepo";
-import { getModel, stripCodeFences } from "./aiService";
+import { getModel, stripCodeFences, getTemperature } from "./aiService";
 import { channelService } from "./channelService";
 import { getLesson } from "../controllers/lessonControllers";
 import { buildToolContext } from "./channelContextBuilder";
+import { getLangDirective, type SupportedLang } from "../utils/langDirective";
 
 // ── Mind Map: generate ──────────────────────────────────────────────────────
 export async function generateMindMap(
   channelId: string,
   topic: string,
-  serverName: string
+  serverName: string,
+  lang?: SupportedLang
 ) {
   const data = channelToolRepo.load(channelId);
 
@@ -32,11 +34,11 @@ export async function generateMindMap(
       }
     }
 
-    const prompt = `${contextBlock}Create a Mermaid.js mindmap diagram about '${topic}' for study group '${serverName}'. Use \`mindmap\` syntax. Return ONLY the Mermaid code, no markdown fences.`;
+    const prompt = `${getLangDirective(lang)}\n\n${contextBlock}Create a Mermaid.js mindmap diagram about '${topic}' for study group '${serverName}'. Use \`mindmap\` syntax. Return ONLY the Mermaid code, no markdown fences.`;
 
     const result = await getModel().generateContent({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 1500 },
+      generationConfig: { maxOutputTokens: 1500, temperature: getTemperature("balanced") },
     });
     const rawText = result.response.text();
     logger.info(`[AI] CHANNEL_MINDMAP | ~${Math.ceil(prompt.length / 4)} in, ~${Math.ceil(rawText.length / 4)} out | max=1500`);

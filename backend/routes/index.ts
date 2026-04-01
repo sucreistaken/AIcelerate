@@ -15,6 +15,9 @@ import authRoutes from "./authRoutes";
 import roomRoutes from "./roomRoutes";
 import gamificationRoutes from "./gamificationRoutes";
 import adminRoutes from "./adminRoutes";
+import knowledgeGraphRoutes from "./knowledgeGraphRoutes";
+import adaptiveQuizRoutes from "./adaptiveQuizRoutes";
+import loProgressRoutes from "./loProgressRoutes";
 
 const router = Router();
 
@@ -68,5 +71,14 @@ router.use("/api", gamificationRoutes);
 
 // Admin panel
 router.use("/api/admin", adminRoutes);
+
+// Knowledge Graph
+router.use("/api", knowledgeGraphRoutes);
+
+// Adaptive Quiz
+router.use("/api", adaptiveQuizRoutes);
+
+// LO Progress Dashboard
+router.use("/api", loProgressRoutes);
 
 export default router;

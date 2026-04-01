@@ -29,6 +29,10 @@ app.use(
 );
 app.use(express.json({ limit: "2mb" }));
 
+// ---- Request context (attaches requestId + child logger to each request)
+import { requestContext } from "./middleware/requestContext";
+app.use(requestContext);
+
 // ---- Routes (all delegated to ./routes/)
 app.use(routes);
 
@@ -64,14 +68,10 @@ try {
   console.error("Failed to migrate orphan lessons:", err);
 }
 
-// ---- Connect to MongoDB (optional) then start server
-connectDB()
-  .catch((err) => console.warn("MongoDB connection failed (continuing without DB):", err.message))
-  .finally(() => {
-    httpServer.listen(env.PORT, "0.0.0.0", () => {
-      console.log(`Backend running at http://localhost:${env.PORT}`);
-    });
-  });
+// ---- Start server (MongoDB disabled — using JSON file storage)
+httpServer.listen(env.PORT, "0.0.0.0", () => {
+  console.log(`Backend running at http://localhost:${env.PORT}`);
+});
 
 // ---- HTTP server error handler
 httpServer.on("error", (err: NodeJS.ErrnoException) => {

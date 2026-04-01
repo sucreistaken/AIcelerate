@@ -157,3 +157,12 @@ export interface NodeDetailResult {
   example?: { scenario: string; explanation: string; takeaway: string };
   quiz?: { question: string; options: string[]; correctAnswer: string; explanation: string };
 }
+
+// ---- Confidence Scoring Types ----
+export interface ConfidenceScore {
+  coverage: number;      // 0-1: how much of source material is reflected
+  accuracy: number;      // 0-1: factual correctness vs source
+  completeness: number;  // 0-1: all required sections present & populated
+  flags: string[];       // e.g. ["missing_formulas", "low_LO_coverage"]
+  scoredAt: string;      // ISO timestamp
+}

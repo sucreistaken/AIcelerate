@@ -140,46 +140,150 @@ export async function processSlideUpload(file: Express.Multer.File, lessonId: st
   });
 }
 
-async function processImageMarkers(text: string): Promise<string> {
-  const markerRegex = /\[\[\[IMAGE_ANALYSIS_REQUIRED:(.*?)\]\]\]/g;
-  const matches = [...text.matchAll(markerRegex)];
-  if (matches.length === 0) return text;
+const IMG_CONCURRENCY = 3;
+const IMG_MAX_RETRIES = 3;
 
-  logger.info(`[AI Analysis] Found ${matches.length} images to analyze...`);
-  let result = text;
+function readImageAsBase64(imgPath: string) {
+  const ext = path.extname(imgPath).toLowerCase().replace(".", "");
+  const mimeType = ext === "png" ? "image/png" : "image/jpeg";
+  const data = fs.readFileSync(imgPath).toString("base64");
+  return { data, mimeType };
+}
 
-  await Promise.all(matches.map(async (match) => {
-    const marker = match[0];
-    const imgPath = match[1].trim();
-    if (!fs.existsSync(imgPath)) {
-      result = result.replace(marker, "");
-      return;
-    }
-
-    try {
-      const ext = path.extname(imgPath).toLowerCase().replace(".", "");
-      const mimeType = ext === "png" ? "image/png" : "image/jpeg";
-      const imgData = fs.readFileSync(imgPath).toString("base64");
-      const prompt = `Analyze the visual content of this slide image. If irrelevant, output "SKIP".
+async function analyzeImage(imgPath: string): Promise<string> {
+  const { data, mimeType } = readImageAsBase64(imgPath);
+  const prompt = `Analyze the visual content of this slide image. If irrelevant, output "SKIP".
 
 > **[Visual Analysis]**
 > - Visual type: {diagram|table|code|chart|photograph|mixed}
 > - Content summary: {1-2 sentences}
 > - Academic value: {high|medium|low|none}`;
 
-      const aiResult = await getModel().generateContent({
-        contents: [{ role: "user", parts: [{ text: prompt }, { inlineData: { data: imgData, mimeType } }] }],
-        generationConfig: { maxOutputTokens: 500 },
-      });
-      const description = aiResult.response.text().trim();
-      if (description === "SKIP") result = result.replace(marker, "");
-      else result = result.replace(marker, `\n${description}\n`);
-      fs.unlinkSync(imgPath);
-    } catch (err) {
-      logger.error(`[AI Analysis Error] ${imgPath}:`, err);
-      result = result.replace(marker, "\n[Görsel Analizi Başarısız]\n");
+  const aiResult = await getModel().generateContent({
+    contents: [{ role: "user", parts: [{ text: prompt }, { inlineData: { data, mimeType } }] }],
+    generationConfig: { maxOutputTokens: 500 },
+  });
+  return aiResult.response.text().trim();
+}
+
+async function ocrImage(imgPath: string): Promise<string> {
+  const { data, mimeType } = readImageAsBase64(imgPath);
+  const prompt = `Extract ALL text from this slide image exactly as written.
+Preserve formatting: bullet points (●), code blocks, terminal commands.
+For terminal/code screenshots, reproduce the exact text including prompts ($ or >).
+Output the text only, no commentary.`;
+
+  const aiResult = await getModel().generateContent({
+    contents: [{ role: "user", parts: [{ text: prompt }, { inlineData: { data, mimeType } }] }],
+    generationConfig: { maxOutputTokens: 2000 },
+  });
+  return aiResult.response.text().trim();
+}
+
+async function analyzeWithRetry(imgPath: string, fn: (p: string) => Promise<string> = analyzeImage): Promise<string> {
+  for (let attempt = 0; attempt < IMG_MAX_RETRIES; attempt++) {
+    try {
+      return await fn(imgPath);
+    } catch (err: any) {
+      const status = err?.status ?? err?.httpCode ?? 0;
+      const isRetryable = status === 429 || status >= 500;
+      if (!isRetryable || attempt === IMG_MAX_RETRIES - 1) throw err;
+
+      // Use API-suggested delay for 429, exponential backoff otherwise
+      const apiDelay = status === 429 ? parseRetryDelay(err) : 0;
+      const delay = apiDelay || 2000 * Math.pow(2, attempt);
+      logger.warn(`[AI Analysis] Retry ${attempt + 1}/${IMG_MAX_RETRIES} for ${path.basename(imgPath)} in ${delay}ms`);
+      await new Promise(r => setTimeout(r, delay));
     }
-  }));
+  }
+  throw new Error("Unreachable");
+}
+
+function parseRetryDelay(err: any): number {
+  try {
+    const details = err?.errorDetails ?? [];
+    for (const d of details) {
+      if (d?.["@type"]?.includes("RetryInfo") && d.retryDelay) {
+        const seconds = parseInt(String(d.retryDelay).replace(/s$/, ""), 10);
+        if (seconds > 0) return seconds * 1000;
+      }
+    }
+  } catch { /* ignore */ }
+  return 0;
+}
+
+function tryUnlink(filePath: string) {
+  try { fs.unlinkSync(filePath); } catch { /* already deleted */ }
+}
+
+type MarkerJob = { marker: string; imgPath: string; type: "ocr" | "image"; slideLabel?: string };
+
+async function processImageMarkers(text: string): Promise<string> {
+  const jobs: MarkerJob[] = [];
+
+  // Collect OCR markers: [[[OCR_REQUIRED:slide_5:/path/to/img.png]]]
+  for (const m of text.matchAll(/\[\[\[OCR_REQUIRED:(slide_\d+):(.*?)\]\]\]/g)) {
+    jobs.push({ marker: m[0], imgPath: m[2].trim(), type: "ocr", slideLabel: m[1] });
+  }
+
+  // Collect image analysis markers: [[[IMAGE_ANALYSIS_REQUIRED:/path/to/img.png]]]
+  for (const m of text.matchAll(/\[\[\[IMAGE_ANALYSIS_REQUIRED:(.*?)\]\]\]/g)) {
+    jobs.push({ marker: m[0], imgPath: m[1].trim(), type: "image" });
+  }
+
+  if (jobs.length === 0) return text;
+
+  const ocrCount = jobs.filter(j => j.type === "ocr").length;
+  const imgCount = jobs.filter(j => j.type === "image").length;
+  logger.info(`[AI Analysis] Processing ${ocrCount} OCR pages + ${imgCount} images...`);
+  let result = text;
+
+  // Manual concurrency limiter
+  const queue = [...jobs];
+  const results: Promise<void>[] = [];
+
+  function next(): Promise<void> | undefined {
+    const job = queue.shift();
+    if (!job) return;
+    const p = (async () => {
+      if (!fs.existsSync(job.imgPath)) {
+        result = result.replace(job.marker, "");
+        return;
+      }
+      try {
+        if (job.type === "ocr") {
+          const ocrText = await analyzeWithRetry(job.imgPath, ocrImage);
+          const label = job.slideLabel?.replace("slide_", "Slide ") ?? "Slide";
+          result = result.replace(job.marker, `--- ${label} (AI OCR) ---\n${ocrText}\n`);
+        } else {
+          const description = await analyzeWithRetry(job.imgPath, analyzeImage);
+          if (description === "SKIP") result = result.replace(job.marker, "");
+          else result = result.replace(job.marker, `\n${description}\n`);
+        }
+      } catch (err) {
+        logger.error(`[AI ${job.type} Error] ${job.imgPath}:`, err);
+        if (job.type === "ocr") {
+          const label = job.slideLabel?.replace("slide_", "Slide ") ?? "Slide";
+          result = result.replace(job.marker, `--- ${label} (OCR Failed) ---\n`);
+        } else {
+          result = result.replace(job.marker, "\n[Görsel Analizi Başarısız]\n");
+        }
+      } finally {
+        tryUnlink(job.imgPath);
+      }
+    })().finally(() => {
+      const n = next();
+      if (n) results.push(n);
+    });
+    return p;
+  }
+
+  // Kick off initial batch
+  for (let i = 0; i < IMG_CONCURRENCY && queue.length > 0; i++) {
+    const p = next();
+    if (p) results.push(p);
+  }
+  await Promise.all(results);
 
   return result;
 }

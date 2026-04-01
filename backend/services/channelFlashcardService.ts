@@ -3,11 +3,13 @@ import {
   channelToolRepo,
   FlashcardItem,
 } from "../repositories/channelToolRepo";
-import { getModel, stripCodeFences } from "./aiService";
+import { getModel, stripCodeFences, getTemperature } from "./aiService";
+import { SCHEMAS } from "../prompts/schemas";
 import { channelService } from "./channelService";
 import { getLesson } from "../controllers/lessonControllers";
 import { generateId } from "../utils/idGenerator";
 import { buildToolContext } from "./channelContextBuilder";
+import { getLangDirective, type SupportedLang } from "../utils/langDirective";
 export { extractFlashcardsFromLesson } from "./channelFlashcardExtractor";
 
 // ── Flashcards: add manually ────────────────────────────────────────────────
@@ -48,7 +50,8 @@ export async function generateFlashcards(
   channelId: string,
   topic: string,
   serverName: string,
-  count: number = 8
+  count: number = 8,
+  lang?: SupportedLang
 ): Promise<{ cards: FlashcardItem[]; sourcesSummary: string | null }> {
   const data = channelToolRepo.load(channelId);
 
@@ -63,7 +66,7 @@ export async function generateFlashcards(
       ? `Based on the following lecture material, generate flashcards that cover the actual content:\n\n${toolCtx.context}\n\n`
       : '';
 
-    const prompt = `${contextBlock}Generate ${count} high-quality flashcards about '${topic}' for a university study group '${serverName}'.
+    const prompt = `${getLangDirective(lang)}\n\n${contextBlock}Generate ${count} high-quality flashcards about '${topic}' for a university study group '${serverName}'.
 
 Return ONLY a JSON array with this schema:
 [{
@@ -85,11 +88,11 @@ ${toolCtx ? `- Flashcards MUST be based on the provided lecture material
 
     const result = await getModel().generateContent({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 2000 },
+      generationConfig: { maxOutputTokens: 2000, temperature: getTemperature("balanced"), responseMimeType: "application/json", responseSchema: SCHEMAS.CHANNEL_FLASHCARDS } as any,
     });
     const text = result.response.text();
     logger.info(`[AI] CHANNEL_FLASHCARDS | ~${Math.ceil(prompt.length / 4)} in, ~${Math.ceil(text.length / 4)} out | max=2000`);
-    const parsed = JSON.parse(stripCodeFences(text)) as Array<{
+    const parsed = JSON.parse(text) as Array<{
       front: string;
       back: string;
       hint?: string;

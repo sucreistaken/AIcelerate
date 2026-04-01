@@ -21,6 +21,7 @@ const GROUPS: TabGroup[] = [
     label: "mode.groupCourse",
     tabs: [
       { id: "course-dashboard", label: "mode.dashboard", icon: <svg {...svgProps}><rect x="3" y="12" width="4" height="9"/><rect x="10" y="6" width="4" height="15"/><rect x="17" y="2" width="4" height="19"/></svg> },
+      { id: "lo-progress", label: "mode.loProgress", icon: <svg {...svgProps}><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> },
     ],
   },
   {
@@ -45,6 +46,7 @@ const GROUPS: TabGroup[] = [
     tabs: [
       { id: "quiz", label: "mode.quiz", icon: <svg {...svgProps}><circle cx="12" cy="12" r="10"/><path d="M9 9a3 3 0 015.12 2.13c0 2-3.12 2.37-3.12 4.37"/><circle cx="12" cy="19" r="0.5" fill="currentColor" stroke="none"/></svg> },
       { id: "flashcards", label: "mode.flashcards", icon: <svg {...svgProps}><rect x="2" y="6" width="16" height="14" rx="2"/><rect x="6" y="2" width="16" height="14" rx="2"/></svg> },
+      { id: "adaptive-quiz", label: "mode.adaptiveQuiz", icon: <svg {...svgProps}><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg> },
     ],
   },
   {
@@ -53,6 +55,7 @@ const GROUPS: TabGroup[] = [
       { id: "cheat-sheet", label: "mode.cheatSheet", icon: <svg {...svgProps}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><polyline points="14,2 14,8 20,8"/><polyline points="9,15 11,17 15,13"/></svg> },
       { id: "notes", label: "mode.myNotes", icon: <svg {...svgProps}><path d="M17 3l4 4L7 21H3v-4L17 3z"/><line x1="14" y1="6" x2="18" y2="10"/></svg> },
       { id: "connections", label: "mode.connections", icon: <svg {...svgProps}><polyline points="16,3 21,3 21,8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21,16 21,21 16,21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg> },
+      { id: "knowledge-graph", label: "mode.knowledgeGraph", icon: <svg {...svgProps}><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="18" r="3"/><line x1="9" y1="6" x2="15" y2="6"/><line x1="6" y1="9" x2="6" y2="15"/><line x1="18" y1="9" x2="18" y2="15"/><line x1="9" y1="18" x2="15" y2="18"/></svg> },
     ],
   },
   {
