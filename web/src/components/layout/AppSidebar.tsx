@@ -102,7 +102,9 @@ export default function AppSidebar({ onOpenUpload }: AppSidebarProps) {
   const handleDashboardClick = () => {
     setMode("course-dashboard");
     selectCourse(null);
+    setCurrentLessonId(null);
     setExpandedCourseId(null);
+    setExpandedLessonId(null);
   };
 
   const handleCourseClick = (courseId: string) => {
