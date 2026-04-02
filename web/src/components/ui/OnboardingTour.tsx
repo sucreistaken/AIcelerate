@@ -15,8 +15,8 @@ interface TourStep {
 
 const STEPS: TourStep[] = [
   { titleKey: "onboarding.step1Title", descKey: "onboarding.step1Desc", placement: "center" },
-  { titleKey: "onboarding.step2Title", descKey: "onboarding.step2Desc", target: ".lc-sidebar-mini, .lc-sidebar-drawer", placement: "right" },
-  { titleKey: "onboarding.step3Title", descKey: "onboarding.step3Desc", target: ".mr", placement: "bottom" },
+  { titleKey: "onboarding.step2Title", descKey: "onboarding.step2Desc", target: ".app-sidebar", placement: "right" },
+  { titleKey: "onboarding.step3Title", descKey: "onboarding.step3Desc", target: ".app-sidebar__lesson-list", placement: "right" },
   { titleKey: "onboarding.step4Title", descKey: "onboarding.step4Desc", target: ".nav-actions", placement: "bottom" },
 ];
 

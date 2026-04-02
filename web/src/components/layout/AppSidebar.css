@@ -1,0 +1,577 @@
+/* =========================================
+   AIcelerate – App Sidebar
+   ========================================= */
+
+.app-sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  height: calc(100vh - 45px);
+  position: sticky;
+  top: 45px;
+  overflow: hidden;
+  z-index: 10;
+  transition: width var(--duration-base) var(--ease-in-out);
+}
+
+.dark .app-sidebar {
+  background: var(--bg-elevated);
+  border-right-color: rgba(255, 255, 255, 0.06);
+}
+
+/* --- Collapsed --- */
+.app-sidebar--collapsed {
+  width: 56px;
+}
+
+.app-sidebar--collapsed .app-sidebar__label,
+.app-sidebar--collapsed .app-sidebar__section-title,
+.app-sidebar--collapsed .app-sidebar__course-list,
+.app-sidebar--collapsed .app-sidebar__new-lesson,
+.app-sidebar--collapsed .app-sidebar__chevron {
+  display: none;
+}
+
+.app-sidebar--collapsed .app-sidebar__item {
+  justify-content: center;
+  padding: 10px 0;
+}
+
+.app-sidebar--collapsed .app-sidebar__icon {
+  margin: 0;
+}
+
+/* --- Header --- */
+.app-sidebar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--hair);
+  flex-shrink: 0;
+}
+
+.app-sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-sidebar__brand-text {
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-md);
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.app-sidebar--collapsed .app-sidebar__brand-text,
+.app-sidebar--collapsed .app-sidebar__brand .pill {
+  display: none;
+}
+
+.app-sidebar__toggle {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background var(--duration-fast), color var(--duration-fast);
+  flex-shrink: 0;
+}
+
+.app-sidebar__toggle:hover {
+  background: var(--card-hover);
+  color: var(--text);
+}
+
+/* --- Body (flex column, no scroll — courses section scrolls internally) --- */
+.app-sidebar__body {
+  flex: 1;
+  overflow: hidden;
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* --- Sections --- */
+.app-sidebar__section {
+  margin-bottom: 4px;
+  flex-shrink: 0;
+}
+
+/* Courses section takes remaining space and scrolls */
+.app-sidebar__section--courses {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.app-sidebar__section-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  padding: 12px 16px 4px;
+  user-select: none;
+}
+
+.app-sidebar__divider {
+  height: 1px;
+  background: var(--hair);
+  margin: 8px 12px;
+}
+
+/* --- Nav items --- */
+.app-sidebar__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px;
+  margin: 1px 8px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  transition: background var(--duration-fast), color var(--duration-fast);
+  width: calc(100% - 16px);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-decoration: none;
+  line-height: 1.4;
+}
+
+.app-sidebar__item:hover {
+  background: var(--card-hover);
+  color: var(--text);
+}
+
+.app-sidebar__item--active {
+  background: var(--accent-soft);
+  color: var(--accent-2);
+  font-weight: var(--fw-semibold);
+}
+
+.app-sidebar__item--active:hover {
+  background: var(--accent-soft-2);
+}
+
+.app-sidebar__icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+}
+
+.app-sidebar__item--active .app-sidebar__icon {
+  opacity: 1;
+}
+
+.app-sidebar__label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-sidebar__chevron {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--muted);
+  transition: transform var(--duration-fast) var(--ease-in-out);
+}
+
+.app-sidebar__chevron--open {
+  transform: rotate(90deg);
+}
+
+/* --- New lesson item --- */
+.app-sidebar__item--new {
+  color: var(--accent-2);
+  opacity: 0.8;
+}
+
+.app-sidebar__item--new:hover {
+  opacity: 1;
+  background: var(--accent-soft);
+}
+
+/* --- Course list (scrollable) --- */
+.app-sidebar__course-list {
+  padding: 0 4px;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}
+
+.app-sidebar__course-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.app-sidebar__course-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.app-sidebar__course-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+
+.app-sidebar__course {
+  margin: 1px 0;
+}
+
+.app-sidebar__course-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 8px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--duration-fast), color var(--duration-fast);
+}
+
+.app-sidebar__course-btn:hover {
+  background: var(--card-hover);
+  color: var(--text);
+}
+
+.app-sidebar__course-btn--expanded {
+  color: var(--text);
+  font-weight: var(--fw-semibold);
+}
+
+.app-sidebar__course-code {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-2);
+  flex-shrink: 0;
+}
+
+.app-sidebar__course-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-sidebar__course-count {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--input-bg);
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.app-sidebar__course-content {
+  overflow: hidden;
+  padding-left: 8px;
+}
+
+.app-sidebar__empty-course {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 8px 16px;
+  font-style: italic;
+}
+
+/* --- Add lesson inside course --- */
+.app-sidebar__add-lesson {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: calc(100% - 4px);
+  padding: 4px 10px;
+  margin: 2px 2px 4px;
+  border-radius: var(--radius-xs);
+  border: none;
+  background: transparent;
+  color: var(--accent-2);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  transition: background var(--duration-fast);
+  opacity: 0.7;
+}
+
+.app-sidebar__add-lesson:hover {
+  background: var(--accent-soft);
+  opacity: 1;
+}
+
+/* --- Lessons under course --- */
+
+.app-sidebar__lesson-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--duration-fast), color var(--duration-fast);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-sidebar__lesson-btn:hover {
+  background: var(--card-hover);
+  color: var(--text);
+}
+
+.app-sidebar__lesson-btn--active {
+  background: var(--accent-soft);
+  color: var(--accent-2);
+  font-weight: var(--fw-semibold);
+}
+
+.app-sidebar__lesson-btn--active:hover {
+  background: var(--accent-soft-2);
+}
+
+.app-sidebar__lesson-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.app-sidebar__lesson-btn--active .app-sidebar__lesson-dot {
+  background: var(--accent-2);
+}
+
+.app-sidebar__lesson-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- Lesson tools (expanded under active lesson) --- */
+.app-sidebar__tools {
+  padding: 2px 0 4px 20px;
+  overflow: hidden;
+}
+
+.app-sidebar__tool-group-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  padding: 8px 12px 2px;
+  user-select: none;
+}
+
+.app-sidebar__tool-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 12px;
+  margin: 0;
+  border-radius: var(--radius-xs);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: var(--fw-regular);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--duration-fast), color var(--duration-fast);
+}
+
+.app-sidebar__tool-item:hover {
+  background: var(--card-hover);
+  color: var(--text);
+}
+
+.app-sidebar__tool-item--active {
+  background: var(--accent-soft);
+  color: var(--accent-2);
+  font-weight: var(--fw-medium);
+}
+
+.app-sidebar__tool-item--active:hover {
+  background: var(--accent-soft-2);
+}
+
+.app-sidebar__tool-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.app-sidebar__tool-item--active .app-sidebar__tool-icon {
+  opacity: 1;
+}
+
+/* --- New lesson button --- */
+.app-sidebar__new-lesson {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% - 8px);
+  padding: 6px 12px;
+  margin: 0 4px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+  flex-shrink: 0;
+}
+
+.app-sidebar__new-lesson:hover {
+  border-color: var(--accent-2);
+  color: var(--accent-2);
+  background: var(--accent-soft);
+}
+
+/* --- Bottom section --- */
+.app-sidebar__bottom {
+  flex-shrink: 0;
+  border-top: 1px solid var(--hair);
+  padding: 8px 0;
+}
+
+/* --- Upload Drawer --- */
+.upload-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 999;
+}
+
+.dark .upload-drawer-overlay {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.upload-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 420px;
+  max-width: 90vw;
+  height: 100vh;
+  background: var(--card);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-2);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dark .upload-drawer {
+  background: var(--bg-elevated);
+  border-left-color: rgba(255, 255, 255, 0.06);
+}
+
+.upload-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.upload-drawer__title {
+  font-weight: 700;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.upload-drawer__close {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: all var(--duration-fast);
+}
+
+.upload-drawer__close:hover {
+  background: var(--card-hover);
+  color: var(--text);
+}
+
+.upload-drawer__content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.upload-drawer__content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.upload-drawer__content::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+  .app-sidebar {
+    display: none;
+  }
+}
+
+@media (max-width: 1024px) {
+  .app-sidebar:not(.app-sidebar--collapsed) {
+    width: 220px;
+  }
+}

@@ -43,8 +43,14 @@ interface UiState {
     cheatErr: string | null;
     devErr: string | null;
 
-    // Left panel
+    // Left panel / sidebar
     leftPanelCollapsed: boolean;
+
+    // Upload drawer
+    showUploadDrawer: boolean;
+
+    // Create course modal
+    showCreateCourseModal: boolean;
 
     // Language
     language: Language;
@@ -70,6 +76,8 @@ interface UiState {
     setCheatErr: (err: string | null) => void;
     setDevErr: (err: string | null) => void;
     toggleLeftPanel: () => void;
+    toggleUploadDrawer: () => void;
+    setShowCreateCourseModal: (show: boolean) => void;
     toggleAdvancedModes: () => void;
 }
 
@@ -112,7 +120,9 @@ export const useUiStore = create<UiState>()(
             loModulesLoading: false,
             cheatErr: null,
             devErr: null,
-            leftPanelCollapsed: true,
+            leftPanelCollapsed: false,
+            showUploadDrawer: false,
+            showCreateCourseModal: false,
             language: initLanguage(),
             showAdvancedModes: false,
 
@@ -174,6 +184,8 @@ export const useUiStore = create<UiState>()(
             setCheatErr: (err) => set({ cheatErr: err }),
             setDevErr: (err) => set({ devErr: err }),
             toggleLeftPanel: () => set((s) => ({ leftPanelCollapsed: !s.leftPanelCollapsed })),
+            toggleUploadDrawer: () => set((s) => ({ showUploadDrawer: !s.showUploadDrawer })),
+            setShowCreateCourseModal: (show) => set({ showCreateCourseModal: show }),
             toggleAdvancedModes: () => set((s) => ({ showAdvancedModes: !s.showAdvancedModes })),
 
             setLanguage: (lang) => {

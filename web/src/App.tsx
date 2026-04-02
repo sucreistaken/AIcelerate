@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from "framer-motion";
 
 import { useApp } from "./hooks/useApp";
 
-import ModeRibbon from "./components/ModeRibbon";
 import { MobileNav } from "./components/layout/MobileNav";
 import ShareModal from "./components/ui/ShareModal";
 import AuthGuard from "./components/auth/AuthGuard";
@@ -12,11 +11,11 @@ import CursorGlow from "./components/ui/CursorGlow";
 import { KeyboardShortcuts } from "./components/ui/KeyboardShortcuts";
 import { OnboardingTour } from "./components/ui/OnboardingTour";
 
-import NavigationChip from "./components/layout/NavigationChip";
 import PaneRouter from "./components/layout/PaneRouter";
 import SchedulerWidget from "./components/SchedulerWidget";
 import AppNavbar from "./components/layout/AppNavbar";
-import AppLeftPanel from "./components/layout/AppLeftPanel";
+import AppSidebar from "./components/layout/AppSidebar";
+import UploadDrawer from "./components/layout/UploadDrawer";
 
 const SettingsPage = lazy(() => import("./components/settings/SettingsPage"));
 const AdminApp = lazy(() => import("./admin/AdminApp"));
@@ -34,8 +33,6 @@ export default function App() {
     lesson,
     transcription,
     ui,
-    leftPanelCollapsed,
-    toggleLeftPanel,
     authUser,
     currentCourse,
     showSettings,
@@ -67,57 +64,17 @@ export default function App() {
           onOpenShortcuts={openShortcuts}
         />
 
-        <div className="lc-container">
-          <header className="hero">
-            <h1 className="h1">
-              {lesson.lessons.find((l) => l.id === lesson.currentLessonId)
-                ?.title || "AIcelerate"}
-            </h1>
-            <div className="hero-breadcrumb">
-              {currentCourse && (
-                <>
-                  <span className="hero-breadcrumb__sep">/</span>
-                  <span style={{ color: "var(--accent-2)" }}>
-                    {currentCourse.code}
-                  </span>
-                </>
-              )}
-              <span className="hero-breadcrumb__sep">/</span>
-              <span>
-                {ui.mode
-                  .replace(/-/g, " ")
-                  .replace(/\b\w/g, (c) => c.toUpperCase())}
-              </span>
-            </div>
-          </header>
+        <div className="app-layout">
+          {!isMobile && (
+            <AppSidebar onOpenUpload={ui.toggleUploadDrawer} />
+          )}
 
-          <NavigationChip />
-
-          <div
-            className={`lc-shell${ui.mode === "study-hub" ? " lc-shell--room" : ""}`}
-          >
-            {ui.mode !== "study-hub" && ui.mode !== "create-lesson" && (
-              <AppLeftPanel
-                collapsed={leftPanelCollapsed}
-                onToggle={toggleLeftPanel}
-                lesson={lesson}
-                ui={ui}
-                transcription={transcription}
-                canSubmit={canSubmit}
-                onSubmit={handleSubmit}
-                onPdfUpload={handlePdfUpload}
-                onAudioUpload={handleAudioUpload}
-              />
+          <main className="app-main" role="main" aria-label="Study content">
+            {(ui.mode === "plan" || ui.mode === "course-dashboard") && (
+              <SchedulerWidget />
             )}
-
-            <main className="lc-plan-pane" role="main" aria-label="Study content">
-              <ModeRibbon mode={ui.mode} setMode={ui.setMode} />
-              {(ui.mode === "plan" || ui.mode === "course-dashboard") && (
-                <SchedulerWidget />
-              )}
-              <PaneRouter mode={ui.mode} lesson={lesson} ui={ui} />
-            </main>
-          </div>
+            <PaneRouter mode={ui.mode} lesson={lesson} ui={ui} />
+          </main>
         </div>
 
         <AnimatePresence>
@@ -145,7 +102,17 @@ export default function App() {
 
         {isMobile && <MobileNav />}
 
-        {/* Quick create modal removed - lessons are now created via Wizard only */}
+        <UploadDrawer
+          open={ui.showUploadDrawer}
+          onClose={ui.toggleUploadDrawer}
+          lesson={lesson}
+          ui={ui}
+          transcription={transcription}
+          canSubmit={canSubmit}
+          onSubmit={handleSubmit}
+          onPdfUpload={handlePdfUpload}
+          onAudioUpload={handleAudioUpload}
+        />
 
         {showSettings && (
           <Suspense fallback={null}>

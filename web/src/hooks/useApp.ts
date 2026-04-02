@@ -97,10 +97,14 @@ export function useApp() {
             e.preventDefault();
             ui.setMode("create-lesson" as any);
             return;
+          case "KeyU":
+            e.preventDefault();
+            ui.toggleUploadDrawer();
+            return;
           case "KeyE":
             e.preventDefault();
             {
-              const el = document.querySelector<HTMLElement>(".lc-plan-pane");
+              const el = document.querySelector<HTMLElement>(".app-main");
               if (el) import("../utils/pdfExport").then(({ exportToPdf }) => exportToPdf(el, "lesson-export.pdf"));
             }
             return;

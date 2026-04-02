@@ -31,7 +31,8 @@ export function useCourseDashboard() {
   const setCurrentLessonId = useLessonStore((s) => s.setCurrentLessonId);
   const allLessons = useLessonStore((s) => s.lessons);
 
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const showCreateModal = useUiStore((s) => s.showCreateCourseModal);
+  const setShowCreateModal = useUiStore((s) => s.setShowCreateCourseModal);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);

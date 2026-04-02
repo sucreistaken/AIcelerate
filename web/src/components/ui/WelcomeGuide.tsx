@@ -132,8 +132,6 @@ export default function WelcomeGuide() {
   const lessons = useLessonStore((s) => s.lessons) as LessonSummary[];
   const setCurrentLessonId = useLessonStore((s) => s.setCurrentLessonId);
   const setMode = useUiStore((s) => s.setMode);
-  const toggleLeftPanel = useUiStore((s) => s.toggleLeftPanel);
-  const leftPanelCollapsed = useUiStore((s) => s.leftPanelCollapsed);
   const courses = useCourseStore((s) => s.courses);
   const { totalXp, streakDays } = useGamificationStore();
   const level = getLevelInfo(totalXp);
@@ -148,7 +146,7 @@ export default function WelcomeGuide() {
   const streakWeek = getStreakWeek(streakDays);
 
   const handleNewLesson = () => {
-    if (leftPanelCollapsed) toggleLeftPanel();
+    setMode("create-lesson");
   };
 
   const handleContinue = (lessonId: string) => {

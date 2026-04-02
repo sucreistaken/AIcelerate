@@ -71,8 +71,9 @@ function useShortcutGroups(): ShortcutGroup[] {
       titleKey: "shortcuts.actions",
       items: [
         { label: "shortcuts.newLesson", keys: { mac: ["⌥", "N"], windows: ["Alt", "N"] }, action: () => setMode("create-lesson" as any) },
+        { label: "shortcuts.uploadMaterials", keys: { mac: ["⌥", "U"], windows: ["Alt", "U"] } },
         { label: "shortcuts.exportPdf", keys: { mac: ["⌥", "E"], windows: ["Alt", "E"] }, action: () => {
-          const el = document.querySelector<HTMLElement>(".lc-plan-pane");
+          const el = document.querySelector<HTMLElement>(".app-main");
           if (el) import("../../utils/pdfExport").then(({ exportToPdf }) => exportToPdf(el, "lesson-export.pdf"));
         }},
         { label: "shortcuts.toggleTheme", keys: { mac: ["⌥", "T"], windows: ["Alt", "T"] }, action: toggleTheme },
