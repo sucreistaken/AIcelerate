@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
@@ -96,11 +96,16 @@ export default function AppSidebar({ onOpenUpload }: AppSidebarProps) {
   const { lessons, currentLessonId, setCurrentLessonId } = useLessonStore();
   const { courses, currentCourseId, selectCourse } = useCourseStore();
 
-  // Track which course is expanded in sidebar (independent from store selection)
+  // Track which course is expanded in sidebar (syncs with store selection)
   const [expandedCourseId, setExpandedCourseId] = useState<string | null>(currentCourseId);
 
+  // Sync sidebar expansion when store selection changes externally (e.g. from Dashboard)
+  useEffect(() => {
+    if (currentCourseId) setExpandedCourseId(currentCourseId);
+  }, [currentCourseId]);
+
   const handleDashboardClick = () => {
-    setMode("course-dashboard");
+    setMode("dashboard");
     selectCourse(null);
     setCurrentLessonId(null);
     setExpandedCourseId(null);
@@ -122,8 +127,17 @@ export default function AppSidebar({ onOpenUpload }: AppSidebarProps) {
     return lessons.filter((l) => course.lessonIds.includes(l.id));
   };
 
-  // Track which lesson's tools are expanded (can toggle off)
+  // Track which lesson's tools are expanded (syncs with store selection)
   const [expandedLessonId, setExpandedLessonId] = useState<string | null>(currentLessonId);
+
+  useEffect(() => {
+    if (currentLessonId) {
+      setExpandedLessonId(currentLessonId);
+      // Also expand the parent course
+      const parentCourse = courses.find((c) => c.lessonIds.includes(currentLessonId));
+      if (parentCourse) setExpandedCourseId(parentCourse.id);
+    }
+  }, [currentLessonId, courses]);
 
   const handleLessonClick = (lessonId: string, courseId: string) => {
     if (expandedLessonId === lessonId) {
@@ -169,7 +183,7 @@ export default function AppSidebar({ onOpenUpload }: AppSidebarProps) {
         {/* Dashboard */}
         <div className="app-sidebar__section">
           <button
-            className={`app-sidebar__item${mode === "course-dashboard" ? " app-sidebar__item--active" : ""}`}
+            className={`app-sidebar__item${mode === "dashboard" ? " app-sidebar__item--active" : ""}`}
             onClick={handleDashboardClick}
             title={t("sidebar.dashboard")}
           >

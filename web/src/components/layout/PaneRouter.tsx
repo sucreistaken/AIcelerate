@@ -23,7 +23,7 @@ const FlashcardPane = lazy(() => import("../FlashcardPane"));
 const ConnectionsPane = lazy(() => import("../ConnectionsPane"));
 const CourseDashboard = lazy(() => import("../CourseDashboard"));
 const StudyHub = lazy(() => import("../collab/layout/StudyHub"));
-const WelcomeGuide = lazy(() => import("../ui/WelcomeGuide"));
+const Dashboard = lazy(() => import("../ui/Dashboard"));
 const LessonWizard = lazy(() => import("../lesson-wizard/LessonWizard"));
 const KnowledgeGraphPane = lazy(() => import("../KnowledgeGraphPane"));
 const AdaptiveQuizPane = lazy(() => import("../AdaptiveQuizPane"));
@@ -71,8 +71,10 @@ function PaneRouter({ mode, lesson, ui }: PaneRouterProps) {
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
           >
+            {mode === "dashboard" && <Dashboard />}
+
             {mode === "plan" && (
-              lesson.plan ? <PlanPane plan={lesson.plan} confidence={(lesson as any).planConfidence} /> : (lesson.currentLessonId ? <NoPlanEmpty /> : <WelcomeGuide />)
+              lesson.plan ? <PlanPane plan={lesson.plan} confidence={(lesson as any).planConfidence} /> : (lesson.currentLessonId ? <NoPlanEmpty /> : <Dashboard />)
             )}
 
             {mode === "alignment" && (

@@ -31,7 +31,7 @@ vi.mock("../LoStudyPane", () => ({ default: () => <div data-testid="pane-lo-stud
 vi.mock("../CheatSheetPane", () => ({ default: () => <div data-testid="pane-cheat-sheet">CheatSheetPane</div> }));
 vi.mock("../LessonsHistoryPane", () => ({ default: () => <div data-testid="pane-history">LessonsHistoryPane</div> }));
 vi.mock("../collab/layout/StudyHub", () => ({ default: () => <div data-testid="pane-study-hub">StudyHub</div> }));
-vi.mock("../ui/WelcomeGuide", () => ({ default: () => <div data-testid="pane-welcome">WelcomeGuide</div> }));
+vi.mock("../ui/Dashboard", () => ({ default: () => <div data-testid="pane-dashboard">Dashboard</div> }));
 vi.mock("../lesson-wizard/LessonWizard", () => ({ default: () => <div data-testid="pane-create-lesson">LessonWizard</div> }));
 vi.mock("../ui/ErrorBoundary", () => ({
   PaneErrorBoundary: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -81,7 +81,18 @@ describe("PaneRouter", () => {
     expect(await screen.findByTestId("pane-plan")).toBeInTheDocument();
   });
 
-  it("renders WelcomeGuide when mode is 'plan' and no plan or lesson", async () => {
+  it("renders Dashboard when mode is 'dashboard'", async () => {
+    render(
+      <PaneRouter
+        mode="dashboard"
+        lesson={buildLessonProp({ plan: null, currentLessonId: null })}
+        ui={buildUiProp()}
+      />
+    );
+    expect(await screen.findByTestId("pane-dashboard")).toBeInTheDocument();
+  });
+
+  it("renders Dashboard when mode is 'plan' and no plan or lesson", async () => {
     render(
       <PaneRouter
         mode="plan"
@@ -89,7 +100,7 @@ describe("PaneRouter", () => {
         ui={buildUiProp()}
       />
     );
-    expect(await screen.findByTestId("pane-welcome")).toBeInTheDocument();
+    expect(await screen.findByTestId("pane-dashboard")).toBeInTheDocument();
   });
 
   it("renders QuizPane for mode 'quiz'", async () => {

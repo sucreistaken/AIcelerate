@@ -100,6 +100,7 @@ export type Plan = {
 };
 
 export type ModeId =
+  | "dashboard"
   | "plan"
   | "alignment"
   | "deviation"

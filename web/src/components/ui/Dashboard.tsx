@@ -1,19 +1,11 @@
-import React, { useMemo } from "react";
+import React, { useRef, useState, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
-import { useLessonStore } from "../../stores/lessonStore";
-import { useUiStore } from "../../stores/uiStore";
-import { useCourseStore } from "../../stores/courseStore";
 import { useGamificationStore, getLevelInfo } from "../../stores/gamificationStore";
+import { useDashboard, type SparklinePoint, type WeeklyBar, type CourseCard } from "../../hooks/useDashboard";
 import { ModeId } from "../../types";
 import { t } from "../../utils/i18n";
 
-interface LessonSummary {
-  id: string;
-  title: string;
-  date?: string;
-  highlights?: string[];
-  plan?: { modules?: any[] };
-}
+/* ── Helpers ── */
 
 function timeAgoShort(d: string): string {
   const diff = Date.now() - new Date(d).getTime();
@@ -36,6 +28,8 @@ function getStreakWeek(streakDays: number) {
   }));
 }
 
+/* ── Icons ── */
+
 function SvgIcon({ size = 22, ...props }: { size?: number } & React.SVGProps<SVGSVGElement>) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" {...props} />;
 }
@@ -53,6 +47,7 @@ const icons = {
   book: <SvgIcon size={18}><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></SvgIcon>,
   plus: <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M8 3v10M3 8h10"/></svg>,
   arrow: <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 4l4 4-4 4"/></svg>,
+  check: <SvgIcon size={16}><polyline points="20 6 9 17 4 12"/></SvgIcon>,
 };
 
 /* ── Study Tools Config ── */
@@ -79,6 +74,7 @@ const statIcons = {
   lessons: <svg {...svgSm}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
   bolt: <svg {...svgSm}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
   target: <svg {...svgSm}><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>,
+  cards: <svg {...svgSm}><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>,
 };
 
 const fireIcon = <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 12c2-2.96 0-7-1-8 0 3.038-1.773 4.741-3 6-1.226 1.26-2 3.24-2 5a6 6 0 1 0 12 0c0-1.532-1.056-3.94-2-5-1.786 3-2.791 3-4 2z"/></svg>;
@@ -90,7 +86,9 @@ const QUICK_ACTIONS: Array<{ icon: React.ReactNode; labelKey: string; mode: Mode
   { icon: qaIcons.search, labelKey: "welcome.qaExplore", mode: "study-hub", tint: "251, 146, 60" },
 ];
 
-function StatCard({ icon, value, label, delay }: { icon: React.ReactNode; value: string | number; label: string; delay: number }) {
+/* ── Sub-Components ── */
+
+function StatCard({ icon, value, label, delay }: { icon: React.ReactNode; value: React.ReactNode; label: string; delay: number }) {
   return (
     <motion.div
       className="wg-stat"
@@ -105,7 +103,6 @@ function StatCard({ icon, value, label, delay }: { icon: React.ReactNode; value:
   );
 }
 
-/* ── Step Card ── */
 function StepCard({ step, icon, title, desc, active, onClick }: {
   step: number; icon: React.ReactNode; title: string; desc: string; active: boolean; onClick: () => void;
 }) {
@@ -127,34 +124,245 @@ function StepCard({ step, icon, title, desc, active, onClick }: {
   );
 }
 
-/* ── Main Component ── */
-export default function WelcomeGuide() {
-  const lessons = useLessonStore((s) => s.lessons) as LessonSummary[];
-  const setCurrentLessonId = useLessonStore((s) => s.setCurrentLessonId);
-  const setMode = useUiStore((s) => s.setMode);
-  const courses = useCourseStore((s) => s.courses);
-  const { totalXp, streakDays } = useGamificationStore();
-  const level = getLevelInfo(totalXp);
-
-  const recentLessons = useMemo(
-    () => [...lessons].sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()).slice(0, 3),
-    [lessons]
+/* ── Level Progress Bar ── */
+function LevelProgressBar({ totalXp, level, progress }: { totalXp: number; level: { level: number; name: string; minXp: number; maxXp: number }; progress: number }) {
+  const isMax = level.maxXp === Infinity;
+  return (
+    <motion.div
+      className="db-level"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.1, duration: 0.4 }}
+    >
+      <div className="db-level__header">
+        <span className="db-level__name">Lv.{level.level} {level.name}</span>
+        <span className="db-level__xp">
+          {isMax ? t("db.maxLevel") : `${totalXp} / ${level.maxXp} XP`}
+        </span>
+      </div>
+      <div className="db-level__track">
+        <motion.div
+          className="db-level__fill"
+          initial={{ width: 0 }}
+          animate={{ width: `${Math.round((isMax ? 1 : progress) * 100)}%` }}
+          transition={{ delay: 0.2, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        />
+      </div>
+      {!isMax && (
+        <div className="db-level__hint">
+          {t("db.xpToNext", { remaining: String(level.maxXp - totalXp) })}
+        </div>
+      )}
+    </motion.div>
   );
+}
 
-  const totalLessons = lessons.length;
-  const totalCourses = courses.length;
+/* ── XP Sparkline (14 days) ── */
+function XpSparkline({ data }: { data: SparklinePoint[] }) {
+  const maxVal = Math.max(...data.map((d) => d.value), 1);
+  const w = 280;
+  const h = 48;
+  const pad = 4;
+  const points = data.map((d, i) => {
+    const x = pad + (i / (data.length - 1)) * (w - pad * 2);
+    const y = h - pad - (d.value / maxVal) * (h - pad * 2);
+    return `${x},${y}`;
+  });
+  const hasData = data.some((d) => d.value > 0);
+
+  return (
+    <motion.div
+      className="db-sparkline"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.14, duration: 0.4 }}
+    >
+      <div className="db-sparkline__label">{t("db.activityChart")}</div>
+      <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
+        {hasData ? (
+          <>
+            <polyline
+              points={points.join(" ")}
+              fill="none"
+              stroke="rgba(99,102,241,0.7)"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            {data.map((d, i) =>
+              d.value > 0 ? (
+                <circle
+                  key={i}
+                  cx={pad + (i / (data.length - 1)) * (w - pad * 2)}
+                  cy={h - pad - (d.value / maxVal) * (h - pad * 2)}
+                  r="3"
+                  fill="#6366f1"
+                />
+              ) : null
+            )}
+          </>
+        ) : (
+          <>
+            <line x1={pad} y1={h / 2} x2={w - pad} y2={h / 2} stroke="rgba(255,255,255,0.1)" strokeWidth="1.5" strokeDasharray="4 4" />
+            <text x={w / 2} y={h / 2 - 6} textAnchor="middle" fill="rgba(255,255,255,0.3)" fontSize="11">{t("db.noActivity")}</text>
+          </>
+        )}
+      </svg>
+    </motion.div>
+  );
+}
+
+/* ── Weekly XP Bars ── */
+function WeeklyXpBars({ bars }: { bars: WeeklyBar[] }) {
+  const maxVal = Math.max(...bars.map((b) => b.value), 1);
+  return (
+    <motion.div
+      className="db-weekly"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.16, duration: 0.4 }}
+    >
+      <div className="db-weekly__label">{t("db.weeklyXp")}</div>
+      <div className="db-weekly__bars">
+        {bars.map((b, i) => (
+          <div key={i} className="db-weekly__col">
+            <div className="db-weekly__bar-track">
+              <motion.div
+                className="db-weekly__bar-fill"
+                initial={{ height: 0 }}
+                animate={{ height: `${Math.max((b.value / maxVal) * 100, b.value > 0 ? 8 : 0)}%` }}
+                transition={{ delay: 0.2 + i * 0.03, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              />
+            </div>
+            <span className="db-weekly__day">{t(b.dayKey)}</span>
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+/* ── Course Progress Cards ── */
+const arrowLeft = <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M10 4l-4 4 4 4"/></svg>;
+const arrowRight = <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 4l4 4-4 4"/></svg>;
+
+function CourseProgressCards({ cards, onGoToCourse, onCreateCourse }: {
+  cards: CourseCard[];
+  onGoToCourse: (id: string) => void;
+  onCreateCourse: () => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canLeft, setCanLeft] = useState(false);
+  const [canRight, setCanRight] = useState(false);
+
+  const checkArrows = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanLeft(el.scrollLeft > 4);
+    setCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    checkArrows();
+    const el = scrollRef.current;
+    if (el) el.addEventListener("scroll", checkArrows, { passive: true });
+    window.addEventListener("resize", checkArrows);
+    return () => {
+      el?.removeEventListener("scroll", checkArrows);
+      window.removeEventListener("resize", checkArrows);
+    };
+  }, [checkArrows, cards.length]);
+
+  const scroll = (dir: number) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const cardWidth = el.querySelector(".db-course-card")?.clientWidth || 250;
+    el.scrollBy({ left: dir * (cardWidth + 10), behavior: "smooth" });
+  };
+
+  if (cards.length === 0) {
+    return (
+      <motion.div
+        className="wg-section"
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.18 }}
+      >
+        <div className="wg-section__label">{t("db.courseProgress")}</div>
+        <motion.button
+          className="db-course-card db-course-card--cta"
+          onClick={onCreateCourse}
+          whileHover={{ y: -2 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <span className="db-course-card__plus">+</span>
+          <span>{t("db.createFirstCourse")}</span>
+        </motion.button>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div
+      className="wg-section"
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.18 }}
+    >
+      <div className="wg-section__label">{t("db.courseProgress")}</div>
+      <div className="db-course-wrap">
+        {canLeft && (
+          <button className="db-course-arrow db-course-arrow--left" onClick={() => scroll(-1)}>
+            {arrowLeft}
+          </button>
+        )}
+        <div className="db-course-cards" ref={scrollRef}>
+          {cards.map((c, i) => {
+            const pct = c.lessonCount > 0 ? Math.round((c.completedCount / c.lessonCount) * 100) : 0;
+            return (
+              <motion.button
+                key={c.id}
+                className="db-course-card"
+                onClick={() => onGoToCourse(c.id)}
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.2 + i * 0.04 }}
+                whileHover={{ y: -3 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <div className="db-course-card__code">{c.code}</div>
+                <div className="db-course-card__name">{c.name}</div>
+                <div className="db-course-card__meta">
+                  {t("db.lessonsCompleted", { done: String(c.completedCount), total: String(c.lessonCount) })}
+                </div>
+                <div className="db-course-card__bar">
+                  <div className="db-course-card__bar-fill" style={{ width: `${pct}%` }} />
+                </div>
+              </motion.button>
+            );
+          })}
+        </div>
+        {canRight && (
+          <button className="db-course-arrow db-course-arrow--right" onClick={() => scroll(1)}>
+            {arrowRight}
+          </button>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+/* ── Main Component ── */
+export default function Dashboard() {
+  const {
+    totalXp, streakDays, level, levelProgress,
+    totalLessons, totalCourses, hasActivity,
+    recentLessons, sparklineData, weeklyXp, courseCards,
+    flashcardStats,
+    setMode, handleContinue, handleNewLesson, handleGoToCourse,
+  } = useDashboard();
+
   const streakWeek = getStreakWeek(streakDays);
-
-  const handleNewLesson = () => {
-    setMode("create-lesson");
-  };
-
-  const handleContinue = (lessonId: string) => {
-    setCurrentLessonId(lessonId);
-    setMode("plan");
-  };
-
-  const hasActivity = totalLessons > 0 || totalXp > 0;
 
   return (
     <div className="wg">
@@ -178,7 +386,6 @@ export default function WelcomeGuide() {
             ? t("welcome.backDesc", { count: totalLessons })
             : t("welcome.helloDesc")}
         </p>
-
         {totalXp > 0 && (
           <div className="wg-hero__stats">
             {streakDays > 0 && <div className="wg-hero__stat">{streakDays} {t("welcome.dayStreak")}</div>}
@@ -210,6 +417,11 @@ export default function WelcomeGuide() {
         </motion.div>
       )}
 
+      {/* ── Level Progress Bar ── */}
+      {totalXp > 0 && (
+        <LevelProgressBar totalXp={totalXp} level={level} progress={levelProgress} />
+      )}
+
       {/* ── Stats Row ── */}
       {hasActivity && (
         <div className="wg-stats">
@@ -217,8 +429,29 @@ export default function WelcomeGuide() {
           <StatCard icon={statIcons.lessons} value={totalLessons} label={t("welcome.statLessons")} delay={0.12} />
           <StatCard icon={statIcons.bolt} value={totalXp || 0} label="XP" delay={0.16} />
           <StatCard icon={statIcons.target} value={level.name} label={t("welcome.statLevel")} delay={0.2} />
+          <StatCard
+            icon={statIcons.cards}
+            value={flashcardStats ? (flashcardStats.dueToday > 0 ? flashcardStats.dueToday : <span style={{ color: "var(--success)" }}>{icons.check}</span>) : "-"}
+            label={flashcardStats?.dueToday === 0 ? t("db.flashcardsAllDone") : t("db.flashcardsDue")}
+            delay={0.24}
+          />
         </div>
       )}
+
+      {/* ── XP Charts Row ── */}
+      {hasActivity && (
+        <div className="db-charts-row">
+          <XpSparkline data={sparklineData} />
+          <WeeklyXpBars bars={weeklyXp} />
+        </div>
+      )}
+
+      {/* ── Course Progress ── */}
+      <CourseProgressCards
+        cards={courseCards}
+        onGoToCourse={handleGoToCourse}
+        onCreateCourse={() => setMode("course-dashboard")}
+      />
 
       {/* ── Quick Actions ── */}
       <motion.div

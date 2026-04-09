@@ -82,13 +82,13 @@ interface UiState {
 }
 
 const getInitialMode = (): ModeId => {
-    if (typeof window === 'undefined') return 'plan';
+    if (typeof window === 'undefined') return 'dashboard';
     const sp = new URLSearchParams(window.location.search);
     const q = sp.get('mode') as ModeId | null;
     const saved = localStorage.getItem('lc.mode') as ModeId | null;
     if (q) return q;
     if (saved) return saved;
-    return 'plan';
+    return 'dashboard';
 };
 
 const getInitialTheme = (): Theme => {

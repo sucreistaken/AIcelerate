@@ -911,6 +911,20 @@ const translations: Record<Lang, Record<string, string>> = {
     'welcome.sat': 'Ct',
     'welcome.sun': 'Pz',
 
+    // Dashboard
+    'db.levelProgress': 'Seviye İlerlemesi',
+    'db.xpToNext': '{remaining} XP sonraki seviyeye',
+    'db.maxLevel': 'Maksimum seviye',
+    'db.weeklyXp': 'Bu Hafta XP',
+    'db.activityChart': 'Aktivite (14 gün)',
+    'db.courseProgress': 'Kurs İlerlemesi',
+    'db.createFirstCourse': 'İlk kursunu oluştur',
+    'db.viewAllCourses': 'Tüm kurslar',
+    'db.lessonsCompleted': '{done}/{total} ders',
+    'db.flashcardsDue': 'Bugün Kart',
+    'db.flashcardsAllDone': 'Kartlar Tamam',
+    'db.noActivity': 'Henüz aktivite yok',
+
     // Enhanced Empty States
     'empty.noFlashcards': 'Flashcard desteniz boş',
     'empty.noFlashcardsDesc': 'AI ile otomatik flashcard oluştur, SM-2 algoritması ile tekrar zamanlarını optimize et.',
@@ -1850,6 +1864,20 @@ const translations: Record<Lang, Record<string, string>> = {
     'welcome.fri': 'Fr',
     'welcome.sat': 'Sa',
     'welcome.sun': 'Su',
+
+    // Dashboard
+    'db.levelProgress': 'Level Progress',
+    'db.xpToNext': '{remaining} XP to next level',
+    'db.maxLevel': 'Max level reached',
+    'db.weeklyXp': 'This Week XP',
+    'db.activityChart': 'Activity (14 days)',
+    'db.courseProgress': 'Course Progress',
+    'db.createFirstCourse': 'Create your first course',
+    'db.viewAllCourses': 'View all courses',
+    'db.lessonsCompleted': '{done}/{total} lessons',
+    'db.flashcardsDue': 'Due Today',
+    'db.flashcardsAllDone': 'All Caught Up',
+    'db.noActivity': 'No activity yet',
 
     // Enhanced Empty States
     'empty.noFlashcards': 'Your flashcard deck is empty',
