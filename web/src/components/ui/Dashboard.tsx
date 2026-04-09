@@ -536,35 +536,6 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* ── Study Tools ── */}
-      <motion.div
-        className="wg-section"
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-      >
-        <div className="wg-section__label">{t("welcome.studyTools")}</div>
-        <div className="wg-tools">
-          {STUDY_TOOLS.map((tool, i) => (
-            <motion.button
-              key={tool.id}
-              className="wg-tool"
-              onClick={() => setMode(tool.id)}
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.24 + i * 0.035 }}
-              whileHover={{ y: -3 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <div className="wg-tool__icon-wrap" style={{ '--tool-tint': tool.tint } as React.CSSProperties}>
-                {tool.icon}
-              </div>
-              <div className="wg-tool__label">{t(tool.labelKey)}</div>
-              <div className="wg-tool__desc">{t(tool.descKey)}</div>
-            </motion.button>
-          ))}
-        </div>
-      </motion.div>
     </div>
   );
 }
