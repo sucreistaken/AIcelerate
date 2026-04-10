@@ -489,6 +489,23 @@ export function setupCollabNamespace(io: Server) {
     socket.on("disconnect", async () => {
       if (!userId) return;
 
+      // Clean up typing state for ALL channels this user was typing in
+      for (const [chId, channelTyping] of typingUsers.entries()) {
+        if (channelTyping.has(userId)) {
+          clearTimeout(channelTyping.get(userId)!);
+          channelTyping.delete(userId);
+          collab.to(`channel:${chId}`).emit("typing:stop", { channelId: chId, userId });
+        }
+        if (channelTyping.size === 0) typingUsers.delete(chId);
+      }
+
+      // Clean up active channel
+      const channelId = activeChannels.get(socket.id);
+      if (channelId) {
+        activeChannels.delete(socket.id);
+      }
+
+      // Clean up online status
       const sockets = onlineUsers.get(userId);
       if (sockets) {
         sockets.delete(socket.id);
@@ -505,12 +522,6 @@ export function setupCollabNamespace(io: Server) {
             logger.warn({ event: "disconnect", userId, error: err.message }, "Socket disconnect cleanup failed");
           }
         }
-      }
-
-      const channelId = activeChannels.get(socket.id);
-      if (channelId) {
-        activeChannels.delete(socket.id);
-        clearTyping(channelId, userId, collab);
       }
     });
   });

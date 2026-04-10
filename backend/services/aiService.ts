@@ -62,8 +62,13 @@ export async function safeGenerate(
       return result;
     } catch (err: any) {
       lastError = err;
-      // Only fallback on certain errors, not on circuit open or timeout
-      if (modelName !== MODELS[MODELS.length - 1]) {
+
+      // Don't fallback on 429 (quota/billing) — another model won't help
+      const is429 = err.status === 429 || err.message?.includes("429");
+      // Don't fallback on circuit breaker open — all models share the breaker
+      const isCircuitOpen = err.message === "AI_CIRCUIT_OPEN";
+
+      if (modelName !== MODELS[MODELS.length - 1] && !is429 && !isCircuitOpen) {
         logger.warn({ model: modelName, error: err.message, label: options?.label }, "AI model failed, trying fallback");
         continue;
       }

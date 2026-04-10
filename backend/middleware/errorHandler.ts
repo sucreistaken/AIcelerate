@@ -135,6 +135,27 @@ export function errorHandler(err: Error, req: Request, res: Response, _next: Nex
     return;
   }
 
+  // Handle Google Generative AI HTTP errors (429, 503, etc.)
+  if ((err as any).status === 429 || (err.message && err.message.includes("429"))) {
+    res.status(429).json({
+      ok: false,
+      error: "AI istek limiti aşıldı. Lütfen biraz bekleyin.",
+      code: "AI_RATE_LIMITED",
+      ...(requestId && { requestId }),
+    });
+    return;
+  }
+
+  if ((err as any).status === 503 || (err.message && err.message.includes("503"))) {
+    res.status(503).json({
+      ok: false,
+      error: "AI servisi geçici olarak meşgul. Lütfen tekrar deneyin.",
+      code: "AI_SERVICE_UNAVAILABLE",
+      ...(requestId && { requestId }),
+    });
+    return;
+  }
+
   // Handle JSON parse errors from LLM
   if (isLlmParseError(err)) {
     logger.error("LLM parse error:", err.message);
