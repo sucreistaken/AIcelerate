@@ -21,7 +21,7 @@ const MindMapPane = lazy(() => import("../MindMapPane"));
 const NotesPane = lazy(() => import("../NotesPane"));
 const FlashcardPane = lazy(() => import("../FlashcardPane"));
 const ConnectionsPane = lazy(() => import("../ConnectionsPane"));
-const CourseDashboard = lazy(() => import("../CourseDashboard"));
+// CourseDashboard removed — courses managed via sidebar + dashboard
 const StudyHub = lazy(() => import("../collab/layout/StudyHub"));
 const Dashboard = lazy(() => import("../ui/Dashboard"));
 const LessonWizard = lazy(() => import("../lesson-wizard/LessonWizard"));
@@ -146,7 +146,7 @@ function PaneRouter({ mode, lesson, ui }: PaneRouterProps) {
             {mode === "notes" && <NotesPane />}
 
             {mode === "study-hub" && <StudyHub />}
-            {mode === "course-dashboard" && <CourseDashboard />}
+            {mode === "course-dashboard" && <Dashboard />}
             {mode === "create-lesson" && <LessonWizard />}
             {mode === "knowledge-graph" && <KnowledgeGraphPane />}
             {mode === "adaptive-quiz" && <AdaptiveQuizPane />}

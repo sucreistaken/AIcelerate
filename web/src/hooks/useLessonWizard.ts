@@ -160,7 +160,7 @@ export function useLessonWizard() {
     } else if (hasProgress) {
       if (!window.confirm("Wizard'dan çıkmak istediğinize emin misiniz?")) return;
     }
-    ui.setMode("course-dashboard");
+    ui.setMode("dashboard");
   }, [ui, hasProgress, state.analysisCompleted, state.lessonId, lessonStore]);
 
   const canProceed = useMemo(() => {

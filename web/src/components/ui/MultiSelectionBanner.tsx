@@ -9,7 +9,7 @@ export default function MultiSelectionBanner() {
   const mode = useUiStore((s) => s.mode);
 
   if (!isSelectionMode || selectedLessonIds.length === 0) return null;
-  if (mode === "course-dashboard" || mode === "create-lesson") return null;
+  if (mode === "dashboard" || mode === "create-lesson") return null;
 
   const selectedTitles = selectedLessonIds
     .map((id) => lessons.find((l) => l.id === id)?.title)
@@ -56,7 +56,7 @@ export default function MultiSelectionBanner() {
         <button
           className="btn btn-ghost"
           style={{ fontSize: 11, padding: "2px 8px" }}
-          onClick={() => setMode("course-dashboard")}
+          onClick={() => setMode("dashboard")}
         >
           Seçimi Değiştir
         </button>

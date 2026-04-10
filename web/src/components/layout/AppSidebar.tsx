@@ -205,7 +205,6 @@ export default function AppSidebar({ onOpenUpload }: AppSidebarProps) {
           <button
             className="app-sidebar__new-lesson"
             onClick={() => {
-              setMode("course-dashboard");
               setShowCreateCourseModal(true);
             }}
             title={t("sidebar.newCourse")}

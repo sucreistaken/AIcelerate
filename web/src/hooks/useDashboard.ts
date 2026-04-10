@@ -133,9 +133,8 @@ export function useDashboard() {
   const handleGoToCourse = useCallback(
     (courseId: string) => {
       useCourseStore.getState().selectCourse(courseId);
-      setMode("course-dashboard");
     },
-    [setMode]
+    []
   );
 
   return {

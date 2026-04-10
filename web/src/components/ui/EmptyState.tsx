@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { t } from "../../utils/i18n";
+import { useUiStore } from "../../stores/uiStore";
 
 const svgP = { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 
@@ -242,13 +243,16 @@ export function EmptyState({
 }
 
 export function NoPlanEmpty({ onAction }: { onAction?: () => void }) {
+    const toggleUpload = useUiStore((s) => s.toggleUploadDrawer);
+
     return (
         <EmptyState
             illustration={<IllusRocket />}
             title={t("empty.noPlan")}
             description={t("empty.noPlanDesc")}
             hint={t("empty.noPlanHint")}
-            action={onAction ? { label: t("empty.getStarted"), onClick: onAction } : undefined}
+            action={{ label: t("empty.uploadMaterial") || "Materyal Yukle", onClick: toggleUpload }}
+            secondaryAction={onAction ? { label: t("empty.getStarted"), onClick: onAction } : undefined}
         />
     );
 }

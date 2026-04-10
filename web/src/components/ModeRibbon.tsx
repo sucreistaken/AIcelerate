@@ -20,7 +20,6 @@ const GROUPS: TabGroup[] = [
   {
     label: "mode.groupCourse",
     tabs: [
-      { id: "course-dashboard", label: "mode.dashboard", icon: <svg {...svgProps}><rect x="3" y="12" width="4" height="9"/><rect x="10" y="6" width="4" height="15"/><rect x="17" y="2" width="4" height="19"/></svg> },
       { id: "lo-progress", label: "mode.loProgress", icon: <svg {...svgProps}><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> },
     ],
   },

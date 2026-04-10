@@ -70,7 +70,7 @@ export default function App() {
           )}
 
           <main className="app-main" role="main" aria-label="Study content">
-            {(ui.mode === "dashboard" || ui.mode === "plan" || ui.mode === "course-dashboard") && (
+            {(ui.mode === "dashboard" || ui.mode === "plan") && (
               <SchedulerWidget />
             )}
             <PaneRouter mode={ui.mode} lesson={lesson} ui={ui} />

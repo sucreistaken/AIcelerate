@@ -80,7 +80,7 @@ const statIcons = {
 const fireIcon = <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M12 12c2-2.96 0-7-1-8 0 3.038-1.773 4.741-3 6-1.226 1.26-2 3.24-2 5a6 6 0 1 0 12 0c0-1.532-1.056-3.94-2-5-1.786 3-2.791 3-4 2z"/></svg>;
 
 const QUICK_ACTIONS: Array<{ icon: React.ReactNode; labelKey: string; mode: ModeId; tint: string }> = [
-  { icon: qaIcons.plus, labelKey: "welcome.qaCourse", mode: "course-dashboard", tint: "59, 130, 246" },
+  { icon: qaIcons.plus, labelKey: "welcome.qaCourse", mode: "create-lesson", tint: "59, 130, 246" },
   { icon: qaIcons.doc, labelKey: "welcome.qaLesson", mode: "create-lesson", tint: "168, 85, 247" },
   { icon: qaIcons.house, labelKey: "welcome.qaRoom", mode: "study-hub", tint: "34, 197, 94" },
   { icon: qaIcons.search, labelKey: "welcome.qaExplore", mode: "study-hub", tint: "251, 146, 60" },
@@ -450,7 +450,7 @@ export default function Dashboard() {
       <CourseProgressCards
         cards={courseCards}
         onGoToCourse={handleGoToCourse}
-        onCreateCourse={() => setMode("course-dashboard")}
+        onCreateCourse={() => setMode("create-lesson")}
       />
 
       {/* ── Quick Actions ── */}
