@@ -129,7 +129,7 @@ roomSchema.index({ memberIds: 1 });
 roomSchema.index({ ownerId: 1 });
 roomSchema.index({ isPublic: 1, archivedAt: 1 });
 roomSchema.index({ tags: 1 });
-roomSchema.index({ inviteCode: 1 });
+// inviteCode already has unique:true in schema definition — no duplicate index needed
 roomSchema.index({ "settings.isPublic": 1, lastActivityAt: -1 });
 roomSchema.index({ name: "text", description: "text", university: "text", tags: "text" }, {
   weights: { name: 10, tags: 5, university: 3, description: 1 },

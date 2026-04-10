@@ -75,6 +75,8 @@ export const useChannelToolStore = create<ChannelToolState>((set, get) => ({
     set((s) => {
       const existing = s.dataByChannel[channelId] || { ...EMPTY_TOOL_DATA, channelId };
       const cards = existing.flashcards?.cards ?? [];
+      // Deduplicate by card ID
+      if (cards.some((c: any) => c.id === card.id)) return s;
       return {
         dataByChannel: {
           ...s.dataByChannel,
@@ -91,12 +93,16 @@ export const useChannelToolStore = create<ChannelToolState>((set, get) => ({
     set((s) => {
       const existing = s.dataByChannel[channelId] || { ...EMPTY_TOOL_DATA, channelId };
       const prev = existing.deepDive?.messages ?? [];
+      // Deduplicate by message ID — prevents double-render on API response + socket echo
+      const existingIds = new Set(prev.map((m: any) => m.id));
+      const newOnly = messages.filter((m) => !existingIds.has(m.id));
+      if (newOnly.length === 0) return s; // No new messages, skip re-render
       return {
         dataByChannel: {
           ...s.dataByChannel,
           [channelId]: {
             ...existing,
-            deepDive: { messages: [...prev, ...messages] },
+            deepDive: { messages: [...prev, ...newOnly] },
           },
         },
       };
@@ -125,6 +131,8 @@ export const useChannelToolStore = create<ChannelToolState>((set, get) => ({
     set((s) => {
       const existing = s.dataByChannel[channelId] || { ...EMPTY_TOOL_DATA, channelId };
       const items = existing.notes?.items ?? [];
+      // Deduplicate by note ID
+      if (items.some((n: any) => n.id === note.id)) return s;
       return {
         dataByChannel: {
           ...s.dataByChannel,

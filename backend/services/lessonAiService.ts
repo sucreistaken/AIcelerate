@@ -265,23 +265,42 @@ export async function generateChatResponseStream(
     setTimeout(() => reject(new Error("AI_TIMEOUT")), timeoutMs)
   );
 
-  const streamResult = await Promise.race([
-    getModel().generateContentStream({
-      contents: [
-        ...(compressed.map((h) => ({ role: h.role === 'user' ? 'user' as const : 'model' as const, parts: [{ text: h.content }] }))),
-        { role: 'user', parts: [{ text: prompt }] },
-      ],
-      generationConfig: { maxOutputTokens: 2000, temperature: getTemperature("creative") },
-    }),
-    timeoutPromise,
-  ]);
+  let streamResult;
+  try {
+    streamResult = await Promise.race([
+      getModel().generateContentStream({
+        contents: [
+          ...(compressed.map((h) => ({ role: h.role === 'user' ? 'user' as const : 'model' as const, parts: [{ text: h.content }] }))),
+          { role: 'user', parts: [{ text: prompt }] },
+        ],
+        generationConfig: { maxOutputTokens: 2000, temperature: getTemperature("creative") },
+      }),
+      timeoutPromise,
+    ]);
+  } catch (initErr: any) {
+    logger.error({ err: initErr.message }, "AI stream init failed");
+    res.write(`data: ${JSON.stringify({ type: 'error', message: 'AI bağlantısı başarısız oldu, lütfen tekrar deneyin.' })}\n\n`);
+    res.end();
+    return;
+  }
 
   let fullText = '';
-  for await (const chunk of streamResult.stream) {
-    const chunkText = chunk.text();
-    if (chunkText) {
-      fullText += chunkText;
-      res.write(`data: ${JSON.stringify({ type: 'chunk', text: chunkText })}\n\n`);
+  try {
+    for await (const chunk of streamResult.stream) {
+      const chunkText = chunk.text();
+      if (chunkText) {
+        fullText += chunkText;
+        res.write(`data: ${JSON.stringify({ type: 'chunk', text: chunkText })}\n\n`);
+      }
+    }
+  } catch (streamErr: any) {
+    // Gemini sometimes throws "Failed to parse stream" mid-response.
+    // Send whatever we have so far rather than losing the entire response.
+    logger.warn({ err: streamErr.message }, "AI stream interrupted, sending partial response");
+    if (!fullText) {
+      res.write(`data: ${JSON.stringify({ type: 'error', message: 'AI yanıt üretemedi, lütfen tekrar deneyin.' })}\n\n`);
+      res.end();
+      return;
     }
   }
 

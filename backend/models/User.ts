@@ -56,7 +56,7 @@ const userSchema = new Schema<IUser>(
 // ── Indexes for frequent queries ──
 userSchema.index({ status: 1 });               // Online user lookups
 userSchema.index({ roomIds: 1 });               // "Which rooms is user in?"
-userSchema.index({ friendCode: 1 }, { unique: true }); // Friend code lookup (already unique in schema, explicit index)
+// friendCode already has unique:true in schema definition — no duplicate index needed
 userSchema.index({ "friendRequests.from": 1 }); // Pending friend request queries
 
 export const User = mongoose.model<IUser>("User", userSchema);
