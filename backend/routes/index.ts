@@ -2,6 +2,11 @@ import { Router } from "express";
 import mongoose from "mongoose";
 import { rateLimiter } from "../middleware/rateLimiter";
 import { getAiMetrics } from "../services/aiService";
+import { listLessons } from "../controllers/lessonControllers";
+import { listCourses } from "../controllers/courseController";
+import { getNextSession, getDailyPlan, getStreak } from "../controllers/schedulerController";
+import { getFlashcardStats } from "../controllers/flashcardController";
+import { checkAndGenerateNotifications, getUnreadCount } from "../controllers/notificationController";
 
 import lessonRoutes from "./lessonRoutes";
 import uploadRoutes from "./uploadRoutes";
@@ -39,13 +44,40 @@ router.get("/health/ai-metrics", (_req, res) => {
   res.json({ ok: true, data: getAiMetrics() });
 });
 
+// Dashboard batch endpoint — replaces 7 separate calls with 1
+// All data served from in-memory cache (0 disk I/O)
+router.get("/api/dashboard/init", (req, res) => {
+  const courseId = req.query.courseId as string | undefined;
+  const t0 = performance.now();
+  try {
+    checkAndGenerateNotifications();
+    const result = {
+      ok: true,
+      lessons: listLessons(),
+      courses: listCourses(),
+      unreadCount: getUnreadCount(),
+      scheduler: {
+        nextSession: getNextSession(courseId),
+        streak: getStreak(),
+        dailyPlan: getDailyPlan(courseId),
+      },
+      flashcardStats: getFlashcardStats(),
+      _perf: { ms: +(performance.now() - t0).toFixed(2) },
+    };
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // Auth
 router.use("/api", authRoutes);
 
-// General API rate limit (200 req/min per user — generous for reads, AI routes have their own stricter limits)
+// General API rate limit per user (1200 req/min — frontend sends ~15 req per page load,
+// normal navigation easily hits 100-200/min. AI/write routes have their own stricter limits)
 router.use(
   "/api",
-  rateLimiter("api-global", 200, 60_000)
+  rateLimiter("api-global", 1200, 60_000)
 );
 
 // Core lesson & AI routes

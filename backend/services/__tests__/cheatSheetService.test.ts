@@ -58,16 +58,17 @@ describe("buildCheatSheetPrompt", () => {
     expect(prompt.length).toBeLessThan(25000);
   });
 
-  it("includes JSON schema instructions", () => {
+  it("includes output format rules (schema enforced via responseSchema)", () => {
     const prompt = buildCheatSheetPrompt({
       title: "Test",
       transcript: "text",
       slideText: "slides",
     });
-    expect(prompt).toContain('"sections"');
-    expect(prompt).toContain('"formulas"');
-    expect(prompt).toContain('"pitfalls"');
-    expect(prompt).toContain('"quickQuiz"');
+    // Inline JSON schema removed — responseSchema parameter handles format.
+    // Prompt should still mention key structural rules.
+    expect(prompt).toContain("sections");
+    expect(prompt).toContain("pitfalls");
+    expect(prompt).toContain("quickQuiz");
   });
 
   it("includes emphases when provided", () => {

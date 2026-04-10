@@ -1,9 +1,10 @@
 import { logger } from "../utils/logger";
 // controllers/connectionsController.ts
-import path from "path";
 import { readJSON, writeJSON } from "../utils/file-Handler";
+import { connectionsCache } from "../cache";
 import { listLessons, getMemory } from "./lessonControllers";
 import { SCHEMAS } from "../prompts/schemas";
+import path from "path";
 
 export type ConceptConnection = {
   concept: string;
@@ -20,8 +21,14 @@ const MEMORY_PATH = path.join(DATA_DIR, "memory.json");
 const stripCodeFences = (s: string) =>
   s.replace(/```json/gi, "").replace(/```/g, "").trim();
 
-// Build connections by scanning all lessons
+// Build connections by scanning all lessons (cached 120s when no AI enrichment)
 export async function buildConnections(model?: any): Promise<ConceptConnection[]> {
+  // Use cached result if available and no AI model provided
+  if (!model) {
+    const cached = connectionsCache.get("connections");
+    if (cached) return cached;
+  }
+
   const lessons = listLessons();
   const memory = getMemory();
 
@@ -80,21 +87,34 @@ export async function buildConnections(model?: any): Promise<ConceptConnection[]
     (memory.recurringConcepts || []).map((c: string) => c.toLowerCase().trim())
   );
 
+  // Build inverted index: lessonId -> Set<concept> for O(1) co-occurrence lookup
+  const lessonToConcepts = new Map<string, Set<string>>();
+  for (const [concept, data] of conceptMap) {
+    for (const lessonId of data.lessonIds) {
+      if (!lessonToConcepts.has(lessonId)) lessonToConcepts.set(lessonId, new Set());
+      lessonToConcepts.get(lessonId)!.add(concept);
+    }
+  }
+
   // Build connections for concepts appearing in 2+ lessons
   const multiLessonConnections: ConceptConnection[] = [];
 
   for (const [concept, data] of conceptMap) {
     if (data.lessonIds.size < 2) continue;
 
-    // Find related concepts (co-occurring in same lessons)
-    const relatedConcepts: string[] = [];
-    for (const [otherConcept, otherData] of conceptMap) {
-      if (otherConcept === concept) continue;
-      const shared = [...data.lessonIds].filter((id) => otherData.lessonIds.has(id));
-      if (shared.length > 0 && relatedConcepts.length < 5) {
-        relatedConcepts.push(otherConcept);
+    // Find related concepts via inverted index (O(k) instead of O(n^2))
+    const relatedSet = new Set<string>();
+    for (const lessonId of data.lessonIds) {
+      const coOccurring = lessonToConcepts.get(lessonId);
+      if (coOccurring) {
+        for (const other of coOccurring) {
+          if (other !== concept) relatedSet.add(other);
+          if (relatedSet.size >= 5) break;
+        }
       }
+      if (relatedSet.size >= 5) break;
     }
+    const relatedConcepts = [...relatedSet].slice(0, 5);
 
     const baseFraction = data.lessonIds.size / Math.max(1, lessons.length);
     const boost = recurringSet.has(concept) ? 0.2 : 0;
@@ -118,15 +138,19 @@ export async function buildConnections(model?: any): Promise<ConceptConnection[]
   } else {
     connections = [];
     for (const [concept, data] of conceptMap) {
-      // Find related concepts within the same lesson
-      const relatedConcepts: string[] = [];
-      for (const [otherConcept, otherData] of conceptMap) {
-        if (otherConcept === concept) continue;
-        const shared = [...data.lessonIds].filter((id) => otherData.lessonIds.has(id));
-        if (shared.length > 0 && relatedConcepts.length < 5) {
-          relatedConcepts.push(otherConcept);
+      // Find related concepts via inverted index (O(k) instead of O(n^2))
+      const relatedSet = new Set<string>();
+      for (const lessonId of data.lessonIds) {
+        const coOccurring = lessonToConcepts.get(lessonId);
+        if (coOccurring) {
+          for (const other of coOccurring) {
+            if (other !== concept) relatedSet.add(other);
+            if (relatedSet.size >= 5) break;
+          }
         }
+        if (relatedSet.size >= 5) break;
       }
+      const relatedConcepts = [...relatedSet].slice(0, 5);
 
       const isRecurring = recurringSet.has(concept);
       const strength = Math.min(
@@ -197,6 +221,9 @@ ${JSON.stringify(batch, null, 2)}`;
   const memData = readJSON<any>(MEMORY_PATH) || {};
   memData.connections = connections;
   writeJSON(MEMORY_PATH, memData);
+
+  // Cache the computed result
+  connectionsCache.set("connections", connections);
 
   return connections;
 }

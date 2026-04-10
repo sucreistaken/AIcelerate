@@ -1,6 +1,7 @@
 import path from "path";
 import fs from "fs";
 import { badRequest, notFound } from "../middleware/errorHandler";
+import { readJSON, writeJSON, ensureDataFiles } from "../utils/file-Handler";
 
 const UPLOAD_DIR = path.join(process.cwd(), "backend", "data", "materials");
 
@@ -25,17 +26,14 @@ interface MaterialData {
 
 const MATERIALS_FILE = path.join(process.cwd(), "backend", "data", "materials.json");
 
+ensureDataFiles([{ path: MATERIALS_FILE, initial: [] }]);
+
 function readMaterials(): MaterialData[] {
-  try {
-    if (fs.existsSync(MATERIALS_FILE)) {
-      return JSON.parse(fs.readFileSync(MATERIALS_FILE, "utf-8"));
-    }
-  } catch {}
-  return [];
+  return readJSON<MaterialData[]>(MATERIALS_FILE) || [];
 }
 
 function writeMaterials(materials: MaterialData[]): void {
-  fs.writeFileSync(MATERIALS_FILE, JSON.stringify(materials, null, 2));
+  writeJSON(MATERIALS_FILE, materials);
 }
 
 export const materialService = {

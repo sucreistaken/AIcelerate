@@ -52,7 +52,8 @@ const rid = (p: string) => generateId(p);
 
 // 🧠 1. Quiz üretme
 export const generateQuizFromEmphases = (count = 5, lessonIds?: string[]) => {
-  const lessons = readJSON<Lesson[]>(LESSONS_PATH) || [];
+  const { lessonCache } = require("../cache");
+  const lessons = lessonCache.getAll() as Lesson[];
   const emphases: Array<{ lessonId: string; e: Emphasis }> = [];
 
   for (const L of lessons) {

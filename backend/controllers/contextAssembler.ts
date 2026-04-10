@@ -5,6 +5,20 @@ import { getLesson } from "./lessonControllers";
 import { getCourse, getCourseForLesson, type Course, type CourseKnowledgeIndex } from "./courseController";
 import { channelService } from "../services/channelService";
 import { estimateTokens, trimToTokenBudget } from "../utils/tokenBudget";
+import { TTLCache } from "../utils/cache";
+
+// --- Context caches (avoid redundant AI token spend) ---
+// Tool context cache: same lesson + tool type → same context for 5 min
+const toolContextCache = new TTLCache<{ context: string; meta: LessonContextMeta }>({
+  ttlMs: 5 * 60_000,
+  maxSize: 50,
+});
+
+// Course context cache: same lesson + endpoint → same context for 2 min
+const courseContextCache = new TTLCache<AssembledContext>({
+  ttlMs: 2 * 60_000,
+  maxSize: 100,
+});
 
 // Token budget per endpoint type
 const BUDGETS: Record<string, { course: number; lesson: number; crossLesson: number; progress: number }> = {
@@ -38,6 +52,13 @@ export function assembleCourseContext(
   endpointType: string,
   options?: { userQuery?: string }
 ): AssembledContext {
+  // Cache check — skip for chat (unique per message due to userQuery)
+  if (endpointType !== "chat") {
+    const cacheKey = `course:${lessonId}:${endpointType}`;
+    const cached = courseContextCache.get(cacheKey);
+    if (cached) return cached;
+  }
+
   const budget = BUDGETS[endpointType] || BUDGETS["chat"];
   const lesson = getLesson(lessonId);
 
@@ -119,9 +140,11 @@ export function assembleCourseContext(
     lessonBlock = trimToTokenBudget(parts.join("\n\n"), budget.lesson);
   }
 
-  // 3. Cross-Lesson Block
+  // 3. Cross-Lesson Block — skip for endpoints that don't benefit (mindmap, cheat-sheet)
+  // Only include when: chat (user may ask about other weeks), quiz (cross-lesson questions)
   let crossLessonBlock = "";
-  if (course && ki && budget.crossLesson > 0) {
+  const crossLessonEndpoints = new Set(["chat", "quiz", "weakness"]);
+  if (course && ki && budget.crossLesson > 0 && crossLessonEndpoints.has(endpointType)) {
     const currentDigest = ki.lessonDigests.find((d) => d.lessonId === lessonId);
     const currentTopics = new Set(currentDigest?.keyTopics.map((t) => t.toLowerCase()) || []);
 
@@ -192,7 +215,7 @@ export function assembleCourseContext(
   if (crossLessonBlock) sections.push(`=== RELATED LESSONS ===\n${crossLessonBlock}`);
   if (progressBlock) sections.push(`=== STUDENT PROGRESS ===\n${progressBlock}`);
 
-  return {
+  const result: AssembledContext = {
     courseBlock,
     lessonBlock,
     crossLessonBlock,
@@ -201,6 +224,13 @@ export function assembleCourseContext(
     courseId: course?.id || null,
     courseName: course ? `${course.code} - ${course.name}` : null,
   };
+
+  // Store in cache (skip chat — unique per message)
+  if (endpointType !== "chat") {
+    courseContextCache.set(`course:${lessonId}:${endpointType}`, result);
+  }
+
+  return result;
 }
 
 // Assemble context for course-level chat (no specific lesson)
@@ -304,6 +334,14 @@ export async function buildToolContext(
     const channel = await channelService.getByIdGlobal(channelId);
     if (!channel.lessonId) return null;
 
+    // Cache check — same lesson + tool type = same context for 5 min
+    // Skip cache for deep-dive (conversational, needs fresh context)
+    const cacheKey = `tool:${channel.lessonId}:${toolType}`;
+    if (toolType !== "deep-dive") {
+      const cached = toolContextCache.get(cacheKey);
+      if (cached) return cached;
+    }
+
     const lesson = getLesson(channel.lessonId);
     if (!lesson) return null;
 
@@ -325,21 +363,21 @@ export async function buildToolContext(
       sources.push("slides");
     }
 
-    // 3. Emphases (sorted by confidence, include evidence)
+    // 3. Emphases — compact pipe-delimited format (~30% fewer tokens vs JSON)
     const emphases = lesson.professorEmphases || [];
     if (emphases.length > 0) {
       const sorted = [...emphases].sort((a: any, b: any) => (b.confidence || 0) - (a.confidence || 0));
       const emphasisParts: string[] = [];
       let tokensUsed = 0;
       for (const e of sorted) {
-        const line = `- [${(e.confidence * 100).toFixed(0)}%] ${e.statement}\n  Why: ${e.why}\n  Evidence: ${e.evidence || "N/A"}`;
+        const line = `${e.statement} | ${e.why} | ${e.evidence || "—"}`;
         const lineTok = estimateTokens(line);
         if (tokensUsed + lineTok > budgets.emphases) break;
         emphasisParts.push(line);
         tokensUsed += lineTok;
       }
       if (emphasisParts.length > 0) {
-        parts.push(`=== PROFESSOR EMPHASES (${emphasisParts.length}/${emphases.length}) ===\n${emphasisParts.join("\n")}`);
+        parts.push(`=== EMPHASES (${emphasisParts.length}/${emphases.length}) ===\n${emphasisParts.join("\n")}`);
         sources.push(`${emphasisParts.length} emphases`);
       }
     }
@@ -438,8 +476,21 @@ export async function buildToolContext(
       sourcesSummary: sources.join(" + "),
     };
 
-    return { context: parts.join("\n\n"), meta };
+    const result = { context: parts.join("\n\n"), meta };
+
+    // Store in cache (skip deep-dive — conversational)
+    if (toolType !== "deep-dive") {
+      toolContextCache.set(cacheKey, result);
+    }
+
+    return result;
   } catch {
     return null;
   }
+}
+
+// Invalidate tool context cache when lesson is updated or unlinked
+export function invalidateToolContextCache(lessonId: string): void {
+  toolContextCache.invalidate(`tool:${lessonId}:*`);
+  courseContextCache.invalidate(`course:${lessonId}:*`);
 }

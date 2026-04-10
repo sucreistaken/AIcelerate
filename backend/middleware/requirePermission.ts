@@ -6,6 +6,8 @@ import { forbidden } from "./errorHandler";
 import type { Permission, Role } from "../types/admin";
 
 // Simple in-memory role cache to avoid re-reading JSON on every request
+// Max 50 entries to prevent unbounded growth
+const ROLE_CACHE_MAX = 50;
 const roleCache = new Map<string, { role: Role; cachedAt: number }>();
 const CACHE_TTL_MS = 60_000; // 1 minute
 
@@ -17,6 +19,12 @@ async function getCachedRole(roleName: string): Promise<Role | null> {
   const cached = roleCache.get(roleName);
   if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
     return cached.role;
+  }
+  // Evict expired entries on access to keep cache bounded
+  if (cached) roleCache.delete(roleName);
+  if (roleCache.size >= ROLE_CACHE_MAX) {
+    const firstKey = roleCache.keys().next().value;
+    if (firstKey !== undefined) roleCache.delete(firstKey);
   }
   const role = await roleRepo.findByName(roleName);
   if (role) {

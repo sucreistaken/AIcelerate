@@ -4,7 +4,7 @@ import { useCourseStore } from "../stores/courseStore";
 import { useAuthStore } from "../stores/authStore";
 import { useLesson } from "./useLesson";
 import { useTranscription } from "./useTranscription";
-import { notificationApi } from "../services/api";
+import { notificationApi, dashboardApi } from "../services/api";
 import type { ModeId } from "../types";
 
 export const MODE_KEY_MAP: Record<string, ModeId> = {
@@ -62,9 +62,22 @@ export function useApp() {
   );
 
   useEffect(() => {
-    lesson.fetchLessons();
-    courseStore.fetchCourses();
-    notificationApi.check().catch(() => {});
+    // Batch endpoint: 1 request instead of 7 separate calls
+    dashboardApi.init().then((data) => {
+      if (data?.ok) {
+        if (data.lessons) lesson.setLessons(data.lessons);
+        if (data.courses) courseStore.setCourses(data.courses);
+      } else {
+        // Fallback to individual calls if batch fails
+        lesson.fetchLessons();
+        courseStore.fetchCourses();
+        notificationApi.check().catch(() => {});
+      }
+    }).catch(() => {
+      lesson.fetchLessons();
+      courseStore.fetchCourses();
+      notificationApi.check().catch(() => {});
+    });
   }, []);
 
   useEffect(() => {

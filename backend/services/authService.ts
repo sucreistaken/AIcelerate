@@ -28,13 +28,14 @@ const LOGIN_MAX_ATTEMPTS = 5;
 const LOGIN_LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
 const failedLoginAttempts = new Map<string, { count: number; lockedUntil: number }>();
 
-// Cleanup expired lockouts every 10 minutes
-setInterval(() => {
+// Cleanup expired lockouts every 10 minutes (unref to not block shutdown)
+const _loginCleanup = setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of failedLoginAttempts) {
     if (entry.lockedUntil <= now) failedLoginAttempts.delete(key);
   }
 }, 10 * 60 * 1000);
+_loginCleanup.unref();
 
 function checkLoginLockout(email: string): void {
   const entry = failedLoginAttempts.get(email);

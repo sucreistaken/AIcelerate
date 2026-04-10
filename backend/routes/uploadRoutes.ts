@@ -47,6 +47,7 @@ router.get("/transcribe/stream/:jobId", (req, res) => {
 
   const send = (msg: any) => { res.write(`data: ${JSON.stringify(msg)}\n\n`); };
   const heartbeat = setInterval(() => { res.write(`: ping\n\n`); }, 15000);
+  heartbeat.unref(); // Don't block shutdown
   const onMsg = (msg: any) => send(msg);
   job.emitter.on("msg", onMsg);
   req.on("close", () => { clearInterval(heartbeat); job.emitter.off("msg", onMsg); res.end(); });

@@ -1,8 +1,10 @@
 import { Request, Response } from "express";
-import fs from "fs";
 import path from "path";
+import { readJSON, writeJSON, ensureDataFiles } from "../utils/file-Handler";
 
 const DATA_FILE = path.join(__dirname, "..", "data", "xp.json");
+
+ensureDataFiles([{ path: DATA_FILE, initial: { totalXp: 0, streakDays: 0, lastActiveDate: null, history: [] } }]);
 
 interface XpEntry {
   action: string;
@@ -18,18 +20,11 @@ interface XpData {
 }
 
 function readData(): XpData {
-  try {
-    if (fs.existsSync(DATA_FILE)) {
-      return JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"));
-    }
-  } catch {}
-  return { totalXp: 0, streakDays: 0, lastActiveDate: null, history: [] };
+  return readJSON<XpData>(DATA_FILE) || { totalXp: 0, streakDays: 0, lastActiveDate: null, history: [] };
 }
 
 function writeData(data: XpData) {
-  const dir = path.dirname(DATA_FILE);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), "utf-8");
+  writeJSON(DATA_FILE, data);
 }
 
 const XP_AMOUNTS: Record<string, number> = {

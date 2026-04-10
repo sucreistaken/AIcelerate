@@ -1,7 +1,19 @@
 // controllers/lessonControllers.ts
 import path from "path";
 import { readJSON, writeJSON, ensureDataFiles } from "../utils/file-Handler";
-import { lessonRepo } from "../repositories/lessonRepo";
+import { lessonCache, invalidateLessonCaches } from "../cache";
+// Lazy import to avoid circular dependency (contextAssembler → channelService → env)
+let _invalidateCache: ((lessonId: string) => void) | null = null;
+function getInvalidateCache() {
+  if (!_invalidateCache) {
+    try {
+      _invalidateCache = require("./contextAssembler").invalidateToolContextCache;
+    } catch {
+      _invalidateCache = () => {};
+    }
+  }
+  return _invalidateCache!;
+}
 import type { LessonPlan, LoAlignment, DeviationResult, MindmapCache, MindmapModuleCacheEntry } from "../types";
 import type { CheatSheet } from "../types";
 
@@ -91,22 +103,20 @@ type GlobalMemory = {
 
 // ---- Yollar ----
 const DATA_DIR = path.join(process.cwd(), "backend", "data");
-const LESSONS_PATH = path.join(DATA_DIR, "lessons.json");
 const MEMORY_PATH = path.join(DATA_DIR, "memory.json");
 
 // Başlangıç dosyalarını garanti altına al
 ensureDataFiles([
-  { path: LESSONS_PATH, initial: [] },
   { path: MEMORY_PATH, initial: { recurringConcepts: [], recentEmphases: [], lastUpdated: new Date().toISOString() } }
 ]);
 
-// ---- Yardımcılar ----
+// ---- Yardımcılar (now backed by DataCache — O(1) reads, debounced writes) ----
 function loadLessons(): Lesson[] {
-  return lessonRepo.findAllSync();
+  return lessonCache.getAll();
 }
 
 function saveLessons(list: Lesson[]) {
-  lessonRepo.saveAllSync(list);
+  lessonCache.setAll(list);
 }
 
 function loadMemory(): GlobalMemory {
@@ -170,7 +180,7 @@ export function listLessonsPaginated(cursor?: string, limit = 20): { items: Less
 export const getLessons = (): Lesson[] => listLessons();
 
 export function getLesson(id: string): Lesson | null {
-  return loadLessons().find((l) => l.id === id) || null;
+  return lessonCache.get(id);
 }
 
 export const getMemory = (): GlobalMemory => loadMemory();
@@ -179,14 +189,12 @@ export const getMemory = (): GlobalMemory => loadMemory();
 
 // Eski API ile uyumluluk: addLesson (oluşturur + memory günceller)
 export const addLesson = (lesson: Lesson) => {
-  const lessons = loadLessons();
   const stamped: Lesson = {
     ...lesson,
     createdAt: lesson.createdAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
-  lessons.push(stamped);
-  saveLessons(lessons);
+  lessonCache.set(stamped); // O(1) + debounced flush
 
   updateGlobalMemoryFromLesson(stamped);
   return stamped;
@@ -194,15 +202,14 @@ export const addLesson = (lesson: Lesson) => {
 
 // Yeni API: upsert (varsa günceller, yoksa oluşturur) + memory günceller
 export function upsertLesson(newL: Partial<Lesson> & { id?: string }): Lesson {
-  const list = loadLessons();
   let l: Lesson;
 
   if (newL.id) {
-    const i = list.findIndex((x) => x.id === newL.id);
-    if (i >= 0) {
+    const existing = lessonCache.get(newL.id);
+    if (existing) {
       // Güncelle
       l = {
-        ...list[i],
+        ...existing,
         ...newL,
         updatedAt: new Date().toISOString(),
       } as Lesson;
@@ -212,10 +219,8 @@ export function upsertLesson(newL: Partial<Lesson> & { id?: string }): Lesson {
       l.slideText = l.slideText ?? "";
       l.highlights = l.highlights ?? [];
       l.professorEmphases = l.professorEmphases ?? [];
-      l.quizPacks = l.quizPacks ?? list[i].quizPacks ?? [];
-      l.progress = { ...(list[i].progress || {}), ...(newL.progress || {}) };
-
-      list[i] = l;
+      l.quizPacks = l.quizPacks ?? existing.quizPacks ?? [];
+      l.progress = { ...(existing.progress || {}), ...(newL.progress || {}) };
     } else {
       // Yoksa oluştur
       l = {
@@ -234,7 +239,6 @@ export function upsertLesson(newL: Partial<Lesson> & { id?: string }): Lesson {
         createdAt: newL.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      list.push(l);
     }
   } else {
     // Yeni kayıt oluştur
@@ -255,10 +259,12 @@ export function upsertLesson(newL: Partial<Lesson> & { id?: string }): Lesson {
       createdAt: newL.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    list.push(l);
   }
 
-  saveLessons(list);
+  lessonCache.set(l); // O(1) memory write + debounced async disk flush
+  // Invalidate context & computed caches
+  getInvalidateCache()(l.id);
+  invalidateLessonCaches(l.id);
   // Memory'yi ders içeriğine göre güncelle
   updateGlobalMemoryFromLesson(l);
   return l;
@@ -266,31 +272,26 @@ export function upsertLesson(newL: Partial<Lesson> & { id?: string }): Lesson {
 
 // Quiz paketi iliştirme
 export function attachQuizPack(lessonId: string, packId: string) {
-  const list = loadLessons();
-  const i = list.findIndex((l) => l.id === lessonId);
-  if (i < 0) return;
+  const lesson = lessonCache.get(lessonId);
+  if (!lesson) return;
 
-  const lp = list[i].quizPacks || [];
+  const lp = lesson.quizPacks || [];
   lp.push({ packId, createdAt: new Date().toISOString() });
-  list[i].quizPacks = lp;
-  list[i].updatedAt = new Date().toISOString();
-
-  saveLessons(list);
+  lessonCache.set({ ...lesson, quizPacks: lp, updatedAt: new Date().toISOString() });
+  invalidateLessonCaches(lessonId);
 }
 
 // Quiz skorunu güncelleme
 export function setQuizScore(lessonId: string, packId: string, score: number) {
-  const list = loadLessons();
-  const i = list.findIndex((l) => l.id === lessonId);
-  if (i < 0) return;
+  const lesson = lessonCache.get(lessonId);
+  if (!lesson) return;
 
-  const lp = list[i].quizPacks || [];
-  const p = lp.find((x) => x.packId === packId);
+  const lp = lesson.quizPacks || [];
+  const p = lp.find((x: any) => x.packId === packId);
   if (p) p.lastScore = score;
 
-  list[i].quizPacks = lp;
-  list[i].updatedAt = new Date().toISOString();
-  saveLessons(list);
+  lessonCache.set({ ...lesson, quizPacks: lp, updatedAt: new Date().toISOString() });
+  invalidateLessonCaches(lessonId);
 }
 
 // İlerleme güncelleme (ders bazında durum saklama)
@@ -298,22 +299,22 @@ export function updateProgress(
   lessonId: string,
   progress: Partial<Lesson["progress"]>
 ) {
-  const list = loadLessons();
-  const i = list.findIndex((l) => l.id === lessonId);
-  if (i < 0) return null;
+  const lesson = lessonCache.get(lessonId);
+  if (!lesson) return null;
 
-  list[i].progress = { ...(list[i].progress || {}), ...progress };
-  list[i].updatedAt = new Date().toISOString();
-  saveLessons(list);
-  return list[i];
+  const updated = {
+    ...lesson,
+    progress: { ...(lesson.progress || {}), ...progress },
+    updatedAt: new Date().toISOString(),
+  };
+  lessonCache.set(updated);
+  invalidateLessonCaches(lessonId);
+  return updated;
 }
 
-// 🗑️ Ders silme
+// Ders silme
 export function deleteLesson(lessonId: string): boolean {
-  const list = loadLessons();
-  const idx = list.findIndex((l) => l.id === lessonId);
-  if (idx === -1) return false;
-  list.splice(idx, 1);
-  saveLessons(list);
-  return true;
+  const deleted = lessonCache.delete(lessonId);
+  if (deleted) invalidateLessonCaches(lessonId);
+  return deleted;
 }

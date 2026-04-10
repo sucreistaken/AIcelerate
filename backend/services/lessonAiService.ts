@@ -99,10 +99,11 @@ export async function generatePlan(
   const alignmentPrompt = buildAlignmentPrompt(LEC, SLD, langDir);
 
   // Fire all 3 in parallel
+  // Right-sized maxOutputTokens based on actual output analysis
   const [modulesResult, emphasesResult, alignmentResult] = await Promise.all([
-    callWithRetry(() => planSubCall(modulesPrompt, SCHEMAS.PLAN_MODULES, 10000, "PLAN_MODULES"), "PLAN_MODULES"),
-    callWithRetry(() => planSubCall(emphasesPrompt, SCHEMAS.PLAN_EMPHASES, 5000, "PLAN_EMPHASES"), "PLAN_EMPHASES"),
-    callWithRetry(() => planSubCall(alignmentPrompt, SCHEMAS.PLAN_ALIGNMENT, 6000, "PLAN_ALIGNMENT"), "PLAN_ALIGNMENT"),
+    callWithRetry(() => planSubCall(modulesPrompt, SCHEMAS.PLAN_MODULES, 7000, "PLAN_MODULES"), "PLAN_MODULES"),
+    callWithRetry(() => planSubCall(emphasesPrompt, SCHEMAS.PLAN_EMPHASES, 3500, "PLAN_EMPHASES"), "PLAN_EMPHASES"),
+    callWithRetry(() => planSubCall(alignmentPrompt, SCHEMAS.PLAN_ALIGNMENT, 4500, "PLAN_ALIGNMENT"), "PLAN_ALIGNMENT"),
   ]);
 
   // Merge into unified LessonPlan
@@ -232,6 +233,23 @@ export function buildChatContextForLesson(lesson: Lesson, lessonId: string, mess
   return { prompt, history: history || [], courseCtx };
 }
 
+// Compress chat history: keep last 4 messages intact, summarize older ones
+function compressHistory(history: ChatMessage[], keepRecent = 4): ChatMessage[] {
+  if (history.length <= keepRecent) return history;
+
+  const older = history.slice(0, -keepRecent);
+  const recent = history.slice(-keepRecent);
+
+  const summary = older
+    .map((h) => `${h.role}: ${h.content.slice(0, 120)}`)
+    .join("\n");
+
+  return [
+    { role: "user", content: `[Conversation summary]\n${summary}` },
+    ...recent,
+  ];
+}
+
 export async function generateChatResponseStream(
   prompt: string, history: ChatMessage[], res: import("express").Response
 ) {
@@ -241,6 +259,8 @@ export async function generateChatResponseStream(
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders?.();
 
+  const compressed = compressHistory(history);
+
   const timeoutPromise = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error("AI_TIMEOUT")), timeoutMs)
   );
@@ -248,10 +268,10 @@ export async function generateChatResponseStream(
   const streamResult = await Promise.race([
     getModel().generateContentStream({
       contents: [
-        ...(history.map((h) => ({ role: h.role === 'user' ? 'user' as const : 'model' as const, parts: [{ text: h.content }] }))),
+        ...(compressed.map((h) => ({ role: h.role === 'user' ? 'user' as const : 'model' as const, parts: [{ text: h.content }] }))),
         { role: 'user', parts: [{ text: prompt }] },
       ],
-      generationConfig: { maxOutputTokens: 2500, temperature: getTemperature("creative") },
+      generationConfig: { maxOutputTokens: 2000, temperature: getTemperature("creative") },
     }),
     timeoutPromise,
   ]);
@@ -278,9 +298,10 @@ export async function generateChatResponseSync(
     setTimeout(() => reject(new Error("AI_TIMEOUT")), timeoutMs)
   );
 
+  const compressed = compressHistory(history);
   const chat = getModel().startChat({
-    history: history.map((h) => ({ role: h.role === 'user' ? 'user' as const : 'model' as const, parts: [{ text: h.content }] })),
-    generationConfig: { maxOutputTokens: 2500, temperature: getTemperature("creative") },
+    history: compressed.map((h) => ({ role: h.role === 'user' ? 'user' as const : 'model' as const, parts: [{ text: h.content }] })),
+    generationConfig: { maxOutputTokens: 2000, temperature: getTemperature("creative") },
   });
 
   const result = await Promise.race([chat.sendMessage(prompt), timeoutPromise]);

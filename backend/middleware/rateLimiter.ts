@@ -12,15 +12,18 @@ function getStore(name: string): Map<string, RateLimitEntry> {
   return stores.get(name)!;
 }
 
-// Cleanup old entries every 5 minutes
-setInterval(() => {
+// Cleanup old entries every 5 minutes (unref to not block shutdown)
+const _rlCleanup = setInterval(() => {
   const now = Date.now();
-  for (const store of stores.values()) {
+  for (const [name, store] of stores) {
     for (const [key, entry] of store) {
       if (entry.resetAt <= now) store.delete(key);
     }
+    // Remove empty stores to prevent unbounded growth
+    if (store.size === 0) stores.delete(name);
   }
 }, 5 * 60 * 1000);
+_rlCleanup.unref();
 
 export function rateLimiter(
   name: string,

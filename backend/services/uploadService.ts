@@ -72,7 +72,8 @@ export function startTranscriptionJob(file: Express.Multer.File, lessonId?: stri
       const existing = getLesson(lessonId);
       if (existing) upsertLesson({ id: lessonId, transcript: job.transcript });
     }
-    setTimeout(() => jobs.delete(jobId), 5 * 60 * 1000);
+    const _cleanup = setTimeout(() => jobs.delete(jobId), 5 * 60 * 1000);
+    _cleanup.unref();
   });
 
   return jobId;

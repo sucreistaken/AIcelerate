@@ -28,6 +28,7 @@ interface CourseState {
   removeLessonFromCourse: (courseId: string, lessonId: string) => Promise<void>;
   rebuildIndex: (courseId: string) => Promise<void>;
   getCourseForCurrentLesson: (lessonId: string) => Course | null;
+  setCourses: (courses: Course[]) => void;
 
   // New actions
   fetchCourseProgress: (courseId: string) => Promise<void>;
@@ -46,6 +47,8 @@ export const useCourseStore = create<CourseState>()(
       weeklySchedule: null,
       progressLoading: false,
       scheduleLoading: false,
+
+      setCourses: (courses: Course[]) => set({ courses, loading: false }),
 
       fetchCourses: async () => {
         set({ loading: true, error: null });

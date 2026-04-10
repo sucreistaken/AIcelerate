@@ -20,52 +20,16 @@ export function buildCheatSheetPrompt(input: {
   const lang = input.language || 'tr';
   const langDirective = getLangDirective(lang);
 
-  return `
-You are an exam-focused teaching assistant.
+  return `You are an exam-focused teaching assistant. ${langDirective}
 
-${langDirective}
+Create a ONE-PAGE Cheat Sheet: ultra-condensed, high-signal, last-minute revision.
+Rules: 5-9 sections (3-7 bullets each), 3-8 pitfalls, 3-6 quickQuiz Q/A. Emphases are priority. Reflect LOs in sections.
 
-Goal:
-Create a ONE-PAGE "Cheat Sheet" (A4 style) from the lecture transcript + slides.
-It must be ultra-condensed, high-signal, and optimized for last-minute revision.
-
-OUTPUT: Return ONLY VALID JSON with this schema:
-
-{
-  "title": "string",
-  "updatedAt": "ISO_STRING",
-  "sections": [
-    { "heading": "string", "bullets": ["string", "..."] }
-  ],
-  "formulas": ["string", "..."],
-  "pitfalls": ["string", "..."],
-  "quickQuiz": [{ "q": "string", "a": "string" }]
-}
-
-Rules:
-- sections: 5–9 sections max
-- each section bullets: 3–7 bullets max (short!!)
-- formulas can be empty array if none
-- pitfalls: common traps/mistakes (3–8)
-- quickQuiz: 3–6 very short Q/A
-- Use the professor emphases as a priority if available.
-- If Learning Outcomes exist, reflect them indirectly in sections.
-
-[LESSON TITLE]
-${input.title || "Lesson"}
-
-[LEARNING OUTCOMES]
-${LOS || "—"}
-
-[PROFESSOR EMPHASES (optional)]
-${EMPH}
-
-[TRANSCRIPT]
-${LEC}
-
-[SLIDES]
-${SLD}
-`.trim();
+[TITLE] ${input.title || "Lesson"}
+[LOs] ${LOS || "—"}
+[EMPHASES] ${EMPH}
+[TRANSCRIPT] ${LEC}
+[SLIDES] ${SLD}`.trim();
 }
 
 export async function generateCheatSheet(

@@ -1,6 +1,5 @@
 // controllers/flashcardController.ts
-import path from "path";
-import { readJSON, writeJSON, ensureDataFiles } from "../utils/file-Handler";
+import { flashcardCache, invalidateFlashcardCaches } from "../cache";
 import { getLesson, listLessons } from "./lessonControllers";
 
 export type Flashcard = {
@@ -27,20 +26,16 @@ export type ReviewEntry = {
   newInterval: number;
 };
 
-const DATA_DIR = path.join(process.cwd(), "backend", "data");
-const FLASHCARDS_PATH = path.join(DATA_DIR, "flashcards.json");
-
-ensureDataFiles([{ path: FLASHCARDS_PATH, initial: [] }]);
-
 import { generateId } from "../utils/idGenerator";
 const rid = () => generateId("fc");
 
 export function loadFlashcards(): Flashcard[] {
-  return readJSON<Flashcard[]>(FLASHCARDS_PATH) || [];
+  return flashcardCache.getAll();
 }
 
 export function saveFlashcards(cards: Flashcard[]) {
-  writeJSON(FLASHCARDS_PATH, cards);
+  flashcardCache.setAll(cards);
+  invalidateFlashcardCaches();
 }
 
 export function createCard(
@@ -71,8 +66,7 @@ export function generateFlashcardsForLesson(lessonId: string): Flashcard[] {
   const lesson = getLesson(lessonId);
   if (!lesson) return [];
 
-  const existing = loadFlashcards();
-  const existingForLesson = existing.filter((c) => c.lessonId === lessonId);
+  const existingForLesson = flashcardCache.getByIndex("lessonId", lessonId);
 
   // Avoid duplicates by checking front text
   const existingFronts = new Set(existingForLesson.map((c) => c.front));
@@ -157,10 +151,11 @@ export function generateFlashcardsForLesson(lessonId: string): Flashcard[] {
     }
   }
 
-  // Save all new cards
+  // Batch-save: append new cards to existing cache in one operation
   if (newCards.length > 0) {
-    const all = [...existing, ...newCards];
-    saveFlashcards(all);
+    const all = [...flashcardCache.getAll(), ...newCards];
+    flashcardCache.setAll(all); // Single rebuild + single disk flush
+    invalidateFlashcardCaches();
   }
 
   return newCards;
@@ -171,16 +166,14 @@ export function reviewCard(
   cardId: string,
   quality: number // 0-5
 ): { card: Flashcard; reviewEntry: ReviewEntry } | null {
-  const cards = loadFlashcards();
-  const idx = cards.findIndex((c) => c.id === cardId);
-  if (idx < 0) return null;
+  const existing = flashcardCache.get(cardId);
+  if (!existing) return null;
 
-  const card = cards[idx];
+  const card = { ...existing };
   const previousInterval = card.interval;
 
   // SM-2 algorithm
   if (quality >= 3) {
-    // Successful review
     card.repetitions += 1;
     if (card.repetitions === 1) {
       card.interval = 1;
@@ -191,7 +184,6 @@ export function reviewCard(
     }
     card.state = card.repetitions >= 5 ? "graduated" : "review";
   } else {
-    // Failed review
     card.repetitions = 0;
     card.interval = 1;
     card.state = "learning";
@@ -209,8 +201,8 @@ export function reviewCard(
   card.nextReviewDate = nextDate.toISOString();
   card.lastReviewedAt = now.toISOString();
 
-  cards[idx] = card;
-  saveFlashcards(cards);
+  flashcardCache.set(card); // O(1) + debounced flush
+  invalidateFlashcardCaches();
 
   const reviewEntry: ReviewEntry = {
     cardId,
@@ -223,23 +215,21 @@ export function reviewCard(
   return { card, reviewEntry };
 }
 
-// Get due cards (nextReviewDate <= now)
+// Get due cards (nextReviewDate <= now) — reads from memory cache
 export function getDueCards(): Flashcard[] {
-  const cards = loadFlashcards();
   const now = new Date().toISOString();
-  return cards
+  return flashcardCache
     .filter((c) => c.state !== "graduated" && c.nextReviewDate <= now)
     .sort((a, b) => a.nextReviewDate.localeCompare(b.nextReviewDate));
 }
 
-// Get all cards, optionally filtered by lessonId
+// Get all cards, optionally filtered by lessonId (indexed: O(1) lookup)
 export function getFlashcards(lessonId?: string): Flashcard[] {
-  const cards = loadFlashcards();
-  if (lessonId) return cards.filter((c) => c.lessonId === lessonId);
-  return cards;
+  if (lessonId) return flashcardCache.getByIndex("lessonId", lessonId);
+  return flashcardCache.getAll();
 }
 
-// Get stats
+// Get stats — single pass over cached data
 export function getFlashcardStats(): {
   total: number;
   new: number;
@@ -248,24 +238,24 @@ export function getFlashcardStats(): {
   graduated: number;
   dueToday: number;
 } {
-  const cards = loadFlashcards();
+  const cards = flashcardCache.getAll();
   const now = new Date().toISOString();
-  return {
-    total: cards.length,
-    new: cards.filter((c) => c.state === "new").length,
-    learning: cards.filter((c) => c.state === "learning").length,
-    review: cards.filter((c) => c.state === "review").length,
-    graduated: cards.filter((c) => c.state === "graduated").length,
-    dueToday: cards.filter((c) => c.state !== "graduated" && c.nextReviewDate <= now).length,
-  };
+  let newC = 0, learning = 0, review = 0, graduated = 0, dueToday = 0;
+  for (const c of cards) {
+    switch (c.state) {
+      case "new": newC++; break;
+      case "learning": learning++; break;
+      case "review": review++; break;
+      case "graduated": graduated++; break;
+    }
+    if (c.state !== "graduated" && c.nextReviewDate <= now) dueToday++;
+  }
+  return { total: cards.length, new: newC, learning, review, graduated, dueToday };
 }
 
 // Delete a card
 export function deleteFlashcard(cardId: string): boolean {
-  const cards = loadFlashcards();
-  const idx = cards.findIndex((c) => c.id === cardId);
-  if (idx < 0) return false;
-  cards.splice(idx, 1);
-  saveFlashcards(cards);
-  return true;
+  const deleted = flashcardCache.delete(cardId);
+  if (deleted) invalidateFlashcardCaches();
+  return deleted;
 }

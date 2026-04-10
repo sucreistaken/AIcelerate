@@ -1,6 +1,5 @@
 // controllers/weaknessController.ts
-import path from "path";
-import { readJSON, writeJSON, ensureDataFiles } from "../utils/file-Handler";
+import { weaknessCache, weaknessSummaryCache } from "../cache";
 import { getLesson, listLessons } from "./lessonControllers";
 
 export type TopicScore = {
@@ -34,17 +33,13 @@ export type WeaknessSummary = {
   generatedAt: string;
 };
 
-const DATA_DIR = path.join(process.cwd(), "backend", "data");
-const WEAKNESS_PATH = path.join(DATA_DIR, "weakness.json");
-
-ensureDataFiles([{ path: WEAKNESS_PATH, initial: [] }]);
-
 function loadWeakness(): WeaknessAnalysis[] {
-  return readJSON<WeaknessAnalysis[]>(WEAKNESS_PATH) || [];
+  return weaknessCache.getAll();
 }
 
 function saveWeakness(data: WeaknessAnalysis[]) {
-  writeJSON(WEAKNESS_PATH, data);
+  weaknessCache.setAll(data);
+  weaknessSummaryCache.clear();
 }
 
 // Extract topics from lesson plan modules, emphases, LO modules
@@ -159,13 +154,13 @@ function detectTrend(
   return "stable";
 }
 
-// Analyze a single lesson
+// Analyze a single lesson (race-safe via cache.upsert)
 export function analyzeLessonWeakness(lessonId: string): WeaknessAnalysis | null {
   const lesson = getLesson(lessonId);
   if (!lesson) return null;
 
-  const existingAll = loadWeakness();
-  const previous = existingAll.find((w) => w.lessonId === lessonId);
+  // O(1) lookup via keyed cache — no load-all needed
+  const previous = weaknessCache.get(lessonId);
 
   const topicNames = extractTopicsFromLesson(lesson);
   if (!topicNames.length) {
@@ -191,12 +186,9 @@ export function analyzeLessonWeakness(lessonId: string): WeaknessAnalysis | null
     analyzedAt: new Date().toISOString(),
   };
 
-  // Upsert
-  const idx = existingAll.findIndex((w) => w.lessonId === lessonId);
-  if (idx >= 0) existingAll[idx] = analysis;
-  else existingAll.push(analysis);
-
-  saveWeakness(existingAll);
+  // Atomic upsert — no race condition (single cache write, no load-modify-save)
+  weaknessCache.set(analysis);
+  weaknessSummaryCache.clear();
   return analysis;
 }
 
@@ -215,14 +207,17 @@ export function analyzeAllWeaknesses(): WeaknessAnalysis[] {
   return results;
 }
 
-// Get weakness analysis for a specific lesson
+// Get weakness analysis for a specific lesson (indexed: O(1) lookup)
 export function getWeaknessForLesson(lessonId: string): WeaknessAnalysis | null {
-  const all = loadWeakness();
-  return all.find((w) => w.lessonId === lessonId) || null;
+  const results = weaknessCache.getByIndex("lessonId", lessonId);
+  return results.length > 0 ? results[0] : null;
 }
 
-// Get global summary
+// Get global summary (cached for 60s)
 export function getGlobalWeaknessSummary(): WeaknessSummary {
+  const cached = weaknessSummaryCache.get("global");
+  if (cached) return cached;
+
   const all = loadWeakness();
   const topicMap = new Map<string, { lessonIds: string[]; ratios: number[] }>();
 
@@ -262,9 +257,11 @@ export function getGlobalWeaknessSummary(): WeaknessSummary {
 
   const studyPriority = globalWeakTopics.map((t) => t.topicName);
 
-  return {
+  const result: WeaknessSummary = {
     globalWeakTopics,
     studyPriority,
     generatedAt: new Date().toISOString(),
   };
+  weaknessSummaryCache.set("global", result);
+  return result;
 }

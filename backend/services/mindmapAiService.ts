@@ -21,8 +21,15 @@ export async function generateMindmap(lesson: Lesson, lessonId: string, lang?: S
   const modules = plan?.modules || [];
   const emphases = lesson.professorEmphases || plan?.emphases || [];
   const highlights = lesson.highlights || [];
-  const transcript = (lesson.transcript || "").substring(0, 2000);
-  const slides = (lesson.slideText || "").substring(0, 1500);
+
+  // Use digest if available (higher quality, same budget), fallback to raw truncation
+  const digest = (lesson as any).digest;
+  const transcript = digest?.transcriptDigest
+    ? digest.transcriptDigest.substring(0, 2000)
+    : (lesson.transcript || "").substring(0, 2000);
+  const slides = digest?.slidesDigest
+    ? digest.slidesDigest.substring(0, 1500)
+    : (lesson.slideText || "").substring(0, 1500);
   const mindmapCourseCtx = assembleCourseContext(lessonId, "mindmap");
   const moduleNames = modules.slice(0, 4).map((m: PlanModule) => m.title || m.name || "Module");
   const keyPoints = emphases.slice(0, 6).map((e: PlanEmphasis) => e.statement || String(e)).filter(Boolean);
@@ -75,7 +82,10 @@ export async function generateMindmapModule(
 export async function generateMindmapNodeDetail(
   lesson: Lesson, nodeName: string, action: "explain" | "example" | "quiz" | "all", lang?: SupportedLang
 ): Promise<NodeDetailResult> {
-  const transcript = (lesson.transcript || "").substring(0, 3000);
+  const digest = (lesson as any).digest;
+  const transcript = digest?.transcriptDigest
+    ? digest.transcriptDigest.substring(0, 3000)
+    : (lesson.transcript || "").substring(0, 3000);
   const lessonTitle = lesson.title || "Lesson";
 
   const prompt = buildMindmapNodeDetailPrompt(nodeName, lessonTitle, transcript, action, lang);

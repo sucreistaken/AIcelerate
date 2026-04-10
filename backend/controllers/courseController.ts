@@ -1,7 +1,8 @@
 // controllers/courseController.ts
-import path from "path";
-import { ensureDataFiles } from "../utils/file-Handler";
-import { courseRepo } from "../repositories/courseRepo";
+import {
+  courseCache, lessonCache, flashcardCache,
+  courseProgressCache, knowledgeIndexCache,
+} from "../cache";
 import { listLessons, getLesson } from "./lessonControllers";
 import type { Lesson } from "./lessonControllers";
 import type { PlanEmphasis } from "../types";
@@ -60,19 +61,13 @@ export interface Course {
   updatedAt: string;
 }
 
-// ---- Paths ----
-const DATA_DIR = path.join(process.cwd(), "backend", "data");
-const COURSES_PATH = path.join(DATA_DIR, "courses.json");
-
-ensureDataFiles([{ path: COURSES_PATH, initial: [] }]);
-
-// ---- Helpers ----
+// ---- Helpers (backed by DataCache) ----
 function loadCourses(): Course[] {
-  return courseRepo.findAllSync();
+  return courseCache.getAll();
 }
 
 function saveCourses(courses: Course[]) {
-  courseRepo.saveAllSync(courses);
+  courseCache.setAll(courses);
 }
 
 // ---- CRUD ----
@@ -81,11 +76,10 @@ export function listCourses(): Course[] {
 }
 
 export function getCourse(id: string): Course | null {
-  return loadCourses().find((c) => c.id === id) || null;
+  return courseCache.get(id);
 }
 
 export function createCourse(data: { code: string; name: string; description?: string; learningOutcomes?: string[]; settings?: Course["settings"] }): Course {
-  const courses = loadCourses();
   const course: Course = {
     id: "course-" + Date.now(),
     code: data.code,
@@ -97,80 +91,87 @@ export function createCourse(data: { code: string; name: string; description?: s
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
-  courses.push(course);
-  saveCourses(courses);
+  courseCache.set(course);
   return course;
 }
 
 export function updateCourse(id: string, updates: Partial<Omit<Course, "id" | "createdAt">>): Course | null {
-  const courses = loadCourses();
-  const idx = courses.findIndex((c) => c.id === id);
-  if (idx < 0) return null;
+  const existing = courseCache.get(id);
+  if (!existing) return null;
 
-  courses[idx] = {
-    ...courses[idx],
-    ...updates,
-    updatedAt: new Date().toISOString(),
-  };
-  saveCourses(courses);
-  return courses[idx];
+  const updated = { ...existing, ...updates, updatedAt: new Date().toISOString() };
+  courseCache.set(updated);
+  courseProgressCache.invalidate(id);
+  knowledgeIndexCache.invalidate(id);
+  return updated;
 }
 
 export function deleteCourse(id: string): boolean {
-  const courses = loadCourses();
-  const idx = courses.findIndex((c) => c.id === id);
-  if (idx < 0) return false;
-  courses.splice(idx, 1);
-  saveCourses(courses);
-  return true;
+  const deleted = courseCache.delete(id);
+  if (deleted) {
+    courseProgressCache.invalidate(id);
+    knowledgeIndexCache.invalidate(id);
+  }
+  return deleted;
 }
 
 // ---- Lesson-Course Relationships ----
 export function addLessonToCourse(courseId: string, lessonId: string): Course | null {
-  const courses = loadCourses();
-  const idx = courses.findIndex((c) => c.id === courseId);
-  if (idx < 0) return null;
+  const course = courseCache.get(courseId);
+  if (!course) return null;
 
-  if (!courses[idx].lessonIds.includes(lessonId)) {
-    courses[idx].lessonIds.push(lessonId);
-    courses[idx].updatedAt = new Date().toISOString();
-    saveCourses(courses);
+  if (!course.lessonIds.includes(lessonId)) {
+    const updated = { ...course, lessonIds: [...course.lessonIds, lessonId], updatedAt: new Date().toISOString() };
+    courseCache.set(updated);
+    courseProgressCache.invalidate(courseId);
+    knowledgeIndexCache.invalidate(courseId);
+    return updated;
   }
-  return courses[idx];
+  return course;
 }
 
 export function removeLessonFromCourse(courseId: string, lessonId: string): Course | null {
-  const courses = loadCourses();
-  const idx = courses.findIndex((c) => c.id === courseId);
-  if (idx < 0) return null;
+  const course = courseCache.get(courseId);
+  if (!course) return null;
 
-  courses[idx].lessonIds = courses[idx].lessonIds.filter((id) => id !== lessonId);
-  courses[idx].updatedAt = new Date().toISOString();
-  saveCourses(courses);
-  return courses[idx];
+  const updated = {
+    ...course,
+    lessonIds: course.lessonIds.filter((id: string) => id !== lessonId),
+    updatedAt: new Date().toISOString(),
+  };
+  courseCache.set(updated);
+  courseProgressCache.invalidate(courseId);
+  knowledgeIndexCache.invalidate(courseId);
+  return updated;
 }
 
 export function getCourseLessons(courseId: string): Lesson[] {
   const course = getCourse(courseId);
   if (!course) return [];
+  // O(1) per lesson via cache Map lookup (no N+1)
   return course.lessonIds
-    .map((id) => getLesson(id))
-    .filter((l): l is Lesson => l !== null);
+    .map((id: string) => lessonCache.get(id))
+    .filter((l: any): l is Lesson => l !== null);
 }
 
 export function getCourseForLesson(lessonId: string): Course | null {
-  const courses = loadCourses();
-  return courses.find((c) => c.lessonIds.includes(lessonId)) || null;
+  // Linear scan on courses (small set), but each lookup is from memory
+  return courseCache.find((c) => c.lessonIds?.includes(lessonId));
 }
 
 // ---- Knowledge Index Builder (Phase 2) ----
 export function rebuildKnowledgeIndex(courseId: string): CourseKnowledgeIndex | null {
+  // Check computed cache first (120s TTL)
+  const cached = knowledgeIndexCache.get(courseId);
+  if (cached) return cached;
+
   const course = getCourse(courseId);
   if (!course) return null;
 
+  // Batch-load all lessons at once via cache (O(1) per lookup, no N+1)
   const lessons = course.lessonIds
-    .map((id) => getLesson(id))
-    .filter((l): l is Lesson => l !== null);
+    .map((id: string) => lessonCache.get(id))
+    .filter((l: any): l is Lesson => l !== null);
 
   // 1. Build lesson digests
   const lessonDigests = lessons.map((lesson, i) => {
@@ -258,7 +259,6 @@ export function rebuildKnowledgeIndex(courseId: string): CourseKnowledgeIndex | 
   });
 
   // 6. Build progress snapshot
-  const allLessons = listLessons();
   let totalScore = 0;
   let scoreCount = 0;
   for (const lesson of lessons) {
@@ -271,7 +271,7 @@ export function rebuildKnowledgeIndex(courseId: string): CourseKnowledgeIndex | 
     }
   }
 
-  // Get weakness data
+  // Get weakness data — batch via cache (no N+1: each lookup is O(1) from weaknessCache)
   const weakTopics: string[] = [];
   const strongTopics: string[] = [];
   for (const lesson of lessons) {
@@ -287,10 +287,15 @@ export function rebuildKnowledgeIndex(courseId: string): CourseKnowledgeIndex | 
     }
   }
 
-  // Count due flashcards for course lessons
-  const dueCards = getDueCards();
+  // Count due flashcards for course lessons (from memory cache)
   const courseLessonIds = new Set(course.lessonIds);
-  const flashcardsDue = dueCards.filter(c => courseLessonIds.has(c.lessonId)).length;
+  const now = new Date().toISOString();
+  let flashcardsDue = 0;
+  for (const card of flashcardCache.getAll()) {
+    if (courseLessonIds.has(card.lessonId) && card.state !== "graduated" && card.nextReviewDate <= now) {
+      flashcardsDue++;
+    }
+  }
 
   const completedLessons = lessons.filter((l) => l.plan && l.transcript).length;
 
@@ -319,34 +324,56 @@ export function rebuildKnowledgeIndex(courseId: string): CourseKnowledgeIndex | 
 
   // Save to course
   updateCourse(courseId, { knowledgeIndex: index });
+  // Cache the computed result
+  knowledgeIndexCache.set(courseId, index);
 
   return index;
 }
 
-// ---- Course Progress ----
+// ---- Course Progress (cached 60s, batch-loaded) ----
 export function getCourseProgress(courseId: string) {
+  // Check computed cache first
+  const cached = courseProgressCache.get(courseId);
+  if (cached) return cached;
+
   const course = getCourse(courseId);
   if (!course) return null;
 
+  // Batch-load all lessons via cache (O(1) per lookup)
   const lessons = course.lessonIds
-    .map((id) => getLesson(id))
-    .filter((l): l is Lesson => l !== null);
+    .map((id: string) => lessonCache.get(id))
+    .filter((l: any): l is Lesson => l !== null);
 
-  const lessonStatuses = lessons.map((lesson) => {
+  // Pre-build flashcard stats per lesson in ONE pass over flashcard cache
+  const courseLessonIds = new Set(course.lessonIds as string[]);
+  const fcStatsMap = new Map<string, { total: number; new: number; learning: number; review: number; graduated: number }>();
+  const now = new Date().toISOString();
+  let dueCount = 0;
+
+  for (const card of flashcardCache.getAll()) {
+    if (!courseLessonIds.has(card.lessonId)) continue;
+    let stats = fcStatsMap.get(card.lessonId);
+    if (!stats) {
+      stats = { total: 0, new: 0, learning: 0, review: 0, graduated: 0 };
+      fcStatsMap.set(card.lessonId, stats);
+    }
+    stats.total++;
+    switch (card.state) {
+      case "new": stats.new++; break;
+      case "learning": stats.learning++; break;
+      case "review": stats.review++; break;
+      case "graduated": stats.graduated++; break;
+    }
+    if (card.state !== "graduated" && card.nextReviewDate <= now) dueCount++;
+  }
+
+  const emptyFcStats = { total: 0, new: 0, learning: 0, review: 0, graduated: 0 };
+
+  const lessonStatuses = lessons.map((lesson: Lesson) => {
     const packs = lesson.quizPacks || [];
     const quizScores = packs
-      .filter(p => typeof p.lastScore === 'number')
-      .map(p => p.lastScore as number);
-
-    // Get flashcard stats for this lesson
-    const allCards = getFlashcards(lesson.id);
-    const fcStats = {
-      total: allCards.length,
-      new: allCards.filter(c => c.state === 'new').length,
-      learning: allCards.filter(c => c.state === 'learning').length,
-      review: allCards.filter(c => c.state === 'review').length,
-      graduated: allCards.filter(c => c.state === 'graduated').length,
-    };
+      .filter((p: any) => typeof p.lastScore === 'number')
+      .map((p: any) => p.lastScore as number);
 
     return {
       lessonId: lesson.id,
@@ -354,28 +381,30 @@ export function getCourseProgress(courseId: string) {
       hasTranscript: !!lesson.transcript,
       hasPlan: !!lesson.plan,
       quizScores,
-      flashcardStats: fcStats,
+      flashcardStats: fcStatsMap.get(lesson.id) || emptyFcStats,
     };
   });
 
   // Overall quiz average
-  const allScores = lessonStatuses.flatMap((s) => s.quizScores);
+  const allScores = lessonStatuses.flatMap((s: any) => s.quizScores);
   const overallQuizAvg = allScores.length > 0
-    ? allScores.reduce((a, b) => a + b, 0) / allScores.length
+    ? allScores.reduce((a: number, b: number) => a + b, 0) / allScores.length
     : 0;
 
-  // Flashcard summary
-  const allFcStats = lessonStatuses.map((s) => s.flashcardStats);
+  // Flashcard summary (aggregated from per-lesson stats)
+  let fcTotal = 0, fcNew = 0, fcLearning = 0, fcReview = 0, fcGraduated = 0;
+  for (const stats of fcStatsMap.values()) {
+    fcTotal += stats.total;
+    fcNew += stats.new;
+    fcLearning += stats.learning;
+    fcReview += stats.review;
+    fcGraduated += stats.graduated;
+  }
   const flashcardSummary = {
-    total: allFcStats.reduce((a, s) => a + s.total, 0),
-    new: allFcStats.reduce((a, s) => a + s.new, 0),
-    learning: allFcStats.reduce((a, s) => a + s.learning, 0),
-    review: allFcStats.reduce((a, s) => a + s.review, 0),
-    graduated: allFcStats.reduce((a, s) => a + s.graduated, 0),
-    due: getDueCards().filter(c => course.lessonIds.includes(c.lessonId)).length,
+    total: fcTotal, new: fcNew, learning: fcLearning, review: fcReview, graduated: fcGraduated, due: dueCount,
   };
 
-  // Weak/strong topics from weakness data
+  // Weak/strong topics from weakness cache (O(1) per lesson)
   const weakTopics: string[] = [];
   const strongTopics: string[] = [];
   for (const lesson of lessons) {
@@ -391,9 +420,9 @@ export function getCourseProgress(courseId: string) {
     }
   }
 
-  const completedLessons = lessons.filter((l) => l.plan && l.transcript).length;
+  const completedLessons = lessons.filter((l: Lesson) => l.plan && l.transcript).length;
 
-  return {
+  const result = {
     courseId,
     totalLessons: lessons.length,
     completedLessons,
@@ -403,32 +432,34 @@ export function getCourseProgress(courseId: string) {
     weakTopics,
     strongTopics,
   };
+
+  // Store in computed cache
+  courseProgressCache.set(courseId, result);
+  return result;
 }
 
-// ---- Course Export ----
+// ---- Course Export (batch-loaded) ----
 export function exportCourseData(courseId: string) {
   const course = getCourse(courseId);
   if (!course) return null;
 
+  // Batch-load lessons via cache
   const lessons = course.lessonIds
-    .map((id) => getLesson(id))
-    .filter((l): l is Lesson => l !== null);
+    .map((id: string) => lessonCache.get(id))
+    .filter((l: any): l is Lesson => l !== null);
 
-  const lessonExports = lessons.map((l) => ({
+  const lessonExports = lessons.map((l: Lesson) => ({
     id: l.id,
     title: l.title || 'Untitled',
     plan: l.plan || undefined,
     cheatSheet: l.cheatSheet || undefined,
   }));
 
-  // All flashcards for course lessons
-  const allFlashcards: Flashcard[] = [];
-  for (const lid of course.lessonIds) {
-    const cards = getFlashcards(lid);
-    allFlashcards.push(...cards);
-  }
+  // All flashcards for course lessons — single pass via indexed cache
+  const courseLessonIds = new Set(course.lessonIds as string[]);
+  const allFlashcards = flashcardCache.filter((c) => courseLessonIds.has(c.lessonId));
 
-  // Weak topics
+  // Weak topics via cache
   const weakTopics: string[] = [];
   for (const lesson of lessons) {
     const weakness = getWeaknessForLesson(lesson.id);
@@ -454,8 +485,8 @@ export function exportCourseData(courseId: string) {
 const GENERAL_COURSE_CODE = "GENEL";
 
 export function migrateOrphanLessons(): void {
-  const courses = loadCourses();
-  const lessons = listLessons();
+  const courses = courseCache.getAll();
+  const lessons = lessonCache.getAll();
 
   // Collect all lesson IDs that are already assigned to any course
   const assignedIds = new Set<string>();
@@ -464,11 +495,11 @@ export function migrateOrphanLessons(): void {
   }
 
   // Find orphan lessons (not assigned to any course)
-  const orphanIds = lessons.filter((l) => !assignedIds.has(l.id)).map((l) => l.id);
+  const orphanIds = lessons.filter((l: any) => !assignedIds.has(l.id)).map((l: any) => l.id);
   if (orphanIds.length === 0) return;
 
   // Find or create "Genel" course
-  let general = courses.find((c) => c.code === GENERAL_COURSE_CODE);
+  let general = courseCache.find((c) => c.code === GENERAL_COURSE_CODE);
   if (!general) {
     general = {
       id: "course-general",
@@ -481,17 +512,16 @@ export function migrateOrphanLessons(): void {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    courses.push(general);
   }
 
   // Assign orphans to general course
+  const newLessonIds = [...general.lessonIds];
   for (const oid of orphanIds) {
-    if (!general.lessonIds.includes(oid)) {
-      general.lessonIds.push(oid);
+    if (!newLessonIds.includes(oid)) {
+      newLessonIds.push(oid);
     }
   }
-  general.updatedAt = new Date().toISOString();
-  saveCourses(courses);
+  courseCache.set({ ...general, lessonIds: newLessonIds, updatedAt: new Date().toISOString() });
 
   console.log(`[Migration] ${orphanIds.length} orphan lesson(s) assigned to "${GENERAL_COURSE_CODE}" course.`);
 }

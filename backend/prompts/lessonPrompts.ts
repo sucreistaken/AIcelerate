@@ -61,123 +61,43 @@ export function buildModulesPrompt(
   LEC: string, SLD: string, courseCode: string | undefined,
   LO_BLOCK: string, langDirective: string
 ): string {
-  return `
-You are an instructional designer. Create a structured learning plan from the lecture transcript and slides.
+  return `Instructional designer. ${langDirective}
 
-${langDirective}
+Create PRACTICAL LEARNING PLAN: 2-6 modules, 1-6 lessons each. Include objectives, study time, activities (referencing content), mini quiz. Output ONLY valid JSON.
 
-[COURSE CODE]
-${courseCode || "—"}
-
-[OFFICIAL LEARNING OUTCOMES]
-${LO_BLOCK}
-
-Create a PRACTICAL LEARNING PLAN with 2–6 modules, each with 1–6 lessons.
-Each lesson should have clear objectives, study time, activities, and a mini quiz.
-
-OUTPUT: ONLY VALID JSON.
-
-RULES:
-- Activities must reference specific content from the lecture/slides.
-- Mini quiz questions must be answerable from the provided content.
-- Include key concepts and estimated study duration.
-
-[LEC]
-${LEC}
-
-[SLIDE]
-${SLD}
-`.trim();
+[COURSE] ${courseCode || "—"}
+[LOs] ${LO_BLOCK}
+[LEC] ${LEC}
+[SLIDE] ${SLD}`.trim();
 }
 
 export function buildEmphasesPrompt(
   LEC: string, SLD: string, langDirective: string
 ): string {
-  return `
-You are an educational analyst. Extract teacher emphases from the lecture transcript.
+  return `Educational analyst. ${langDirective}
 
-${langDirective}
+Extract 5-12 teacher emphases: repeated topics, examples/analogies, "important"/"remember" phrases, extra time spent, common mistakes. For each: statement, why, in_slides, evidence (direct quotes), source. Only valid JSON. No hallucination.
 
-Look for:
-- Topics the teacher REPEATS multiple times
-- Concepts explained with EXAMPLES or ANALOGIES
-- Phrases like "this is important", "pay attention", "remember this"
-- Topics where the teacher spends significantly more time
-- Warnings about common mistakes
-
-For each emphasis, provide:
-- The statement itself
-- WHY the teacher emphasized it
-- Whether it appears in the slides
-- Direct evidence (quotes from transcript)
-- Source: "lecture", "slides", or "both"
-
-OUTPUT: ONLY VALID JSON.
-
-RULES:
-- At least 5 emphases, ideally 8-12.
-- Include direct transcript quotes as evidence.
-- Do NOT hallucinate — only extract what is actually in the content.
-
-[LEC]
-${LEC}
-
-[SLIDE]
-${SLD}
-`.trim();
+[LEC] ${LEC}
+[SLIDE] ${SLD}`.trim();
 }
 
 export function buildAlignmentPrompt(
   LEC: string, SLD: string, langDirective: string
 ): string {
-  return `
-You are an educational content analyst. Compare the lecture transcript with the slide text.
+  return `Educational content analyst. ${langDirective}
 
-${langDirective}
+Compare lecture vs slides. For each topic: in_both, emphasis_level (high/medium/low), lecture_quotes, slide_refs, duration_min, confidence (0-1). Include summary_chatty. Min 5 items. Only valid JSON.
 
-For each topic covered, determine:
-- Whether it appears in both lecture and slides, or only one
-- The emphasis level (high/medium/low)
-- Direct quotes from the lecture
-- Slide references
-- Estimated time spent on the topic
-- Confidence level (0-1)
-
-Also write a brief summary comparing how the lecture and slides relate.
-
-OUTPUT: ONLY VALID JSON.
-
-RULES:
-- At least 5 alignment items.
-- Be specific with quotes and references.
-
-[LEC]
-${LEC}
-
-[SLIDE]
-${SLD}
-`.trim();
+[LEC] ${LEC}
+[SLIDE] ${SLD}`.trim();
 }
 
 export function buildQuizFromPlanPrompt(planJson: string, crossLessonHint: string, lang?: SupportedLang): string {
-  return `You are an expert academic quiz generator. Generate exactly 10 quiz questions based on the plan below.
-
-${getLangDirective(lang)}
-
-RULES:
-- Difficulty distribution: 3 Easy (factual recall), 4 Medium (understanding/application), 3 Hard (analysis/evaluation)
-- Question type variety: include at least 2 "Why/How" questions, 2 multiple-choice (with options A-D), 2 true/false, and the rest open-ended
-- Each question MUST cover a DIFFERENT concept from the plan — no duplicate or overlapping topics
-- Each question must be at least 15 words long and be self-contained (understandable without seeing the plan)
-- For multiple-choice questions, format as: "Question text? A) option1 B) option2 C) option3 D) option4"
-- For true/false questions, start with "[T/F]"
-
-FORMAT: Return one question per line, prefixed with difficulty tag:
-[Easy] question text
-[Medium] question text
-[Hard] question text
+  return `${getLangDirective(lang)}
+Generate 10 quiz questions from plan. Distribution: 3 Easy, 4 Medium, 3 Hard. Types: 2 Why/How, 2 MC (A-D), 2 T/F, rest open. Each covers DIFFERENT concept, 15+ words, self-contained.
+Format: [Easy/Medium/Hard] question text. MC: "Q? A) B) C) D)". T/F: "[T/F] Q"
 ${crossLessonHint}
-
 PLAN:
 ${planJson}`.trim();
 }
@@ -193,51 +113,24 @@ export function buildQuizAnswersPrompt(
 export function buildQuizEvalPrompt(
   contextBlock: string, question: string, studentAnswer: string, lang?: SupportedLang
 ): string {
-  return `Act as a strict but fair academic exam grader. Grade the student's answer based ONLY on the lesson context provided.
+  return `${getLangDirective(lang)}
+Strict but fair exam grader. Grade from LESSON CONTEXT only.
+Rubric: correct (all key concepts, accurate) | partial (main idea right, details missing) | incorrect (wrong/irrelevant).
+Give specific feedback, list missing_points, include evidence quotes.
 
-${getLangDirective(lang)}
-
-GRADING RUBRIC:
-- "correct": All key concepts covered with accurate reasoning. Minor wording differences are acceptable.
-- "partial": Main idea is correct but missing important supporting details, or has minor inaccuracies.
-- "incorrect": Fundamentally wrong, irrelevant, or shows no understanding of the concept.
-
-INSTRUCTIONS:
-1. Compare the student's answer against the lesson context
-2. Identify which key concepts from the context are addressed vs missed
-3. Provide specific, actionable feedback explaining what was good and what was missed
-4. List the specific concepts/points the student failed to mention in missing_points
-5. Include direct quotes from lesson content as evidence
-
-[LESSON CONTEXT]
-${contextBlock}
-
-[QUESTION]
-${question}
-
-[STUDENT_ANSWER]
-${studentAnswer}`.trim();
+[CONTEXT] ${contextBlock}
+[Q] ${question}
+[ANSWER] ${studentAnswer}`.trim();
 }
 
 export function buildQuizEvalBatchPrompt(
   contextBlock: string, questionsBlock: string, lang?: SupportedLang
 ): string {
-  return `Act as a strict but fair academic exam grader. Grade ALL student answers based ONLY on the lesson context.
+  return `${getLangDirective(lang)}
+Grade ALL answers from CONTEXT only. Rubric: correct|partial|incorrect. Each: feedback + missing_points.
 
-${getLangDirective(lang)}
-
-GRADING RUBRIC (apply to each answer):
-- "correct": All key concepts covered with accurate reasoning
-- "partial": Main idea correct but missing important details or has minor inaccuracies
-- "incorrect": Fundamentally wrong, irrelevant, or shows no understanding
-
-For each answer, provide specific feedback and list missed concepts in missing_points.
-
-[LESSON CONTEXT]
-${contextBlock}
-
-[STUDENT ANSWERS]
-${questionsBlock}`.trim();
+[CONTEXT] ${contextBlock}
+[ANSWERS] ${questionsBlock}`.trim();
 }
 
 export function buildChatContext(
@@ -272,35 +165,17 @@ ${progressBlock ? `\n=== STUDENT PROGRESS ===\n${progressBlock}\n` : ''}`;
 export function buildChatPrompt(
   context: string, message: string, courseId: string | undefined, lang?: SupportedLang
 ): string {
-  return `
-=== CRITICAL RULES ===
-1. INSTRUCTION FOLLOWING: Do exactly what the user asks.
-2. LANGUAGE: ${getLangDirective(lang)}
-3. CONTEXT-BASED ANSWERS: Base answers on the LESSON CONTEXT.
-4. ACCURACY: If info is not available, say so.
-
-=== YOUR ROLE ===
-You are an EXPERT AI TUTOR for this lesson.${courseId ? ` Full course knowledge available.` : ''}
+  return `${getLangDirective(lang)}
+Expert AI tutor.${courseId ? ' Full course knowledge.' : ''} Answer from LESSON CONTEXT only. If unavailable, say so. Use **bold** for key terms. End with:
+---
+💡 **Suggested Questions:**
+1. [Follow-up] 2. [Deeper] 3. [Application]
 
 === LESSON CONTEXT ===
 ${context}
 
-=== FORMATTING ===
-- **bold** for key terms, bullet points, short paragraphs
-
-=== RESPONSE STRUCTURE ===
-1. Answer directly
-2. Reference lesson content
-3. End with:
----
-💡 **Suggested Questions:**
-1. [Follow-up]
-2. [Deeper]
-3. [Application]
-
 === STUDENT MESSAGE ===
-${message}
-`;
+${message}`;
 }
 
 export function buildMindmapPrompt(
@@ -308,62 +183,27 @@ export function buildMindmapPrompt(
   concepts: string[], transcript: string, slides: string,
   crossLessonBlock: string | undefined, lang?: SupportedLang
 ): string {
-  return `
-You are a MASTER EDUCATOR creating a STUDY GUIDE mindmap.
+  return `${getLangDirective(lang)}
+Create Mermaid mindmap. Syntax: "mindmap" header, root((Topic)), 2-space indent, no special chars, max 35 char labels.
+5 branches: What(definition), Why(purpose), How(steps), Practice(examples), Remember(key points).
 
-${getLangDirective(lang)}
-
-=== MERMAID SYNTAX (STRICT) ===
-- Start with: mindmap
-- Root: root((📚 Topic Name))
-- Use 2-space indentation
-- NO special chars: no [], (), {}, :, backticks, quotes
-- Labels: MAX 35 chars
-
-=== STRUCTURE (5 BRANCHES) ===
-📚 TOPIC (root)
-├── ❓ What - Definition
-├── 🎯 Why - Purpose
-├── ⚡ How - Steps
-├── 💡 Practice - Examples
-└── 📝 Remember - Key points
-
-=== LESSON DATA ===
 Topic: ${title}
 Sections: ${moduleNames.join(", ") || "Introduction, Main Content, Practice"}
-Key points: ${keyPoints.slice(0, 4).join(" | ") || "Important concepts"}
+Key: ${keyPoints.slice(0, 4).join(" | ") || "concepts"}
 Terms: ${concepts.slice(0, 6).join(", ") || "vocabulary"}
-
-=== LECTURE CONTENT ===
-${smartTruncate(transcript, 1000) || "No transcript"}
-
-=== SLIDE CONTENT ===
-${smartTruncate(slides, 800) || "No slides"}
-
-${crossLessonBlock ? `=== CONNECTIONS ===\n${crossLessonBlock}\n` : ''}
-Create a STUDY GUIDE mindmap for "${title}". OUTPUT ONLY mermaid code.
-`;
+[LEC] ${smartTruncate(transcript, 1000) || "—"}
+[SLD] ${smartTruncate(slides, 800) || "—"}
+${crossLessonBlock ? `[CONNECTIONS] ${crossLessonBlock}` : ''}
+Output ONLY mermaid code.`;
 }
 
 export function buildMindmapModulePrompt(targetTitle: string, targetContent: string, lang?: SupportedLang): string {
-  return `
-You are a MASTER EDUCATOR creating a STUDY GUIDE mindmap for a specific module.
+  return `${getLangDirective(lang)}
+Create Mermaid mindmap. Syntax: "mindmap" header, root((Topic)), 2-space indent, no special chars, max 35 chars.
 
-${getLangDirective(lang)}
-
-=== MERMAID SYNTAX (STRICT) ===
-- Start with: mindmap
-- Root: root((📚 Topic Name))
-- Use 2-space indentation
-- NO special chars
-- Labels: MAX 35 chars
-
-=== MODULE DATA ===
-Module Title: ${targetTitle}
-Module Content: ${smartTruncate(targetContent, 1000)}
-
-OUTPUT ONLY mermaid code for "${targetTitle}".
-`;
+Module: ${targetTitle}
+Content: ${smartTruncate(targetContent, 1000)}
+Output ONLY mermaid code.`;
 }
 
 export function buildMindmapNodeDetailPrompt(

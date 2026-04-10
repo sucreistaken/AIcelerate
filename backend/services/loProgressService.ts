@@ -2,7 +2,7 @@
 // Computes Learning Outcome mastery from quiz scores, flashcard states, and lesson coverage.
 
 import { getCourse, type Course } from "../controllers/courseController";
-import { getLesson } from "../controllers/lessonControllers";
+import { lessonCache } from "../cache";
 import { logger } from "../utils/logger";
 import type { LOProgress, LODashboardData } from "../types/loProgress";
 
@@ -62,6 +62,21 @@ export function computeLOProgress(courseId: string): LODashboardData | null {
 
   const loProgressList: LOProgress[] = [];
 
+  // Pre-fetch all contributing lessons at once via cache (O(1) per lookup, eliminates N+1)
+  const allContributingIds = new Set<string>();
+  for (let i = 0; i < los.length; i++) {
+    const loId = `LO${i + 1}`;
+    const coverageEntry = loCoverage.find((lc: any) => lc.loId === loId);
+    if (coverageEntry?.coveredByLessons) {
+      for (const lid of coverageEntry.coveredByLessons) allContributingIds.add(lid);
+    }
+  }
+  const lessonMap = new Map<string, any>();
+  for (const lid of allContributingIds) {
+    const lesson = lessonCache.get(lid);
+    if (lesson) lessonMap.set(lid, lesson);
+  }
+
   for (let i = 0; i < los.length; i++) {
     const loTitle = los[i];
     const loId = `LO${i + 1}`;
@@ -73,7 +88,7 @@ export function computeLOProgress(courseId: string): LODashboardData | null {
     // 1. Quiz scores (40% weight)
     const quizScores: number[] = [];
     for (const lid of contributingLessons) {
-      const lesson = getLesson(lid);
+      const lesson = lessonMap.get(lid);
       if (!lesson?.quizPacks) continue;
       for (const pack of lesson.quizPacks) {
         if (typeof pack.lastScore === "number") {
@@ -86,13 +101,10 @@ export function computeLOProgress(courseId: string): LODashboardData | null {
       : 0;
 
     // 2. Flashcard mastery (30% weight)
-    // Count flashcard states across contributing lessons
     let fcTotal = 0, fcGraduated = 0, fcLearning = 0, fcNew = 0;
-    // Note: flashcard data is per-lesson; we approximate by checking lesson progress
     for (const lid of contributingLessons) {
-      const lesson = getLesson(lid);
+      const lesson = lessonMap.get(lid);
       if (!lesson) continue;
-      // If lesson has progress data with flashcard info, use it
       const progress = lesson.progress as any;
       if (progress?.flashcardStats) {
         fcTotal += progress.flashcardStats.total || 0;
@@ -105,8 +117,7 @@ export function computeLOProgress(courseId: string): LODashboardData | null {
 
     // 3. Lesson coverage (20% weight)
     const lessonsWithPlan = contributingLessons.filter((lid: string) => {
-      const l = getLesson(lid);
-      return l?.plan;
+      return lessonMap.get(lid)?.plan;
     }).length;
     const lessonCoverage = contributingLessons.length > 0
       ? lessonsWithPlan / contributingLessons.length
@@ -115,7 +126,7 @@ export function computeLOProgress(courseId: string): LODashboardData | null {
     // 4. LO module completion (10% weight)
     let loModuleExists = 0;
     for (const lid of contributingLessons) {
-      const lesson = getLesson(lid);
+      const lesson = lessonMap.get(lid);
       if (lesson?.loModules?.modules?.some((m: any) => m.loId === loId)) {
         loModuleExists++;
       }

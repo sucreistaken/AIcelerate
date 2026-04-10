@@ -8,6 +8,8 @@ export const ensureDir = (dirPath: string) => {
 };
 
 // mtime-based cache for readJSON — avoids repeated readFileSync + JSON.parse
+// Max 200 entries to prevent unbounded memory growth
+const JSON_CACHE_MAX = 200;
 const jsonCache = new Map<string, { data: unknown; mtime: number }>();
 
 export const readJSON = <T = any>(filePath: string): T | null => {
@@ -22,6 +24,12 @@ export const readJSON = <T = any>(filePath: string): T | null => {
 
     const raw = fs.readFileSync(filePath, "utf-8");
     const data = JSON.parse(raw) as T;
+
+    // Evict oldest entry if at capacity
+    if (jsonCache.size >= JSON_CACHE_MAX && !jsonCache.has(filePath)) {
+      const firstKey = jsonCache.keys().next().value;
+      if (firstKey !== undefined) jsonCache.delete(firstKey);
+    }
     jsonCache.set(filePath, { data, mtime: stat.mtimeMs });
     return data;
   } catch (e) {

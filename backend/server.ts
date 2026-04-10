@@ -19,6 +19,7 @@ import { httpLogger } from "./middleware/httpLogger";
 import { startJobProcessor } from "./queues/jobProcessor";
 import { connectDB } from "./config/database";
 import { migrateOrphanLessons } from "./controllers/courseController";
+import { flushAllCaches } from "./cache";
 import { logger } from "./utils/logger";
 
 // ── Express app ────────────────────────────────────────────────────────────────
@@ -154,7 +155,15 @@ async function shutdown(signal: string) {
   }, 10_000);
   forceTimeout.unref();
 
-  // 4. Close DB connection if open
+  // 4. Flush all data caches to disk before exit
+  try {
+    await flushAllCaches();
+    logger.info("Data caches flushed to disk");
+  } catch (err) {
+    logger.error("Failed to flush caches:", err);
+  }
+
+  // 5. Close DB connection if open
   try {
     const mongoose = await import("mongoose");
     if (mongoose.connection.readyState === 1) {
