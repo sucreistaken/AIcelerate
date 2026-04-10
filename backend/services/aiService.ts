@@ -1,5 +1,6 @@
-import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
+import { GoogleGenerativeAI, GenerativeModel, GenerateContentRequest } from "@google/generative-ai";
 import { env } from "../config/env";
+import { withAiResilience } from "../utils/aiResilience";
 
 let _model: GenerativeModel | null = null;
 
@@ -9,6 +10,23 @@ export function getModel(): GenerativeModel {
     _model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
   }
   return _model;
+}
+
+/**
+ * Safe wrapper: calls generateContent with timeout, circuit breaker, and retry.
+ * Use this instead of getModel().generateContent() directly.
+ */
+export async function safeGenerate(
+  request: GenerateContentRequest,
+  options?: { timeoutMs?: number; label?: string }
+) {
+  return withAiResilience(
+    async (_signal) => {
+      const result = await getModel().generateContent(request);
+      return result;
+    },
+    { timeoutMs: options?.timeoutMs ?? 30_000, label: options?.label ?? "generateContent" }
+  );
 }
 
 // ── Temperature profiles ──────────────────────────────────────────────────────

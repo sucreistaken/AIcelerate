@@ -29,7 +29,7 @@ export default function RoomDiscovery({ onSelectRoom }: Props) {
 
   const handleJoin = async (roomId: string) => {
     if (!user) return;
-    await joinPublicRoom(roomId, user.id);
+    await joinPublicRoom(roomId);
     onSelectRoom(roomId);
   };
 

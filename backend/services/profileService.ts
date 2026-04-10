@@ -1,169 +1,184 @@
-import { profileRepo, UserProfile } from "../repositories/profileRepo";
+import crypto from "crypto";
+import { User, IUser } from "../models/User";
 import { eventBus } from "../events/eventBus";
 import { badRequest, notFound } from "../middleware/errorHandler";
 
 function generateFriendCode(nickname: string): string {
-  const tag = Math.floor(1000 + Math.random() * 9000).toString();
+  const tag = crypto.randomInt(1000, 10000).toString();
   const clean = nickname.replace(/[^a-zA-Z0-9_]/g, "").slice(0, 16) || "User";
   return `${clean}#${tag}`;
 }
 
-import { generateId as _genId } from "../utils/idGenerator";
-const generateId = () => _genId("u");
-
-const AVATAR_COLORS = [
-  "#6C5CE7", "#00B894", "#FDCB6E", "#E17055", "#0984E3",
-  "#D63031", "#A29BFE", "#55A3E8", "#F78FB3", "#3DC1D3",
-];
+// Profile shape returned to frontend (compatible with UserProfile interface)
+function toProfile(user: any): any {
+  const u = user.toJSON ? user.toJSON() : user;
+  return {
+    id: (u._id || u.id).toString(),
+    nickname: u.profile?.nickname || "Unknown",
+    avatar: u.profile?.avatar || "avatar-1",
+    bio: u.profile?.bio || "",
+    status: u.status || "offline",
+    friendIds: u.friendIds || [],
+    friendRequestsSent: (u.friendRequests || []).filter((r: any) => r.direction === "sent").map((r: any) => r.from),
+    friendRequestsReceived: (u.friendRequests || []).filter((r: any) => r.direction === "received").map((r: any) => r.from),
+    friendCode: u.friendCode || "",
+    serverIds: u.roomIds || [],
+    dmChannelIds: u.dmChannelIds || [],
+    lastActiveAt: u.updatedAt || u.createdAt,
+    createdAt: u.createdAt,
+    settings: {
+      notifyMentions: u.settings?.notifications ?? true,
+      notifyDMs: u.settings?.notifications ?? true,
+    },
+  };
+}
 
 export const profileService = {
-  async create(nickname: string, avatar?: string): Promise<UserProfile> {
+  // Profile is now backed by the User model.
+  // This method returns a profile-shaped view for backward compat.
+
+  async getById(id: string) {
+    const user = await User.findById(id).select("-passwordHash");
+    if (!user) throw notFound("Profile not found");
+    return toProfile(user);
+  },
+
+  async getByIdOptional(id: string) {
+    const user = await User.findById(id).select("-passwordHash");
+    return user ? toProfile(user) : null;
+  },
+
+  /**
+   * Setup profile for an authenticated user (called from ProfileSetup component).
+   * Updates the User's profile fields (nickname, avatar) and generates a friend code.
+   */
+  async setupProfile(userId: string, nickname: string, avatar?: string) {
     if (!nickname || nickname.trim().length < 2) {
       throw badRequest("Nickname must be at least 2 characters");
     }
 
-    const profile: UserProfile = {
-      id: generateId(),
-      nickname: nickname.trim(),
-      avatar: avatar || AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)],
-      bio: "",
-      status: "online",
-      friendIds: [],
-      friendRequestsSent: [],
-      friendRequestsReceived: [],
-      friendCode: generateFriendCode(nickname.trim()),
-      serverIds: [],
-      dmChannelIds: [],
-      lastActiveAt: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      settings: { notifyMentions: true, notifyDMs: true },
-    };
-
-    // Ensure unique friend code (max 100 attempts to avoid infinite loop)
-    let existing = await profileRepo.findByFriendCode(profile.friendCode);
+    let friendCode = generateFriendCode(nickname.trim());
     let attempts = 0;
-    while (existing && attempts < 100) {
-      profile.friendCode = generateFriendCode(nickname.trim());
-      existing = await profileRepo.findByFriendCode(profile.friendCode);
+    while (await User.exists({ friendCode, _id: { $ne: userId } }) && attempts < 100) {
+      friendCode = generateFriendCode(nickname.trim());
       attempts++;
     }
-    if (existing) {
-      throw badRequest("Could not generate unique friend code. Please try again.");
-    }
 
-    return profileRepo.create(profile);
+    const updated = await User.findByIdAndUpdate(userId, {
+      $set: {
+        "profile.nickname": nickname.trim(),
+        "profile.avatar": avatar || "avatar-1",
+        friendCode,
+        status: "online",
+      },
+    }, { new: true }).select("-passwordHash");
+
+    if (!updated) throw notFound("User not found");
+    return toProfile(updated);
   },
 
-  async getById(id: string): Promise<UserProfile> {
-    const profile = await profileRepo.findById(id);
-    if (!profile) throw notFound("Profile not found");
-    return profile;
-  },
+  async update(id: string, updates: Record<string, any>) {
+    const user = await User.findById(id);
+    if (!user) throw notFound("Profile not found");
 
-  async getByIdOptional(id: string): Promise<UserProfile | null> {
-    return profileRepo.findById(id);
-  },
+    const set: any = {};
+    if (updates.nickname) set["profile.nickname"] = updates.nickname;
+    if (updates.avatar) set["profile.avatar"] = updates.avatar;
+    if (updates.bio !== undefined) set["profile.bio"] = updates.bio;
 
-  async update(id: string, updates: Partial<Pick<UserProfile, "nickname" | "avatar" | "bio" | "settings">>): Promise<UserProfile> {
-    const profile = await profileRepo.findById(id);
-    if (!profile) throw notFound("Profile not found");
-
-    // If nickname changed, update friend code
-    const patchedUpdates: Partial<UserProfile> = { ...updates };
-    if (updates.nickname && updates.nickname !== profile.nickname) {
-      patchedUpdates.friendCode = generateFriendCode(updates.nickname);
-      let existing = await profileRepo.findByFriendCode(patchedUpdates.friendCode!);
+    // Regenerate friend code on nickname change
+    if (updates.nickname && updates.nickname !== user.profile.nickname) {
+      let code = generateFriendCode(updates.nickname);
       let attempts = 0;
-      while (existing && existing.id !== id && attempts < 100) {
-        patchedUpdates.friendCode = generateFriendCode(updates.nickname);
-        existing = await profileRepo.findByFriendCode(patchedUpdates.friendCode!);
+      while (await User.exists({ friendCode: code, _id: { $ne: id } }) && attempts < 100) {
+        code = generateFriendCode(updates.nickname);
         attempts++;
       }
+      set.friendCode = code;
     }
 
-    const updated = await profileRepo.update(id, patchedUpdates);
+    const updated = await User.findByIdAndUpdate(id, { $set: set }, { new: true }).select("-passwordHash");
     if (!updated) throw notFound("Profile not found");
-    return updated;
+    return toProfile(updated);
   },
 
-  async setStatus(id: string, status: UserProfile["status"]): Promise<UserProfile> {
-    const updated = await profileRepo.updateStatus(id, status);
+  async setStatus(id: string, status: string) {
+    const updated = await User.findByIdAndUpdate(id, { $set: { status } }, { new: true }).select("-passwordHash");
     if (!updated) throw notFound("Profile not found");
     eventBus.emit("profile:statusChanged", { userId: id, status });
-    return updated;
+    return toProfile(updated);
   },
 
-  async sendFriendRequest(fromId: string, friendCode: string): Promise<{ success: boolean; message: string }> {
-    const sender = await profileRepo.findById(fromId);
-    if (!sender) throw notFound("Sender profile not found");
+  async sendFriendRequest(fromId: string, friendCode: string) {
+    const sender = await User.findById(fromId);
+    if (!sender) throw notFound("Sender not found");
 
-    const target = await profileRepo.findByFriendCode(friendCode);
+    const target = await User.findOne({ friendCode: new RegExp(`^${friendCode}$`, "i") });
     if (!target) throw notFound("User not found with that friend code");
-    if (target.id === fromId) throw badRequest("Cannot add yourself");
-    if (sender.friendIds.includes(target.id)) throw badRequest("Already friends");
-    if (sender.friendRequestsSent.includes(target.id)) throw badRequest("Friend request already sent");
+    const targetId = target._id.toString();
+    if (targetId === fromId) throw badRequest("Cannot add yourself");
+    if (sender.friendIds.includes(targetId)) throw badRequest("Already friends");
 
-    await profileRepo.update(fromId, {
-      friendRequestsSent: [...sender.friendRequestsSent, target.id],
-    } as Partial<UserProfile>);
+    // Check existing requests
+    const alreadySent = sender.friendRequests.some(
+      (r) => r.from === targetId && (r as any).direction === "sent"
+    );
+    if (alreadySent) throw badRequest("Friend request already sent");
 
-    await profileRepo.update(target.id, {
-      friendRequestsReceived: [...target.friendRequestsReceived, fromId],
-    } as Partial<UserProfile>);
+    // Add outgoing request to sender
+    await User.findByIdAndUpdate(fromId, {
+      $push: { friendRequests: { from: targetId, direction: "sent", createdAt: new Date() } },
+    });
 
-    return { success: true, message: `Friend request sent to ${target.nickname}` };
+    // Add incoming request to target
+    await User.findByIdAndUpdate(targetId, {
+      $push: { friendRequests: { from: fromId, direction: "received", createdAt: new Date() } },
+    });
+
+    return { success: true, message: `Friend request sent to ${target.profile.nickname}` };
   },
 
-  async acceptFriendRequest(userId: string, fromId: string): Promise<void> {
-    const user = await profileRepo.findById(userId);
-    if (!user) throw notFound("Profile not found");
-    if (!user.friendRequestsReceived.includes(fromId)) throw badRequest("No pending request from this user");
+  async acceptFriendRequest(userId: string, fromId: string) {
+    // Add to both friendIds
+    await User.findByIdAndUpdate(userId, {
+      $addToSet: { friendIds: fromId },
+      $pull: { friendRequests: { from: fromId } },
+    });
 
-    await profileRepo.addFriend(userId, fromId);
+    await User.findByIdAndUpdate(fromId, {
+      $addToSet: { friendIds: userId },
+      $pull: { friendRequests: { from: userId } },
+    });
   },
 
-  async rejectFriendRequest(userId: string, fromId: string): Promise<void> {
-    const user = await profileRepo.findById(userId);
-    if (!user) throw notFound("Profile not found");
-
-    await profileRepo.update(userId, {
-      friendRequestsReceived: user.friendRequestsReceived.filter((id) => id !== fromId),
-    } as Partial<UserProfile>);
-
-    const sender = await profileRepo.findById(fromId);
-    if (sender) {
-      await profileRepo.update(fromId, {
-        friendRequestsSent: sender.friendRequestsSent.filter((id) => id !== userId),
-      } as Partial<UserProfile>);
-    }
+  async rejectFriendRequest(userId: string, fromId: string) {
+    await User.findByIdAndUpdate(userId, {
+      $pull: { friendRequests: { from: fromId } },
+    });
+    await User.findByIdAndUpdate(fromId, {
+      $pull: { friendRequests: { from: userId } },
+    });
   },
 
-  async removeFriend(userId: string, friendId: string): Promise<void> {
-    const user = await profileRepo.findById(userId);
-    const friend = await profileRepo.findById(friendId);
-    if (!user || !friend) throw notFound("Profile not found");
-
-    await profileRepo.update(userId, {
-      friendIds: user.friendIds.filter((id) => id !== friendId),
-    } as Partial<UserProfile>);
-    await profileRepo.update(friendId, {
-      friendIds: friend.friendIds.filter((id) => id !== userId),
-    } as Partial<UserProfile>);
+  async removeFriend(userId: string, friendId: string) {
+    await User.findByIdAndUpdate(userId, { $pull: { friendIds: friendId } });
+    await User.findByIdAndUpdate(friendId, { $pull: { friendIds: userId } });
   },
 
-  async getFriends(userId: string): Promise<UserProfile[]> {
-    const user = await profileRepo.findById(userId);
+  async getFriends(userId: string) {
+    const user = await User.findById(userId);
     if (!user) throw notFound("Profile not found");
 
-    const friends: UserProfile[] = [];
-    for (const fid of user.friendIds) {
-      const f = await profileRepo.findById(fid);
-      if (f) friends.push(f);
-    }
-    return friends;
+    // Single query instead of N+1
+    const friends = await User.find(
+      { _id: { $in: user.friendIds } },
+      { passwordHash: 0 }
+    ).lean();
+
+    return friends.map((f: any) => toProfile(f));
   },
 
-  async touchActive(id: string): Promise<void> {
-    await profileRepo.update(id, { lastActiveAt: new Date().toISOString() } as Partial<UserProfile>);
+  async touchActive(id: string) {
+    await User.findByIdAndUpdate(id, { $set: { updatedAt: new Date() } });
   },
 };

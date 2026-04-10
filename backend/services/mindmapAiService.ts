@@ -1,5 +1,5 @@
 import { logger } from "../utils/logger";
-import { getModel, stripCodeFences, tryParseJSON, getTemperature } from "./aiService";
+import { safeGenerate, stripCodeFences, tryParseJSON, getTemperature } from "./aiService";
 import { SCHEMAS } from "../prompts/schemas";
 import {
   buildMindmapPrompt,
@@ -30,10 +30,10 @@ export async function generateMindmap(lesson: Lesson, lessonId: string, lang?: S
 
   const prompt = buildMindmapPrompt(title, moduleNames, keyPoints, concepts, transcript, slides, mindmapCourseCtx.crossLessonBlock, lang);
 
-  const result = await getModel().generateContent({
+  const result = await safeGenerate({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: { maxOutputTokens: 1500, temperature: getTemperature("balanced") },
-  });
+  }, { label: "mindmap_generate", timeoutMs: 30_000 });
 
   return cleanMindmapCode(result.response.text(), title);
 }
@@ -63,10 +63,10 @@ export async function generateMindmapModule(
   }
 
   const prompt = buildMindmapModulePrompt(targetTitle, targetContent, lang);
-  const result = await getModel().generateContent({
+  const result = await safeGenerate({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: { maxOutputTokens: 1200, temperature: getTemperature("balanced") },
-  });
+  }, { label: "mindmap_module", timeoutMs: 30_000 });
 
   const code = cleanMindmapCode(result.response.text(), targetTitle);
   return { code, moduleTitle: targetTitle };
@@ -87,10 +87,10 @@ export async function generateMindmapNodeDetail(
     genConfig.responseMimeType = "application/json";
     genConfig.responseSchema = schema as import("@google/generative-ai").ResponseSchema;
   }
-  const result = await getModel().generateContent({
+  const result = await safeGenerate({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: genConfig,
-  });
+  }, { label: "mindmap_node_detail", timeoutMs: 30_000 });
   let responseText = result.response.text();
   if (!schema) responseText = responseText.replace(/```json?/gi, "").replace(/```/g, "").trim();
   logAI("MINDMAP_NODE_DETAIL", prompt.length, responseText.length, maxTokens);

@@ -56,14 +56,18 @@ export function gatewayTimeout(msg = "Gateway timeout") {
   return new AppError(504, msg, "GATEWAY_TIMEOUT");
 }
 
-export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction) {
+export function errorHandler(err: Error, req: Request, res: Response, _next: NextFunction) {
   if (res.headersSent) return;
+
+  // Attach requestId for traceability
+  const requestId = (req as any).requestId;
 
   if (err instanceof AppError) {
     res.status(err.statusCode).json({
       ok: false,
       error: err.message,
       code: err.code,
+      ...(requestId && { requestId }),
     });
     return;
   }
@@ -75,6 +79,7 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
       error: err.message,
       code: "VALIDATION_ERROR",
       details: err.details,
+      ...(requestId && { requestId }),
     });
     return;
   }
@@ -85,6 +90,7 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
       ok: false,
       error: "AI yanıt süresi aşıldı. Lütfen tekrar deneyin.",
       code: "AI_TIMEOUT",
+      ...(requestId && { requestId }),
     });
     return;
   }
@@ -97,14 +103,17 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
       error: err.message,
       code: "LLM_PARSE_ERROR",
       llmText: err.llmText,
+      ...(requestId && { requestId }),
     });
     return;
   }
 
-  logger.error("Unhandled error:", err);
+  // Log full stack for unexpected errors
+  logger.error({ err, requestId, method: req.method, path: req.originalUrl }, "Unhandled error");
   res.status(500).json({
     ok: false,
-    error: "Internal server error",
+    error: process.env.NODE_ENV === "production" ? "Internal server error" : err.message,
     code: "INTERNAL_ERROR",
+    ...(requestId && { requestId }),
   });
 }

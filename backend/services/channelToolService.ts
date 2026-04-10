@@ -14,8 +14,8 @@ export { LessonContextMeta } from "./channelContextBuilder";
 
 export const channelToolService = {
   // ── Get data ────────────────────────────────────────────────────────────────
-  getData(channelId: string): ChannelToolData {
-    return channelToolRepo.load(channelId);
+  async getData(channelId: string): Promise<ChannelToolData> {
+    return await channelToolRepo.load(channelId);
   },
 
   // ── Delegated domain methods ──────────────────────────────────────────────
@@ -35,14 +35,14 @@ export const channelToolService = {
   },
 
   // ── Sprint: start ───────────────────────────────────────────────────────────
-  startSprint(
+  async startSprint(
     channelId: string,
     studyMin: number,
     breakMin: number,
     userId: string,
     nickname: string
   ) {
-    const data = channelToolRepo.load(channelId);
+    const data = await channelToolRepo.load(channelId);
 
     const now = new Date().toISOString();
 
@@ -63,19 +63,19 @@ export const channelToolService = {
       },
     };
 
-    channelToolRepo.save(channelId, data);
+    await channelToolRepo.save(channelId, data);
 
     return data.sprint;
   },
 
   // ── Sprint: update member status ────────────────────────────────────────────
-  updateSprintStatus(
+  async updateSprintStatus(
     channelId: string,
     userId: string,
     nickname: string,
     status: string
   ) {
-    const data = channelToolRepo.load(channelId);
+    const data = await channelToolRepo.load(channelId);
 
     if (!data.sprint) {
       data.sprint = {
@@ -93,21 +93,21 @@ export const channelToolService = {
       nickname,
     };
 
-    channelToolRepo.save(channelId, data);
+    await channelToolRepo.save(channelId, data);
 
     return data.sprint;
   },
 
   // ── Notes: add ──────────────────────────────────────────────────────────────
-  addNote(
+  async addNote(
     channelId: string,
     title: string,
     content: string,
     category: NoteItem["category"],
     userId: string,
     nickname: string
-  ): NoteItem {
-    const data = channelToolRepo.load(channelId);
+  ): Promise<NoteItem> {
+    const data = await channelToolRepo.load(channelId);
 
     if (!data.notes) {
       data.notes = { items: [] };
@@ -125,18 +125,18 @@ export const channelToolService = {
     };
 
     data.notes.items.push(note);
-    channelToolRepo.save(channelId, data);
+    await channelToolRepo.save(channelId, data);
 
     return note;
   },
 
   // ── Notes: edit ─────────────────────────────────────────────────────────────
-  editNote(
+  async editNote(
     channelId: string,
     noteId: string,
     updates: { title?: string; content?: string; category?: string }
-  ): NoteItem | null {
-    const data = channelToolRepo.load(channelId);
+  ): Promise<NoteItem | null> {
+    const data = await channelToolRepo.load(channelId);
 
     if (!data.notes) return null;
 
@@ -148,14 +148,14 @@ export const channelToolService = {
     if (updates.category !== undefined) note.category = updates.category as NoteItem["category"];
     note.editedAt = new Date().toISOString();
 
-    channelToolRepo.save(channelId, data);
+    await channelToolRepo.save(channelId, data);
 
     return note;
   },
 
   // ── Notes: delete ───────────────────────────────────────────────────────────
-  deleteNote(channelId: string, noteId: string): boolean {
-    const data = channelToolRepo.load(channelId);
+  async deleteNote(channelId: string, noteId: string): Promise<boolean> {
+    const data = await channelToolRepo.load(channelId);
 
     if (!data.notes) return false;
 
@@ -164,13 +164,13 @@ export const channelToolService = {
 
     if (data.notes.items.length === before) return false;
 
-    channelToolRepo.save(channelId, data);
+    await channelToolRepo.save(channelId, data);
     return true;
   },
 
   // ── Notes: pin/unpin ────────────────────────────────────────────────────────
-  pinNote(channelId: string, noteId: string): NoteItem | null {
-    const data = channelToolRepo.load(channelId);
+  async pinNote(channelId: string, noteId: string): Promise<NoteItem | null> {
+    const data = await channelToolRepo.load(channelId);
 
     if (!data.notes) return null;
 
@@ -178,30 +178,30 @@ export const channelToolService = {
     if (!note) return null;
 
     note.pinned = !note.pinned;
-    channelToolRepo.save(channelId, data);
+    await channelToolRepo.save(channelId, data);
 
     return note;
   },
 
   // ── Lock mode ─────────────────────────────────────────────────────────────
-  lockTool(channelId: string, userId: string): { locked: boolean; lockedBy: string } {
-    const data = channelToolRepo.load(channelId);
+  async lockTool(channelId: string, userId: string): Promise<{ locked: boolean; lockedBy: string }> {
+    const data = await channelToolRepo.load(channelId);
     (data as any).locked = true;
     (data as any).lockedBy = userId;
-    channelToolRepo.save(channelId, data);
+    await channelToolRepo.save(channelId, data);
     return { locked: true, lockedBy: userId };
   },
 
-  unlockTool(channelId: string): { locked: boolean; lockedBy: string | null } {
-    const data = channelToolRepo.load(channelId);
+  async unlockTool(channelId: string): Promise<{ locked: boolean; lockedBy: string | null }> {
+    const data = await channelToolRepo.load(channelId);
     (data as any).locked = false;
     (data as any).lockedBy = null;
-    channelToolRepo.save(channelId, data);
+    await channelToolRepo.save(channelId, data);
     return { locked: false, lockedBy: null };
   },
 
-  getToolLockStatus(channelId: string): { locked: boolean; lockedBy: string | null } {
-    const data = channelToolRepo.load(channelId);
+  async getToolLockStatus(channelId: string): Promise<{ locked: boolean; lockedBy: string | null }> {
+    const data = await channelToolRepo.load(channelId);
     return { locked: !!(data as any).locked, lockedBy: (data as any).lockedBy || null };
   },
 };

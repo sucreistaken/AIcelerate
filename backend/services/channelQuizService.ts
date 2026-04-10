@@ -3,7 +3,7 @@ import {
   channelToolRepo,
   QuizQuestion,
 } from "../repositories/channelToolRepo";
-import { getModel, stripCodeFences, getTemperature } from "./aiService";
+import { safeGenerate, stripCodeFences, getTemperature } from "./aiService";
 import { SCHEMAS } from "../prompts/schemas";
 import { generateId } from "../utils/idGenerator";
 import { buildToolContext } from "./channelContextBuilder";
@@ -18,7 +18,7 @@ export async function generateQuiz(
   options?: { difficulty?: 'easy' | 'medium' | 'hard'; includeTrueFalse?: boolean },
   lang?: SupportedLang
 ) {
-  const data = channelToolRepo.load(channelId);
+  const data = await channelToolRepo.load(channelId);
   const difficulty = options?.difficulty || 'medium';
   const includeTF = options?.includeTrueFalse ?? true;
 
@@ -66,10 +66,10 @@ ${toolCtx ? `- Questions MUST be based on the provided lecture material
 - Reference learning outcomes in explanations where relevant` : ''}
 - Return ONLY valid JSON array`;
 
-    const result = await getModel().generateContent({
+    const result = await safeGenerate({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: { maxOutputTokens: 3000, temperature: getTemperature("balanced"), responseMimeType: "application/json", responseSchema: SCHEMAS.CHANNEL_QUIZ } as any,
-    });
+    }, { label: "channel_quiz", timeoutMs: 45_000 });
     const text = result.response.text();
     logger.info(`[AI] CHANNEL_QUIZ | ~${Math.ceil(prompt.length / 4)} in, ~${Math.ceil(text.length / 4)} out | max=3000`);
     const parsed = JSON.parse(text);
@@ -90,7 +90,7 @@ ${toolCtx ? `- Questions MUST be based on the provided lecture material
       generatedAt: new Date().toISOString(),
     };
 
-    channelToolRepo.save(channelId, data);
+    await channelToolRepo.save(channelId, data);
     return { data, sourcesSummary: toolCtx?.meta.sourcesSummary || null };
   } catch (err) {
     logger.error("channelToolService.generateQuiz error:", err);
@@ -99,14 +99,14 @@ ${toolCtx ? `- Questions MUST be based on the provided lecture material
 }
 
 // ── Quiz: answer ────────────────────────────────────────────────────────────
-export function answerQuiz(
+export async function answerQuiz(
   channelId: string,
   userId: string,
   nickname: string,
   questionId: string,
   selectedIndex: number
 ) {
-  const data = channelToolRepo.load(channelId);
+  const data = await channelToolRepo.load(channelId);
 
   if (!data.quiz || !data.quiz.questions.length) {
     throw new Error("No quiz available");
@@ -128,7 +128,7 @@ export function answerQuiz(
     data.quiz.scores[userId].correct += 1;
   }
 
-  channelToolRepo.save(channelId, data);
+  await channelToolRepo.save(channelId, data);
 
   return {
     correct,

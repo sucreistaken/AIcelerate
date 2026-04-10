@@ -16,7 +16,7 @@ export interface IUser extends Document {
     sound: boolean;
   };
   friendIds: string[];
-  friendRequests: { from: string; createdAt: Date }[];
+  friendRequests: { from: string; direction: "sent" | "received"; createdAt: Date }[];
   friendCode: string;
   roomIds: string[];
   dmChannelIds: string[];
@@ -43,7 +43,7 @@ const userSchema = new Schema<IUser>(
       sound: { type: Boolean, default: true },
     },
     friendIds: [String],
-    friendRequests: [{ from: String, createdAt: { type: Date, default: Date.now } }],
+    friendRequests: [{ from: String, direction: { type: String, enum: ["sent", "received"], default: "received" }, createdAt: { type: Date, default: Date.now } }],
     friendCode: { type: String, unique: true },
     roomIds: [String],
     dmChannelIds: [String],

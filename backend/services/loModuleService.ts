@@ -1,5 +1,5 @@
 import { logger } from "../utils/logger";
-import { getModel, stripCodeFences, tryParseJSON, getTemperature } from "./aiService";
+import { safeGenerate, stripCodeFences, tryParseJSON, getTemperature } from "./aiService";
 import { LoLink, LoAlignedSegment, LoAlignment } from "../types";
 import { smartTruncate } from "../utils/smartTruncate";
 import { getLangDirective, type SupportedLang } from "../utils/langDirective";
@@ -122,7 +122,6 @@ export async function generateLoAlignmentForLesson(
   lectureText: string, slidesText: string, learningOutcomes: string[],
   lang?: SupportedLang
 ): Promise<LoAlignment> {
-  const model = getModel();
   const baseSegments = segmentTranscript(lectureText);
   if (!baseSegments.length) throw new Error("Transcript is empty; cannot generate alignment.");
   const LOs = (learningOutcomes || []).map((t) => String(t || "").trim()).filter(Boolean);
@@ -160,10 +159,10 @@ ${SEGMENTS_JSON}
 ${SLD || "—"}
 `.trim();
 
-  const result = await model.generateContent({
+  const result = await safeGenerate({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: { maxOutputTokens: 4000, temperature: getTemperature("structured"), responseMimeType: "application/json", responseSchema: SCHEMAS.LO_ALIGNMENT } as any,
-  });
+  }, { label: "lo_alignment", timeoutMs: 60_000 });
   const parsed = JSON.parse(result.response.text());
   if (!parsed?.segments || !Array.isArray(parsed.segments)) throw new Error("LO alignment JSON parse/schema error");
 
@@ -207,10 +206,10 @@ export async function generateLoModules(
     transcript: lesson.transcript, slideText: lesson.slideText || "",
     learningOutcomes: lesson.learningOutcomes!, loAlignment: lesson.loAlignment, plan: lesson.plan, lang,
   });
-  const result = await getModel().generateContent({
+  const result = await safeGenerate({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: { maxOutputTokens: 6000, temperature: getTemperature("balanced"), responseMimeType: "application/json", responseSchema: SCHEMAS.LO_MODULES } as any,
-  });
+  }, { label: "lo_modules", timeoutMs: 60_000 });
   const j = JSON.parse(result.response.text());
   if (!j?.modules || !Array.isArray(j.modules)) {
     throw new AppError(500, "LO modules JSON/schema error", "LLM_PARSE_ERROR");
@@ -223,7 +222,6 @@ export async function generateLoModules(
 }
 
 export async function generateAlignmentOnly(lectureText: string, slidesText: string, lang?: SupportedLang) {
-  const model = getModel();
   const LEC = smartTruncate(lectureText, 18000);
   const SLD = smartTruncate(slidesText, 18000);
 
@@ -255,10 +253,10 @@ ${LEC}
 ${SLD}
 `.trim();
 
-  const result = await model.generateContent({
+  const result = await safeGenerate({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: { maxOutputTokens: 4000, temperature: getTemperature("structured"), responseMimeType: "application/json", responseSchema: SCHEMAS.PLAN_ALIGNMENT } as any,
-  });
+  }, { label: "alignment_only", timeoutMs: 60_000 });
   const j = JSON.parse(result.response.text());
   if (!j) throw new Error("Alignment JSON parse error");
   return j;

@@ -65,7 +65,7 @@ export default function ChannelToolRouter({ channel, serverId, serverName, userI
 
   const handleLink = async (lessonId: string, lessonTitle: string) => {
     try {
-      await channelToolApi.linkLesson(channel.id, serverId, userId, lessonId, lessonTitle);
+      await channelToolApi.linkLesson(channel.id, serverId, lessonId, lessonTitle);
       updateChannelLesson(channel.id, lessonId, lessonTitle);
       const socket = getCollabSocket();
       socket.emit("channel:lesson:linked", { channelId: channel.id, lessonId, lessonTitle });
@@ -77,7 +77,7 @@ export default function ChannelToolRouter({ channel, serverId, serverName, userI
 
   const handleUnlink = async () => {
     try {
-      await channelToolApi.unlinkLesson(channel.id, serverId, userId);
+      await channelToolApi.unlinkLesson(channel.id, serverId);
       updateChannelLesson(channel.id, undefined, undefined);
       setLessonCtx(null);
       setShowLessonPanel(false);

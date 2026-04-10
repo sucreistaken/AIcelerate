@@ -33,7 +33,7 @@ export default function CreateRoomWizard({ onCreated, onCancel }: Props) {
     if (!user || !name.trim()) return;
     setLoading(true);
     try {
-      const room = await createRoom(name.trim(), topic.trim(), user.id, undefined, {
+      const room = await createRoom(name.trim(), topic.trim(), undefined, {
         isPublic,
         templateId: selectedTemplate || undefined,
         tags: tags.split(",").map((t) => t.trim()).filter(Boolean),

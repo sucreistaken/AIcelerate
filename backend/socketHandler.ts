@@ -1,9 +1,10 @@
 import { Server, Socket } from "socket.io";
 import { profileService } from "./services/profileService";
 import { messageService } from "./services/messageService";
-import { serverService } from "./services/serverService";
+import { roomService } from "./services/roomService";
 import { channelService } from "./services/channelService";
 import { checkSocketRateLimit } from "./middleware/rateLimiter";
+import { authService } from "./services/authService";
 
 // Track online users: userId -> Set<socketId>
 const onlineUsers = new Map<string, Set<string>>();
@@ -19,15 +20,23 @@ export function setupCollabNamespace(io: Server) {
     let userId: string | null = null;
 
     // ===== AUTH =====
-    socket.on("auth", async (data: { userId: string }, cb) => {
+    socket.on("auth", async (data: { token?: string }, cb) => {
       try {
-        const profile = await profileService.getByIdOptional(data.userId);
+        if (!data.token) {
+          cb?.({ ok: false, error: "Token required" });
+          return;
+        }
+
+        const decoded = authService.verifyToken(data.token);
+        const resolvedUserId = decoded.userId;
+
+        const profile = await profileService.getByIdOptional(resolvedUserId);
         if (!profile) {
           cb?.({ ok: false, error: "Profile not found" });
           return;
         }
 
-        userId = data.userId;
+        userId = resolvedUserId;
 
         // Track online
         if (!onlineUsers.has(userId)) onlineUsers.set(userId, new Set());
@@ -58,7 +67,7 @@ export function setupCollabNamespace(io: Server) {
     socket.on("server:join", async (data: { serverId: string }, cb) => {
       if (!userId) return cb?.({ ok: false, error: "Not authenticated" });
       try {
-        const server = await serverService.join(data.serverId, userId);
+        const server = await roomService.join(data.serverId, userId);
         socket.join(`server:${server.id}`);
 
         const profile = await profileService.getById(userId);
@@ -84,7 +93,7 @@ export function setupCollabNamespace(io: Server) {
     socket.on("server:leave", async (data: { serverId: string }, cb) => {
       if (!userId) return cb?.({ ok: false, error: "Not authenticated" });
       try {
-        await serverService.leave(data.serverId, userId);
+        await roomService.leave(data.serverId, userId);
         socket.leave(`server:${data.serverId}`);
 
         collab.to(`server:${data.serverId}`).emit("server:member:left", {
@@ -103,7 +112,7 @@ export function setupCollabNamespace(io: Server) {
       if (!userId) return cb?.({ ok: false, error: "Not authenticated" });
       try {
         // Verify user is a member of the server
-        const server = await serverService.getById(data.serverId);
+        const server = await roomService.getById(data.serverId);
         if (!server.memberIds.includes(userId)) {
           return cb?.({ ok: false, error: "Not a member of this server" });
         }
@@ -157,7 +166,7 @@ export function setupCollabNamespace(io: Server) {
 
       try {
         // Verify user is a member of the server
-        const server = await serverService.getById(data.serverId);
+        const server = await roomService.getById(data.serverId);
         if (!server.memberIds.includes(userId)) {
           return cb?.({ ok: false, error: "Not a member of this server" });
         }

@@ -2,7 +2,7 @@
 // Lightweight self-evaluation pass for AI-generated artifacts.
 // Runs a quick validation prompt to score coverage, accuracy, completeness.
 
-import { getModel, getTemperature } from "./aiService";
+import { safeGenerate, getTemperature } from "./aiService";
 import { SCHEMAS } from "../prompts/schemas";
 import { smartTruncate } from "../utils/smartTruncate";
 import { logger } from "../utils/logger";
@@ -49,7 +49,7 @@ export async function scoreArtifact(
     smartTruncate(sourceContext, 2000)
   );
 
-  const result = await getModel().generateContent({
+  const result = await safeGenerate({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: {
       maxOutputTokens: 200,
@@ -57,7 +57,7 @@ export async function scoreArtifact(
       responseMimeType: "application/json",
       responseSchema: SCHEMAS.CONFIDENCE_SCORE,
     } as any,
-  });
+  }, { label: "confidence_score", timeoutMs: 15_000 });
 
   const rawText = result.response.text() || "";
   const parsed = JSON.parse(rawText);

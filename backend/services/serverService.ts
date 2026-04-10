@@ -6,18 +6,20 @@ import { badRequest, notFound, forbidden } from "../middleware/errorHandler";
 import { getServerTemplates, ServerTemplate } from "./serverTemplates";
 export { getServerTemplates } from "./serverTemplates";
 
+import crypto from "crypto";
 import { generateId as _genId } from "../utils/idGenerator";
 const generateId = () => _genId("srv");
 
 function generateInviteCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = crypto.randomBytes(6);
   let code = "";
-  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 6; i++) code += chars[bytes[i] % chars.length];
   return code;
 }
 
 function generateCategoryId(): string {
-  return `cat-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 4)}`;
+  return `cat-${Date.now().toString(36)}-${crypto.randomBytes(2).toString("hex")}`;
 }
 
 export const serverService = {

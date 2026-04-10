@@ -24,7 +24,7 @@ export default function LockToggle({ channelId, userId, locked, lockedBy, isOwne
         onLockChange(res.locked, res.lockedBy);
         getCollabSocket().emit("tool:unlock", { channelId });
       } else {
-        const res = await channelToolApi.lockTool(channelId, userId);
+        const res = await channelToolApi.lockTool(channelId);
         onLockChange(res.locked, res.lockedBy);
         getCollabSocket().emit("tool:lock", { channelId, lockedBy: userId });
       }

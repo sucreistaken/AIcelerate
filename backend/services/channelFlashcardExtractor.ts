@@ -13,7 +13,7 @@ export async function extractFlashcardsFromLesson(channelId: string): Promise<{
   const lesson = getLesson(channel.lessonId);
   if (!lesson) throw new Error("Lesson not found");
 
-  const data = channelToolRepo.load(channelId);
+  const data = await channelToolRepo.load(channelId);
   if (!data.flashcards) data.flashcards = { cards: [] };
 
   const existingFronts = new Set(data.flashcards.cards.map((c) => c.front));
@@ -125,7 +125,7 @@ export async function extractFlashcardsFromLesson(channelId: string): Promise<{
 
   if (newCards.length > 0) {
     data.flashcards.cards.push(...newCards);
-    channelToolRepo.save(channelId, data);
+    await channelToolRepo.save(channelId, data);
   }
 
   return { cards: newCards, summary };

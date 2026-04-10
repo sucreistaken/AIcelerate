@@ -3,7 +3,7 @@ import {
   channelToolRepo,
   FlashcardItem,
 } from "../repositories/channelToolRepo";
-import { getModel, stripCodeFences, getTemperature } from "./aiService";
+import { safeGenerate, stripCodeFences, getTemperature } from "./aiService";
 import { SCHEMAS } from "../prompts/schemas";
 import { channelService } from "./channelService";
 import { getLesson } from "../controllers/lessonControllers";
@@ -13,15 +13,15 @@ import { getLangDirective, type SupportedLang } from "../utils/langDirective";
 export { extractFlashcardsFromLesson } from "./channelFlashcardExtractor";
 
 // ── Flashcards: add manually ────────────────────────────────────────────────
-export function addFlashcard(
+export async function addFlashcard(
   channelId: string,
   front: string,
   back: string,
   topic: string,
   userId: string,
   nickname: string
-): FlashcardItem {
-  const data = channelToolRepo.load(channelId);
+): Promise<FlashcardItem> {
+  const data = await channelToolRepo.load(channelId);
 
   if (!data.flashcards) {
     data.flashcards = { cards: [] };
@@ -40,7 +40,7 @@ export function addFlashcard(
   };
 
   data.flashcards.cards.push(card);
-  channelToolRepo.save(channelId, data);
+  await channelToolRepo.save(channelId, data);
 
   return card;
 }
@@ -53,7 +53,7 @@ export async function generateFlashcards(
   count: number = 8,
   lang?: SupportedLang
 ): Promise<{ cards: FlashcardItem[]; sourcesSummary: string | null }> {
-  const data = channelToolRepo.load(channelId);
+  const data = await channelToolRepo.load(channelId);
 
   if (!data.flashcards) {
     data.flashcards = { cards: [] };
@@ -86,10 +86,10 @@ ${toolCtx ? `- Flashcards MUST be based on the provided lecture material
 - Include cards that test understanding of common traps and errors` : ''}
 - Return ONLY valid JSON array`;
 
-    const result = await getModel().generateContent({
+    const result = await safeGenerate({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: { maxOutputTokens: 2000, temperature: getTemperature("balanced"), responseMimeType: "application/json", responseSchema: SCHEMAS.CHANNEL_FLASHCARDS } as any,
-    });
+    }, { label: "channel_flashcards", timeoutMs: 30_000 });
     const text = result.response.text();
     logger.info(`[AI] CHANNEL_FLASHCARDS | ~${Math.ceil(prompt.length / 4)} in, ~${Math.ceil(text.length / 4)} out | max=2000`);
     const parsed = JSON.parse(text) as Array<{
@@ -113,7 +113,7 @@ ${toolCtx ? `- Flashcards MUST be based on the provided lecture material
     }));
 
     data.flashcards.cards.push(...newCards);
-    channelToolRepo.save(channelId, data);
+    await channelToolRepo.save(channelId, data);
 
     return { cards: newCards, sourcesSummary: toolCtx?.meta.sourcesSummary || null };
   } catch (err) {
@@ -123,13 +123,13 @@ ${toolCtx ? `- Flashcards MUST be based on the provided lecture material
 }
 
 // ── Flashcards: SM-2 review ─────────────────────────────────────────────────
-export function reviewFlashcard(
+export async function reviewFlashcard(
   channelId: string,
   cardId: string,
   userId: string,
   quality: number // 0-5 SM-2 quality rating
-): FlashcardItem | null {
-  const data = channelToolRepo.load(channelId);
+): Promise<FlashcardItem | null> {
+  const data = await channelToolRepo.load(channelId);
   if (!data.flashcards) return null;
 
   const card = data.flashcards.cards.find(c => c.id === cardId);
@@ -179,6 +179,6 @@ export function reviewFlashcard(
     lastReview: now.toISOString(),
   };
 
-  channelToolRepo.save(channelId, data);
+  await channelToolRepo.save(channelId, data);
   return card;
 }

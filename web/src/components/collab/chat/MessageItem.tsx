@@ -84,7 +84,7 @@ export default function MessageItem({ message, grouped, channelId }: Props) {
             <button
               key={r.emoji}
               className={`sh-reaction ${r.userIds.includes(profile?.id || "") ? "sh-reaction--active" : ""}`}
-              onClick={() => profile && reactToMessage(channelId, message.id, r.emoji, profile.id)}
+              onClick={() => profile && reactToMessage(channelId, message.id, r.emoji)}
             >
               <span>{r.emoji}</span>
               <span className="sh-reaction__count">{r.userIds.length}</span>
@@ -109,7 +109,7 @@ export default function MessageItem({ message, grouped, channelId }: Props) {
           {isOwnMessage && (
             <button
               className="sh-msg__action-btn sh-msg__action-btn--danger"
-              onClick={() => profile && deleteMessage(channelId, message.id, profile.id)}
+              onClick={() => profile && deleteMessage(channelId, message.id)}
               title="Sil"
             >
               x
@@ -126,7 +126,7 @@ export default function MessageItem({ message, grouped, channelId }: Props) {
               key={emoji}
               className="sh-reaction-picker__btn"
               onClick={() => {
-                if (profile) reactToMessage(channelId, message.id, emoji, profile.id);
+                if (profile) reactToMessage(channelId, message.id, emoji);
                 setShowReactionPicker(false);
               }}
             >

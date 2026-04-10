@@ -7,12 +7,11 @@ interface Props {
   channelId: string;
   topic: string;
   serverName: string;
-  userId: string;
   nickname: string;
   lessonContext?: LessonContextInfo | null;
 }
 
-export default function ChannelDeepDive({ channelId, topic, serverName, userId, nickname, lessonContext }: Props) {
+export default function ChannelDeepDive({ channelId, topic, serverName, nickname, lessonContext }: Props) {
   const {
     messages,
     input,
@@ -26,7 +25,7 @@ export default function ChannelDeepDive({ channelId, topic, serverName, userId, 
     handleQuickAction,
     handleSaveAsNote,
     handleKeyDown,
-  } = useDeepDive(channelId, topic, serverName, userId, nickname, lessonContext);
+  } = useDeepDive(channelId, topic, serverName, nickname, lessonContext);
 
   if (messages.length === 0 && !loading) {
     return (

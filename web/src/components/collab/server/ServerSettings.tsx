@@ -23,7 +23,7 @@ export default function ServerSettings({ open, onClose }: Props) {
   const isOwner = server.ownerId === profile.id;
 
   const handleLeave = async () => {
-    await leaveServer(server.id, profile.id);
+    await leaveServer(server.id);
     onClose();
   };
 
@@ -32,7 +32,7 @@ export default function ServerSettings({ open, onClose }: Props) {
       setConfirmDelete(true);
       return;
     }
-    await deleteServer(server.id, profile.id);
+    await deleteServer(server.id);
     onClose();
   };
 

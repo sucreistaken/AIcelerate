@@ -1,7 +1,6 @@
-import fs from "fs";
-import path from "path";
+import { ToolData } from "../models/ToolData";
 
-// ── Interfaces ──────────────────────────────────────────────────────────────
+// ── Interfaces (preserved for backward compat) ────────────────────────────────
 
 export interface QuizQuestion {
   id: string;
@@ -30,7 +29,6 @@ export interface FlashcardItem {
   createdAt: string;
   votes: Array<{ userId: string; vote: "up" | "down" }>;
   source: "manual" | "ai-generated" | "lesson-emphasis" | "lesson-cheatsheet" | "lesson-miniQuiz" | "lesson-loModule";
-  // SM-2 per-user review state
   sm2?: Record<string, {
     easeFactor: number;
     interval: number;
@@ -108,49 +106,43 @@ export interface ChannelToolData {
   lockedBy?: string;
 }
 
-// ── Repository ──────────────────────────────────────────────────────────────
-
-const DATA_DIR = path.join(__dirname, "../data/channel-tools");
+// ── MongoDB-backed Repository ──────────────────────────────────────────────────
 
 class ChannelToolRepository {
-  constructor() {
-    this.ensureDir();
-  }
-
-  ensureDir(): void {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-  }
-
-  private filePath(channelId: string): string {
-    return path.join(DATA_DIR, `${channelId}.json`);
-  }
-
   private defaultData(channelId: string): ChannelToolData {
+    return { channelId, toolType: "" };
+  }
+
+  async load(channelId: string): Promise<ChannelToolData> {
+    const doc = await ToolData.findOne({ channelId }).lean();
+    if (!doc || !doc.data) return this.defaultData(channelId);
+
     return {
       channelId,
-      toolType: "",
-    };
+      toolType: doc.toolType || "",
+      ...doc.data,
+      locked: doc.locked,
+      lockedBy: doc.lockedBy,
+    } as ChannelToolData;
   }
 
-  load(channelId: string): ChannelToolData {
-    const fp = this.filePath(channelId);
-    try {
-      if (!fs.existsSync(fp)) {
-        return this.defaultData(channelId);
-      }
-      const raw = fs.readFileSync(fp, "utf-8");
-      return JSON.parse(raw) as ChannelToolData;
-    } catch {
-      return this.defaultData(channelId);
-    }
-  }
+  async save(channelId: string, data: ChannelToolData): Promise<void> {
+    const { channelId: _cid, toolType, locked, lockedBy, ...rest } = data;
 
-  save(channelId: string, data: ChannelToolData): void {
-    this.ensureDir();
-    const fp = this.filePath(channelId);
-    fs.writeFileSync(fp, JSON.stringify(data, null, 2), "utf-8");
+    await ToolData.findOneAndUpdate(
+      { channelId },
+      {
+        $set: {
+          channelId,
+          toolType: toolType || "",
+          data: rest,
+          locked: locked ?? false,
+          lockedBy: lockedBy ?? null,
+        },
+        $inc: { version: 1 },
+      },
+      { upsert: true }
+    );
   }
 }
 

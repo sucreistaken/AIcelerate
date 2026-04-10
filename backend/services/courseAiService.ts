@@ -1,5 +1,5 @@
 import { logger } from "../utils/logger";
-import { getModel, getTemperature } from "./aiService";
+import { getModel, safeGenerate, getTemperature } from "./aiService";
 import { getCourse, getCourseProgress } from "../controllers/courseController";
 import { assembleCourseWideContext } from "../controllers/contextAssembler";
 import { SCHEMAS } from "../prompts/schemas";
@@ -73,7 +73,7 @@ ${ki ? `Themes: ${ki.overview.courseThemes.join(', ')}` : ''}
 
 Return JSON: { "days": [{ "day": "Monday", "slots": [{ "time": "Morning", "activity": "..." }] }], "tips": ["..."] }`;
 
-  const result = await getModel().generateContent({
+  const result = await safeGenerate({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: {
       maxOutputTokens: 2000,
@@ -81,7 +81,7 @@ Return JSON: { "days": [{ "day": "Monday", "slots": [{ "time": "Morning", "activ
       responseMimeType: "application/json",
       responseSchema: SCHEMAS.STUDY_SCHEDULE,
     } as any,
-  });
+  }, { label: "study_schedule", timeoutMs: 30_000 });
 
   const text = result.response.text();
   logger.info(`[AI] STUDY_SCHEDULE | courseId=${courseId} | ~${Math.ceil(prompt.length / 4)} in, ~${Math.ceil(text.length / 4)} out`);

@@ -126,7 +126,6 @@ export function useCreateServer(onClose: () => void) {
       const server = await createServer(
         name.trim(),
         description.trim(),
-        profile.id,
         color,
         {
           tags,
@@ -149,7 +148,7 @@ export function useCreateServer(onClose: () => void) {
     setLoading(true);
     setError("");
     try {
-      const server = await joinByInvite(inviteCode.trim(), profile.id);
+      const server = await joinByInvite(inviteCode.trim());
       await selectServer(server.id);
       handleClose();
     } catch (err: any) {

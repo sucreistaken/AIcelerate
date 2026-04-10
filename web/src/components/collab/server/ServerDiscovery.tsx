@@ -54,7 +54,7 @@ export default function ServerDiscovery({ onCreateServer }: Props) {
     if (!profile) return;
     setJoiningId(server.id);
     try {
-      await joinPublicServer(server.id, profile.id);
+      await joinPublicServer(server.id);
       await selectServer(server.id);
       toast.success(`${server.name} çalışma odasına katıldınız!`);
     } catch (err: any) {

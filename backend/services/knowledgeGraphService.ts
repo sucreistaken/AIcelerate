@@ -1,7 +1,7 @@
 // services/knowledgeGraphService.ts
 // Extracts concept relationships from course lessons to build a knowledge graph.
 
-import { getModel, getTemperature } from "./aiService";
+import { safeGenerate, getTemperature } from "./aiService";
 import { SCHEMAS } from "../prompts/schemas";
 import { smartTruncate } from "../utils/smartTruncate";
 import { logger } from "../utils/logger";
@@ -66,7 +66,7 @@ export async function extractGraphFromLessons(courseId: string): Promise<Knowled
 
   const prompt = buildGraphPrompt(smartTruncate(conceptsByLesson.join("\n\n"), 6000));
 
-  const result = await getModel().generateContent({
+  const result = await safeGenerate({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: {
       maxOutputTokens: 4000,
@@ -74,7 +74,7 @@ export async function extractGraphFromLessons(courseId: string): Promise<Knowled
       responseMimeType: "application/json",
       responseSchema: SCHEMAS.KNOWLEDGE_GRAPH,
     } as any,
-  });
+  }, { label: "knowledge_graph", timeoutMs: 60_000 });
 
   const rawText = result.response.text() || "";
   const parsed = JSON.parse(rawText);

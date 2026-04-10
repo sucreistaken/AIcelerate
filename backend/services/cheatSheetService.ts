@@ -1,5 +1,5 @@
 import { logger } from "../utils/logger";
-import { getModel, stripCodeFences, tryParseJSON, getTemperature } from "./aiService";
+import { safeGenerate, stripCodeFences, tryParseJSON, getTemperature } from "./aiService";
 import { getLesson, upsertLesson } from "../controllers/lessonControllers";
 import { assembleCourseContext } from "../controllers/contextAssembler";
 import { buildCondensedContext } from "./loModuleService";
@@ -98,10 +98,10 @@ export async function generateCheatSheet(
     emphases: lesson.plan?.emphases || lesson.professorEmphases || [], language,
   });
 
-  const result = await getModel().generateContent({
+  const result = await safeGenerate({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: { maxOutputTokens: 3000, temperature: getTemperature("balanced"), responseMimeType: "application/json", responseSchema: SCHEMAS.CHEAT_SHEET } as any,
-  });
+  }, { label: "cheat_sheet", timeoutMs: 45_000 });
   const j = JSON.parse(result.response.text());
   if (!j?.sections || !Array.isArray(j.sections)) {
     throw new AppError(500, "Cheat sheet JSON/schema error", "LLM_PARSE_ERROR");

@@ -2,10 +2,10 @@ import { Request, Response, NextFunction } from "express";
 
 /**
  * Wraps an async route handler so thrown errors are forwarded to Express error middleware.
- * Eliminates the need for try-catch in every route.
+ * Supports generic request types (e.g., AuthRequest) for type-safe handlers.
  */
-export const asyncHandler = (
-  fn: (req: Request, res: Response, next: NextFunction) => Promise<any>
+export const asyncHandler = <Req extends Request = Request>(
+  fn: (req: Req, res: Response, next: NextFunction) => Promise<any>
 ) => (req: Request, res: Response, next: NextFunction) => {
-  Promise.resolve(fn(req, res, next)).catch(next);
+  Promise.resolve(fn(req as Req, res, next)).catch(next);
 };

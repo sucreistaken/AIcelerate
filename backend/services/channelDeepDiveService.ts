@@ -3,7 +3,7 @@ import {
   channelToolRepo,
   DeepDiveMessage,
 } from "../repositories/channelToolRepo";
-import { getModel, getTemperature } from "./aiService";
+import { safeGenerate, getTemperature } from "./aiService";
 import { channelService } from "./channelService";
 import { getLesson } from "../controllers/lessonControllers";
 import { generateId } from "../utils/idGenerator";
@@ -20,7 +20,7 @@ export async function deepDiveChat(
   serverName: string,
   lang?: SupportedLang
 ): Promise<{ userMessage: DeepDiveMessage; aiMessage: DeepDiveMessage }> {
-  const data = channelToolRepo.load(channelId);
+  const data = await channelToolRepo.load(channelId);
 
   if (!data.deepDive) {
     data.deepDive = { messages: [] };
@@ -74,10 +74,10 @@ export async function deepDiveChat(
 
     const prompt = `${getLangDirective(lang)}\n\nYou are a study assistant for '${serverName}' helping with '${topic}'.${lessonBlock} Answer clearly and educationally. Previous conversation: ${context}\n\nStudent ${nickname} asks: ${text}`;
 
-    const result = await getModel().generateContent({
+    const result = await safeGenerate({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: { maxOutputTokens: 2500, temperature: getTemperature("creative") },
-    });
+    }, { label: "channel_deep_dive", timeoutMs: 45_000 });
     const aiText = result.response.text();
     logger.info(`[AI] CHANNEL_DEEP_DIVE | ~${Math.ceil(prompt.length / 4)} in, ~${Math.ceil(aiText.length / 4)} out | max=2500`);
 
@@ -91,7 +91,7 @@ export async function deepDiveChat(
     };
     data.deepDive.messages.push(aiMessage);
 
-    channelToolRepo.save(channelId, data);
+    await channelToolRepo.save(channelId, data);
 
     return { userMessage, aiMessage };
   } catch (err) {

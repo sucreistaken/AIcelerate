@@ -58,7 +58,7 @@ export function useChannelQuiz(
 
     try {
       const { result: answerResult } = await channelToolApi.answerQuiz(
-        channelId, userId, nickname, question.id, optIndex
+        channelId, nickname, question.id, optIndex
       );
       setResult({
         correct: answerResult.correct,

@@ -31,11 +31,6 @@ async function getCachedRole(roleName: string): Promise<Role | null> {
  */
 export function requirePermission(...permissions: Permission[]) {
   return async (req: AuthRequest, _res: Response, next: NextFunction) => {
-    // DEV BYPASS — skip permission checks in development
-    if (process.env.NODE_ENV !== "production") {
-      return next();
-    }
-
     try {
       const userId = req.user?.userId;
       if (!userId) {

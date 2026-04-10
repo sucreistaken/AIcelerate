@@ -29,7 +29,7 @@ export default function ChannelSprint({ channelId, topic, userId, nickname }: Pr
     handleResume,
     handleReset,
     handleStatusChange,
-  } = useChannelSprint(channelId, userId, nickname);
+  } = useChannelSprint(channelId, nickname);
 
   if (!sprint || sprint.phase === "idle") {
     return (

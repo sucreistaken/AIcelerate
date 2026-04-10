@@ -28,7 +28,8 @@ export function rateLimiter(
   windowMs: number
 ) {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const key = (req.headers["x-user-id"] as string) || req.ip || "unknown";
+    // Prefer authenticated userId (tamper-proof), fall back to IP
+    const key = (req as any).user?.userId || req.ip || "unknown";
     const store = getStore(name);
     const now = Date.now();
     const entry = store.get(key);

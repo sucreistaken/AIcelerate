@@ -6,7 +6,7 @@ import readline from "readline";
 import { EventEmitter } from "events";
 import { env } from "../config/env";
 import { getLesson, upsertLesson } from "../controllers/lessonControllers";
-import { getModel } from "./aiService";
+import { safeGenerate } from "./aiService";
 import { uid } from "../utils/idGenerator";
 import { AppError } from "../middleware/errorHandler";
 
@@ -159,10 +159,10 @@ async function analyzeImage(imgPath: string): Promise<string> {
 > - Content summary: {1-2 sentences}
 > - Academic value: {high|medium|low|none}`;
 
-  const aiResult = await getModel().generateContent({
+  const aiResult = await safeGenerate({
     contents: [{ role: "user", parts: [{ text: prompt }, { inlineData: { data, mimeType } }] }],
     generationConfig: { maxOutputTokens: 500 },
-  });
+  }, { label: "slide_image_analyze", timeoutMs: 15_000 });
   return aiResult.response.text().trim();
 }
 
@@ -173,10 +173,10 @@ Preserve formatting: bullet points (●), code blocks, terminal commands.
 For terminal/code screenshots, reproduce the exact text including prompts ($ or >).
 Output the text only, no commentary.`;
 
-  const aiResult = await getModel().generateContent({
+  const aiResult = await safeGenerate({
     contents: [{ role: "user", parts: [{ text: prompt }, { inlineData: { data, mimeType } }] }],
     generationConfig: { maxOutputTokens: 2000 },
-  });
+  }, { label: "slide_image_ocr", timeoutMs: 30_000 });
   return aiResult.response.text().trim();
 }
 

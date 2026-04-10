@@ -1,4 +1,5 @@
 import { API_BASE } from "../config";
+import { fetchWithAuth } from "./fetchWithAuth";
 import type {
   UserProfile,
   StudyServer,
@@ -9,21 +10,7 @@ import type {
 } from "../types";
 
 const BASE = `${API_BASE}/api/collab`;
-
-async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const token = localStorage.getItem("lc_token");
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(url, {
-    headers,
-    ...options,
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || res.statusText);
-  }
-  return res.json();
-}
+const request = fetchWithAuth;
 
 // ===== Profiles =====
 export const profilesApi = {
@@ -86,7 +73,7 @@ export const profilesApi = {
 
 // ===== Servers =====
 export const serversApi = {
-  create(name: string, description: string, ownerId: string, iconColor?: string, options?: {
+  create(name: string, description: string, iconColor?: string, options?: {
     tags?: string[];
     university?: string;
     isPublic?: boolean;
@@ -94,7 +81,7 @@ export const serversApi = {
   }) {
     return request<StudyServer>(`${BASE}/servers`, {
       method: "POST",
-      body: JSON.stringify({ name, description, ownerId, iconColor, ...options }),
+      body: JSON.stringify({ name, description, iconColor, ...options }),
     });
   },
 
@@ -106,8 +93,8 @@ export const serversApi = {
     return request<StudyServer>(`${BASE}/servers/invite/${code}`);
   },
 
-  getUserServers(userId: string) {
-    return request<StudyServer[]>(`${BASE}/servers/user/${userId}`);
+  getUserServers() {
+    return request<StudyServer[]>(`${BASE}/servers/user/me`);
   },
 
   discover(search?: string, tags?: string[]) {
@@ -121,59 +108,55 @@ export const serversApi = {
     return request<ServerTemplate[]>(`${BASE}/servers/templates`);
   },
 
-  update(id: string, userId: string, updates: Partial<Pick<StudyServer, "name" | "description" | "iconColor" | "settings" | "tags" | "university">>) {
+  update(id: string, updates: Partial<Pick<StudyServer, "name" | "description" | "iconColor" | "settings" | "tags" | "university">>) {
     return request<StudyServer>(`${BASE}/servers/${id}`, {
       method: "PATCH",
-      body: JSON.stringify({ userId, ...updates }),
+      body: JSON.stringify(updates),
     });
   },
 
-  join(id: string, userId: string) {
+  join(id: string) {
     return request<StudyServer>(`${BASE}/servers/${id}/join`, {
       method: "POST",
-      body: JSON.stringify({ userId }),
     });
   },
 
-  joinByInvite(inviteCode: string, userId: string) {
+  joinByInvite(inviteCode: string) {
     return request<StudyServer>(`${BASE}/servers/join-invite`, {
       method: "POST",
-      body: JSON.stringify({ inviteCode, userId }),
+      body: JSON.stringify({ inviteCode }),
     });
   },
 
-  leave(id: string, userId: string) {
+  leave(id: string) {
     return request(`${BASE}/servers/${id}/leave`, {
       method: "POST",
-      body: JSON.stringify({ userId }),
     });
   },
 
-  kick(id: string, requesterId: string, targetId: string) {
+  kick(id: string, targetId: string) {
     return request(`${BASE}/servers/${id}/kick`, {
       method: "POST",
-      body: JSON.stringify({ requesterId, targetId }),
+      body: JSON.stringify({ targetId }),
     });
   },
 
-  delete(id: string, userId: string) {
+  delete(id: string) {
     return request(`${BASE}/servers/${id}`, {
       method: "DELETE",
-      body: JSON.stringify({ userId }),
     });
   },
 
-  addCategory(id: string, userId: string, name: string) {
+  addCategory(id: string, name: string) {
     return request<StudyServer>(`${BASE}/servers/${id}/categories`, {
       method: "POST",
-      body: JSON.stringify({ userId, name }),
+      body: JSON.stringify({ name }),
     });
   },
 
-  regenerateInvite(id: string, userId: string) {
+  regenerateInvite(id: string) {
     return request<{ inviteCode: string }>(`${BASE}/servers/${id}/regenerate-invite`, {
       method: "POST",
-      body: JSON.stringify({ userId }),
     });
   },
 
@@ -185,7 +168,6 @@ export const serversApi = {
 // ===== Channels =====
 export const channelsApi = {
   create(serverId: string, data: {
-    userId: string;
     categoryId: string;
     name: string;
     type: Channel["type"];
@@ -207,17 +189,16 @@ export const channelsApi = {
     return request<Channel>(`${BASE}/servers/${serverId}/channels/${channelId}`);
   },
 
-  update(serverId: string, channelId: string, userId: string, updates: Partial<Pick<Channel, "name" | "lessonId" | "lessonTitle">>) {
+  update(serverId: string, channelId: string, updates: Partial<Pick<Channel, "name" | "lessonId" | "lessonTitle">>) {
     return request<Channel>(`${BASE}/servers/${serverId}/channels/${channelId}`, {
       method: "PATCH",
-      body: JSON.stringify({ userId, ...updates }),
+      body: JSON.stringify(updates),
     });
   },
 
-  delete(serverId: string, channelId: string, userId: string) {
+  delete(serverId: string, channelId: string) {
     return request(`${BASE}/servers/${serverId}/channels/${channelId}`, {
       method: "DELETE",
-      body: JSON.stringify({ userId }),
     });
   },
 };
@@ -226,7 +207,6 @@ export const channelsApi = {
 export const messagesApi = {
   send(channelId: string, data: {
     serverId: string;
-    authorId: string;
     content: string;
     type?: ChannelMessage["type"];
     threadId?: string;
@@ -247,24 +227,23 @@ export const messagesApi = {
     return request<ChannelMessage[]>(`${BASE}/channels/${channelId}/threads/${threadId}`);
   },
 
-  edit(channelId: string, messageId: string, userId: string, content: string) {
+  edit(channelId: string, messageId: string, content: string) {
     return request<ChannelMessage>(`${BASE}/channels/${channelId}/messages/${messageId}`, {
       method: "PATCH",
-      body: JSON.stringify({ userId, content }),
+      body: JSON.stringify({ content }),
     });
   },
 
-  delete(channelId: string, messageId: string, userId: string) {
+  delete(channelId: string, messageId: string) {
     return request(`${BASE}/channels/${channelId}/messages/${messageId}`, {
       method: "DELETE",
-      body: JSON.stringify({ userId }),
     });
   },
 
-  react(channelId: string, messageId: string, emoji: string, userId: string) {
+  react(channelId: string, messageId: string, emoji: string) {
     return request<ChannelMessage>(`${BASE}/channels/${channelId}/messages/${messageId}/react`, {
       method: "POST",
-      body: JSON.stringify({ emoji, userId }),
+      body: JSON.stringify({ emoji }),
     });
   },
 
@@ -284,10 +263,10 @@ export const lobbyApi = {
     return request<ChannelMessage[]>(`${BASE}/lobby/messages?${params}`);
   },
 
-  send(authorId: string, content: string) {
+  send(content: string) {
     return request<ChannelMessage>(`${BASE}/lobby/messages`, {
       method: "POST",
-      body: JSON.stringify({ authorId, content }),
+      body: JSON.stringify({ content }),
     });
   },
 };

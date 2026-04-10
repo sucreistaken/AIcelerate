@@ -10,12 +10,11 @@ interface Props {
   channelId: string;
   topic: string;
   serverName: string;
-  userId: string;
   nickname: string;
   lessonContext?: LessonContextInfo | null;
 }
 
-export default function ChannelMindMap({ channelId, topic, serverName, userId, nickname, lessonContext }: Props) {
+export default function ChannelMindMap({ channelId, topic, serverName, nickname, lessonContext }: Props) {
   // Zustand selectors - derive state inline, never call methods in selectors
   const mermaidCode = useChannelToolStore(
     (s) => s.dataByChannel[channelId]?.mindMap?.mermaidCode ?? ""

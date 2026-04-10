@@ -23,7 +23,6 @@ export function useDeepDive(
   channelId: string,
   topic: string,
   serverName: string,
-  userId: string,
   nickname: string,
   lessonContext?: LessonContextInfo | null
 ) {
@@ -69,7 +68,7 @@ export function useDeepDive(
 
     try {
       const { userMessage, aiMessage } = await channelToolApi.deepDiveChat(
-        channelId, messageText, userId, nickname, topic, serverName
+        channelId, messageText, nickname, topic, serverName
       );
       addDeepDiveMessages(channelId, [userMessage, aiMessage]);
       getCollabSocket().emit("tool:deepdive:msg", { channelId, userMessage, aiMessage });
@@ -89,7 +88,7 @@ export function useDeepDive(
       const title = `Deep Dive: ${topic}`;
       const content = msg.text;
       const { note } = await channelToolApi.addNote(
-        channelId, title, content, "summary", userId, nickname
+        channelId, title, content, "summary", nickname
       );
       addNoteToStore(channelId, note);
       getCollabSocket().emit("tool:notes:add", { channelId, note });

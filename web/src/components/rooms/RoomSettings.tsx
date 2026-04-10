@@ -28,7 +28,7 @@ export default function RoomSettings({ room, onClose }: Props) {
 
   const handleRegenerate = async () => {
     if (!user) return;
-    const res = await roomsApi.regenerateInvite(room.id, user.id);
+    const res = await roomsApi.regenerateInvite(room.id);
     setInviteCode(res.inviteCode);
   };
 
@@ -57,7 +57,7 @@ export default function RoomSettings({ room, onClose }: Props) {
         <div className="sh-room-settings__actions">
           <button
             className="sh-room-settings__btn sh-room-settings__btn--danger"
-            onClick={() => { if (user) leaveRoom(room.id, user.id); onClose(); }}
+            onClick={() => { if (user) leaveRoom(room.id); onClose(); }}
           >
             Leave Room
           </button>
@@ -65,7 +65,7 @@ export default function RoomSettings({ room, onClose }: Props) {
             <>
               <button
                 className="sh-room-settings__btn sh-room-settings__btn--danger"
-                onClick={() => { if (user) archiveRoom(room.id, user.id); onClose(); }}
+                onClick={() => { if (user) archiveRoom(room.id); onClose(); }}
               >
                 Archive Room
               </button>
@@ -81,7 +81,7 @@ export default function RoomSettings({ room, onClose }: Props) {
       </div>
       <ConfirmModal
         isOpen={showDeleteConfirm}
-        onConfirm={() => { setShowDeleteConfirm(false); if (user) { deleteRoom(room.id, user.id); onClose(); } }}
+        onConfirm={() => { setShowDeleteConfirm(false); if (user) { deleteRoom(room.id); onClose(); } }}
         onCancel={() => setShowDeleteConfirm(false)}
         title="Delete Room"
         message="Delete this room permanently? This action cannot be undone."

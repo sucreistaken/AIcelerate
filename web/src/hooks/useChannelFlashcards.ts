@@ -104,7 +104,6 @@ export function useChannelFlashcards({
         front.trim(),
         back.trim(),
         cardTopic.trim() || topic,
-        userId,
         nickname
       );
       addFlashcardToStore(channelId, card);
@@ -160,7 +159,6 @@ export function useChannelFlashcards({
       const { card: updatedCard } = await channelToolApi.reviewFlashcard(
         channelId,
         currentCard.id,
-        userId,
         quality
       );
       const store = useChannelToolStore.getState();

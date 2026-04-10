@@ -3,7 +3,7 @@ import { logger } from "../utils/logger";
 // Generates and caches a compact lesson digest to replace full transcript+slides in AI calls.
 // Typical digest: ~4,200 chars (~1,050 tokens) vs full context: ~36,000 chars (~9,000 tokens)
 
-import { getModel, stripCodeFences, tryParseJSON, getTemperature } from "./aiService";
+import { safeGenerate, stripCodeFences, tryParseJSON, getTemperature } from "./aiService";
 import { getLesson, upsertLesson } from "../controllers/lessonControllers";
 import { smartTruncate } from "../utils/smartTruncate";
 import { SCHEMAS } from "../prompts/schemas";
@@ -64,7 +64,7 @@ Return ONLY valid JSON:
 }`;
 
   try {
-    const result = await getModel().generateContent({
+    const result = await safeGenerate({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: {
         maxOutputTokens: 2500,
@@ -72,7 +72,7 @@ Return ONLY valid JSON:
         responseMimeType: "application/json",
         responseSchema: SCHEMAS.LESSON_DIGEST,
       } as any,
-    });
+    }, { label: "lesson_digest", timeoutMs: 45_000 });
 
     const raw = (result.response.text() || "").trim();
     const parsed = tryParseJSON(raw) || tryParseJSON(stripCodeFences(raw));

@@ -17,17 +17,17 @@ interface ServerState {
   error: string | null;
 
   // Server actions
-  loadServers: (userId: string) => Promise<void>;
-  createServer: (name: string, description: string, ownerId: string, iconColor?: string, options?: {
+  loadServers: () => Promise<void>;
+  createServer: (name: string, description: string, iconColor?: string, options?: {
     tags?: string[];
     university?: string;
     isPublic?: boolean;
     templateId?: string;
   }) => Promise<StudyServer>;
-  joinByInvite: (inviteCode: string, userId: string) => Promise<StudyServer>;
-  joinPublicServer: (serverId: string, userId: string) => Promise<StudyServer>;
-  leaveServer: (serverId: string, userId: string) => Promise<void>;
-  deleteServer: (serverId: string, userId: string) => Promise<void>;
+  joinByInvite: (inviteCode: string) => Promise<StudyServer>;
+  joinPublicServer: (serverId: string) => Promise<StudyServer>;
+  leaveServer: (serverId: string) => Promise<void>;
+  deleteServer: (serverId: string) => Promise<void>;
   selectServer: (serverId: string) => Promise<void>;
   deselectServer: () => void;
 
@@ -36,7 +36,7 @@ interface ServerState {
   createChannel: (serverId: string, data: Parameters<typeof channelsApi.create>[1]) => Promise<Channel>;
   selectChannel: (channelId: string) => void;
   selectChatChannel: (channelId: string | null) => void;
-  deleteChannel: (serverId: string, channelId: string, userId: string) => Promise<void>;
+  deleteChannel: (serverId: string, channelId: string) => Promise<void>;
 
   // Member actions
   loadMembers: (serverId: string) => Promise<void>;
@@ -65,20 +65,20 @@ export const useServerStore = create<ServerState>((set, get) => ({
   error: null,
   _listenersAttached: false,
 
-  async loadServers(userId) {
+  async loadServers() {
     set({ loading: true, error: null });
     try {
-      const servers = await serversApi.getUserServers(userId);
+      const servers = await serversApi.getUserServers();
       set({ servers, loading: false });
     } catch (err: any) {
       set({ error: err.message, loading: false });
     }
   },
 
-  async createServer(name, description, ownerId, iconColor, options) {
+  async createServer(name, description, iconColor, options) {
     set({ loading: true, error: null });
     try {
-      const server = await serversApi.create(name, description, ownerId, iconColor, options);
+      const server = await serversApi.create(name, description, iconColor, options);
       set((s) => ({ servers: [...s.servers, server], loading: false }));
 
       // Join server room via socket
@@ -92,10 +92,10 @@ export const useServerStore = create<ServerState>((set, get) => ({
     }
   },
 
-  async joinByInvite(inviteCode, userId) {
+  async joinByInvite(inviteCode) {
     set({ loading: true, error: null });
     try {
-      const server = await serversApi.joinByInvite(inviteCode, userId);
+      const server = await serversApi.joinByInvite(inviteCode);
       set((s) => {
         const exists = s.servers.some((srv) => srv.id === server.id);
         return {
@@ -114,10 +114,10 @@ export const useServerStore = create<ServerState>((set, get) => ({
     }
   },
 
-  async joinPublicServer(serverId, userId) {
+  async joinPublicServer(serverId) {
     set({ loading: true, error: null });
     try {
-      const server = await serversApi.join(serverId, userId);
+      const server = await serversApi.join(serverId);
       set((s) => {
         const exists = s.servers.some((srv) => srv.id === server.id);
         return {
@@ -140,9 +140,9 @@ export const useServerStore = create<ServerState>((set, get) => ({
     set({ activeServerId: null, activeChannelId: null, activeChatChannelId: null, channels: [], members: [] });
   },
 
-  async leaveServer(serverId, userId) {
+  async leaveServer(serverId) {
     try {
-      await serversApi.leave(serverId, userId);
+      await serversApi.leave(serverId);
       const socket = getCollabSocket();
       socket.emit("server:leave", { serverId });
 
@@ -158,9 +158,9 @@ export const useServerStore = create<ServerState>((set, get) => ({
     }
   },
 
-  async deleteServer(serverId, userId) {
+  async deleteServer(serverId) {
     try {
-      await serversApi.delete(serverId, userId);
+      await serversApi.delete(serverId);
       set((s) => ({
         servers: s.servers.filter((srv) => srv.id !== serverId),
         activeServerId: s.activeServerId === serverId ? null : s.activeServerId,
@@ -236,9 +236,9 @@ export const useServerStore = create<ServerState>((set, get) => ({
     set({ activeChatChannelId: channelId });
   },
 
-  async deleteChannel(serverId, channelId, userId) {
+  async deleteChannel(serverId, channelId) {
     try {
-      await channelsApi.delete(serverId, channelId, userId);
+      await channelsApi.delete(serverId, channelId);
       set((s) => ({
         channels: s.channels.filter((c) => c.id !== channelId),
         activeChannelId: s.activeChannelId === channelId ? null : s.activeChannelId,

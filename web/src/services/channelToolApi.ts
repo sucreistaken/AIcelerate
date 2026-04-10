@@ -13,20 +13,11 @@ import type {
   ExtractionSummary,
 } from "../types";
 
+import { fetchWithAuth } from "./fetchWithAuth";
+
 const BASE = `${API_BASE}/api/collab/channels`;
 const COLLAB_BASE = `${API_BASE}/api/collab`;
-
-async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || res.statusText);
-  }
-  return res.json();
-}
+const request = fetchWithAuth;
 
 export const channelToolApi = {
   getToolData(channelId: string) {
@@ -40,17 +31,17 @@ export const channelToolApi = {
     );
   },
 
-  answerQuiz(channelId: string, userId: string, nickname: string, questionId: string, selectedIndex: number) {
+  answerQuiz(channelId: string, nickname: string, questionId: string, selectedIndex: number) {
     return request<{ ok: boolean; result: { correct: boolean; correctIndex: number; explanation: string; scores: any } }>(
       `${BASE}/${channelId}/tool/quiz/answer`,
-      { method: "POST", body: JSON.stringify({ userId, nickname, questionId, selectedIndex }) }
+      { method: "POST", body: JSON.stringify({ nickname, questionId, selectedIndex }) }
     );
   },
 
-  addFlashcard(channelId: string, front: string, back: string, topic: string, userId: string, nickname: string) {
+  addFlashcard(channelId: string, front: string, back: string, topic: string, nickname: string) {
     return request<{ ok: boolean; card: ChannelFlashcardItem }>(
       `${BASE}/${channelId}/tool/flashcards/add`,
-      { method: "POST", body: JSON.stringify({ front, back, topic, userId, nickname }) }
+      { method: "POST", body: JSON.stringify({ front, back, topic, nickname }) }
     );
   },
 
@@ -68,17 +59,17 @@ export const channelToolApi = {
     );
   },
 
-  reviewFlashcard(channelId: string, cardId: string, userId: string, quality: number) {
+  reviewFlashcard(channelId: string, cardId: string, quality: number) {
     return request<{ ok: boolean; card: ChannelFlashcardItem }>(
       `${BASE}/${channelId}/tool/flashcards/review`,
-      { method: "POST", body: JSON.stringify({ cardId, userId, quality }) }
+      { method: "POST", body: JSON.stringify({ cardId, quality }) }
     );
   },
 
-  deepDiveChat(channelId: string, text: string, userId: string, nickname: string, topic: string, serverName: string) {
+  deepDiveChat(channelId: string, text: string, nickname: string, topic: string, serverName: string) {
     return request<{ ok: boolean; userMessage: ChannelDeepDiveMessage; aiMessage: ChannelDeepDiveMessage }>(
       `${BASE}/${channelId}/tool/deep-dive/chat`,
-      { method: "POST", body: JSON.stringify({ text, userId, nickname, topic, serverName }) }
+      { method: "POST", body: JSON.stringify({ text, nickname, topic, serverName }) }
     );
   },
 
@@ -89,24 +80,24 @@ export const channelToolApi = {
     );
   },
 
-  startSprint(channelId: string, studyMin: number, breakMin: number, userId: string, nickname: string) {
+  startSprint(channelId: string, studyMin: number, breakMin: number, nickname: string) {
     return request<{ ok: boolean; sprint: ChannelSprintData }>(
       `${BASE}/${channelId}/tool/sprint/start`,
-      { method: "POST", body: JSON.stringify({ studyMin, breakMin, userId, nickname }) }
+      { method: "POST", body: JSON.stringify({ studyMin, breakMin, nickname }) }
     );
   },
 
-  updateSprintStatus(channelId: string, userId: string, nickname: string, status: string) {
+  updateSprintStatus(channelId: string, nickname: string, status: string) {
     return request<{ ok: boolean; sprint: ChannelSprintData }>(
       `${BASE}/${channelId}/tool/sprint/status`,
-      { method: "POST", body: JSON.stringify({ userId, nickname, status }) }
+      { method: "POST", body: JSON.stringify({ nickname, status }) }
     );
   },
 
-  addNote(channelId: string, title: string, content: string, category: string, userId: string, nickname: string) {
+  addNote(channelId: string, title: string, content: string, category: string, nickname: string) {
     return request<{ ok: boolean; note: ChannelNoteItem }>(
       `${BASE}/${channelId}/tool/notes/add`,
-      { method: "POST", body: JSON.stringify({ title, content, category, userId, nickname }) }
+      { method: "POST", body: JSON.stringify({ title, content, category, nickname }) }
     );
   },
 
@@ -153,10 +144,10 @@ export const channelToolApi = {
   },
 
   // Lock
-  lockTool(channelId: string, userId: string) {
+  lockTool(channelId: string) {
     return request<{ ok: boolean; locked: boolean; lockedBy: string }>(
       `${BASE}/${channelId}/tool/lock`,
-      { method: "POST", body: JSON.stringify({ userId }) }
+      { method: "POST" }
     );
   },
 
@@ -172,17 +163,17 @@ export const channelToolApi = {
     return request<LessonSummary[]>(`${COLLAB_BASE}/lessons`);
   },
 
-  linkLesson(channelId: string, serverId: string, userId: string, lessonId: string, lessonTitle: string) {
+  linkLesson(channelId: string, serverId: string, lessonId: string, lessonTitle: string) {
     return request<{ ok: boolean; channel: Channel }>(
       `${BASE}/${channelId}/link-lesson`,
-      { method: "POST", body: JSON.stringify({ serverId, userId, lessonId, lessonTitle }) }
+      { method: "POST", body: JSON.stringify({ serverId, lessonId, lessonTitle }) }
     );
   },
 
-  unlinkLesson(channelId: string, serverId: string, userId: string) {
+  unlinkLesson(channelId: string, serverId: string) {
     return request<{ ok: boolean; channel: Channel }>(
       `${BASE}/${channelId}/link-lesson`,
-      { method: "DELETE", body: JSON.stringify({ serverId, userId }) }
+      { method: "DELETE", body: JSON.stringify({ serverId }) }
     );
   },
 

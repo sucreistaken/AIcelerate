@@ -11,17 +11,17 @@ interface RoomState {
   error: string | null;
 
   // Room actions
-  loadRooms: (userId: string) => Promise<void>;
-  createRoom: (name: string, description: string, ownerId: string, iconColor?: string, options?: {
+  loadRooms: () => Promise<void>;
+  createRoom: (name: string, description: string, iconColor?: string, options?: {
     tags?: string[]; university?: string; isPublic?: boolean; templateId?: string;
   }) => Promise<StudyServer>;
-  createSoloRoom: (name: string, ownerId: string, options?: { topic?: string; templateId?: string; tags?: string[] }) => Promise<StudyServer>;
-  joinByInvite: (inviteCode: string, userId: string) => Promise<StudyServer>;
-  joinPublicRoom: (roomId: string, userId: string) => Promise<StudyServer>;
-  leaveRoom: (roomId: string, userId: string) => Promise<void>;
-  deleteRoom: (roomId: string, userId: string) => Promise<void>;
-  archiveRoom: (roomId: string, userId: string) => Promise<void>;
-  transferOwnership: (roomId: string, currentOwnerId: string, newOwnerId: string) => Promise<void>;
+  createSoloRoom: (name: string, options?: { topic?: string; templateId?: string; tags?: string[] }) => Promise<StudyServer>;
+  joinByInvite: (inviteCode: string) => Promise<StudyServer>;
+  joinPublicRoom: (roomId: string) => Promise<StudyServer>;
+  leaveRoom: (roomId: string) => Promise<void>;
+  deleteRoom: (roomId: string) => Promise<void>;
+  archiveRoom: (roomId: string) => Promise<void>;
+  transferOwnership: (roomId: string, newOwnerId: string) => Promise<void>;
   selectRoom: (roomId: string) => Promise<void>;
   deselectRoom: () => void;
   discoverRooms: (search?: string, tags?: string[]) => Promise<StudyServer[]>;
@@ -38,20 +38,20 @@ export const useRoomStore = create<RoomState>((set, get) => ({
   loading: false,
   error: null,
 
-  loadRooms: async (userId) => {
+  loadRooms: async () => {
     set({ loading: true, error: null });
     try {
-      const rooms = await roomsApi.getUserRooms(userId);
+      const rooms = await roomsApi.getUserRooms();
       set({ rooms, loading: false });
     } catch (err: any) {
       set({ error: err.message, loading: false });
     }
   },
 
-  createRoom: async (name, description, ownerId, iconColor, options) => {
+  createRoom: async (name, description, iconColor, options) => {
     set({ loading: true, error: null });
     try {
-      const room = await roomsApi.create(name, description, ownerId, iconColor, options);
+      const room = await roomsApi.create(name, description, iconColor, options);
       set((s) => ({ rooms: [...s.rooms, room], loading: false }));
       return room;
     } catch (err: any) {
@@ -60,10 +60,10 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     }
   },
 
-  createSoloRoom: async (name, ownerId, options) => {
+  createSoloRoom: async (name, options) => {
     set({ loading: true, error: null });
     try {
-      const room = await roomsApi.createSolo(name, ownerId, options);
+      const room = await roomsApi.createSolo(name, options);
       set((s) => ({ rooms: [...s.rooms, room], loading: false }));
       return room;
     } catch (err: any) {
@@ -72,10 +72,10 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     }
   },
 
-  joinByInvite: async (inviteCode, userId) => {
+  joinByInvite: async (inviteCode) => {
     set({ loading: true, error: null });
     try {
-      const room = await roomsApi.joinByInvite(inviteCode, userId);
+      const room = await roomsApi.joinByInvite(inviteCode);
       set((s) => ({
         rooms: s.rooms.some((r) => r.id === room.id) ? s.rooms : [...s.rooms, room],
         loading: false,
@@ -87,10 +87,10 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     }
   },
 
-  joinPublicRoom: async (roomId, userId) => {
+  joinPublicRoom: async (roomId) => {
     set({ loading: true, error: null });
     try {
-      const room = await roomsApi.join(roomId, userId);
+      const room = await roomsApi.join(roomId);
       set((s) => ({
         rooms: s.rooms.some((r) => r.id === room.id) ? s.rooms : [...s.rooms, room],
         loading: false,
@@ -102,9 +102,9 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     }
   },
 
-  leaveRoom: async (roomId, userId) => {
+  leaveRoom: async (roomId) => {
     try {
-      await roomsApi.leave(roomId, userId);
+      await roomsApi.leave(roomId);
       set((s) => ({
         rooms: s.rooms.filter((r) => r.id !== roomId),
         activeRoomId: s.activeRoomId === roomId ? null : s.activeRoomId,
@@ -114,9 +114,9 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     }
   },
 
-  deleteRoom: async (roomId, userId) => {
+  deleteRoom: async (roomId) => {
     try {
-      await roomsApi.delete(roomId, userId);
+      await roomsApi.delete(roomId);
       set((s) => ({
         rooms: s.rooms.filter((r) => r.id !== roomId),
         activeRoomId: s.activeRoomId === roomId ? null : s.activeRoomId,
@@ -126,9 +126,9 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     }
   },
 
-  archiveRoom: async (roomId, userId) => {
+  archiveRoom: async (roomId) => {
     try {
-      await roomsApi.archive(roomId, userId);
+      await roomsApi.archive(roomId);
       set((s) => ({
         rooms: s.rooms.filter((r) => r.id !== roomId),
         activeRoomId: s.activeRoomId === roomId ? null : s.activeRoomId,
@@ -138,9 +138,9 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     }
   },
 
-  transferOwnership: async (roomId, currentOwnerId, newOwnerId) => {
+  transferOwnership: async (roomId, newOwnerId) => {
     try {
-      const updated = await roomsApi.transferOwnership(roomId, currentOwnerId, newOwnerId);
+      const updated = await roomsApi.transferOwnership(roomId, newOwnerId);
       set((s) => ({
         rooms: s.rooms.map((r) => (r.id === roomId ? updated : r)),
       }));

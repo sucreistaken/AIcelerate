@@ -14,9 +14,9 @@ interface MessageState {
   loadMessages: (channelId: string) => Promise<void>;
   loadMore: (channelId: string) => Promise<void>;
   sendMessage: (channelId: string, serverId: string, content: string, threadId?: string) => Promise<void>;
-  editMessage: (channelId: string, messageId: string, userId: string, content: string) => Promise<void>;
-  deleteMessage: (channelId: string, messageId: string, userId: string) => Promise<void>;
-  reactToMessage: (channelId: string, messageId: string, emoji: string, userId: string) => Promise<void>;
+  editMessage: (channelId: string, messageId: string, content: string) => Promise<void>;
+  deleteMessage: (channelId: string, messageId: string) => Promise<void>;
+  reactToMessage: (channelId: string, messageId: string, emoji: string) => Promise<void>;
   pinMessage: (channelId: string, serverId: string, messageId: string) => Promise<void>;
 
   // Typing
@@ -90,7 +90,7 @@ export const useMessageStore = create<MessageState>((set, get) => ({
     });
   },
 
-  async editMessage(channelId, messageId, userId, content) {
+  async editMessage(channelId, messageId, content) {
     const socket = getCollabSocket();
     return new Promise<void>((resolve, reject) => {
       socket.emit("msg:edit", { channelId, messageId, content }, (res: any) => {
@@ -100,7 +100,7 @@ export const useMessageStore = create<MessageState>((set, get) => ({
     });
   },
 
-  async deleteMessage(channelId, messageId, userId) {
+  async deleteMessage(channelId, messageId) {
     const socket = getCollabSocket();
     return new Promise<void>((resolve, reject) => {
       socket.emit("msg:delete", { channelId, messageId }, (res: any) => {
@@ -110,7 +110,7 @@ export const useMessageStore = create<MessageState>((set, get) => ({
     });
   },
 
-  async reactToMessage(channelId, messageId, emoji, userId) {
+  async reactToMessage(channelId, messageId, emoji) {
     const socket = getCollabSocket();
     socket.emit("msg:react", { channelId, messageId, emoji });
   },

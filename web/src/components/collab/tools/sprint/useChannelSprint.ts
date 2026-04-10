@@ -6,7 +6,7 @@ import { getCollabSocket } from "../../../../services/socket";
 
 const EMPTY_MEMBERS: Record<string, { status: string; lastUpdate: string; nickname: string }> = {};
 
-export function useChannelSprint(channelId: string, userId: string, nickname: string) {
+export function useChannelSprint(channelId: string, nickname: string) {
   const sprint = useChannelToolStore(s => s.dataByChannel[channelId]?.sprint ?? null);
   const updateSprint = useChannelToolStore(s => s.updateSprint);
 
@@ -71,7 +71,7 @@ export function useChannelSprint(channelId: string, userId: string, nickname: st
     if (starting) return;
     setStarting(true);
     try {
-      const res = await channelToolApi.startSprint(channelId, studyMin, breakMin, userId, nickname);
+      const res = await channelToolApi.startSprint(channelId, studyMin, breakMin, nickname);
       updateSprint(channelId, res.sprint);
       getCollabSocket().emit("tool:sprint:update", {
         channelId,
@@ -86,7 +86,7 @@ export function useChannelSprint(channelId: string, userId: string, nickname: st
 
   async function handlePause() {
     try {
-      const res = await channelToolApi.updateSprintStatus(channelId, userId, nickname, "idle");
+      const res = await channelToolApi.updateSprintStatus(channelId, nickname, "idle");
       updateSprint(channelId, res.sprint);
       getCollabSocket().emit("tool:sprint:update", {
         channelId,
@@ -99,7 +99,7 @@ export function useChannelSprint(channelId: string, userId: string, nickname: st
 
   async function handleResume() {
     try {
-      const res = await channelToolApi.updateSprintStatus(channelId, userId, nickname, "studying");
+      const res = await channelToolApi.updateSprintStatus(channelId, nickname, "studying");
       updateSprint(channelId, res.sprint);
       getCollabSocket().emit("tool:sprint:update", {
         channelId,
@@ -112,7 +112,7 @@ export function useChannelSprint(channelId: string, userId: string, nickname: st
 
   async function handleReset() {
     try {
-      const res = await channelToolApi.updateSprintStatus(channelId, userId, nickname, "idle");
+      const res = await channelToolApi.updateSprintStatus(channelId, nickname, "idle");
       updateSprint(channelId, res.sprint);
       getCollabSocket().emit("tool:sprint:update", {
         channelId,
@@ -125,7 +125,7 @@ export function useChannelSprint(channelId: string, userId: string, nickname: st
 
   async function handleStatusChange(status: "studying" | "break" | "idle") {
     try {
-      const res = await channelToolApi.updateSprintStatus(channelId, userId, nickname, status);
+      const res = await channelToolApi.updateSprintStatus(channelId, nickname, status);
       updateSprint(channelId, res.sprint);
       getCollabSocket().emit("tool:sprint:update", {
         channelId,

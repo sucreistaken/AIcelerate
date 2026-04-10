@@ -3,7 +3,7 @@
 // Handles model calls, retry logic, response parsing.
 
 import { logger } from "../utils/logger";
-import { getModel, getTemperature, tryParseJSON, stripCodeFences } from "./aiService";
+import { getModel, safeGenerate, getTemperature, tryParseJSON, stripCodeFences } from "./aiService";
 import {
   buildModulesPrompt,
   buildEmphasesPrompt,
@@ -55,7 +55,7 @@ async function callWithRetry<T>(
 async function planSubCall(
   prompt: string, schema: any, maxTokens: number, label: string
 ): Promise<any> {
-  const result = await getModel().generateContent({
+  const result = await safeGenerate({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: {
       maxOutputTokens: maxTokens,
@@ -63,7 +63,7 @@ async function planSubCall(
       responseMimeType: "application/json",
       responseSchema: schema,
     } as any,
-  });
+  }, { label, timeoutMs: 60_000 });
   const rawText = result.response.text() || "";
   logAI(label, prompt.length, rawText.length, maxTokens);
 

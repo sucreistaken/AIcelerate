@@ -53,7 +53,7 @@ export default function StudyHub() {
     if (!profile) return;
 
     connectSocket().then(() => {
-      loadServers(profile.id);
+      loadServers();
       setupServerListeners();
       setupMessageListeners();
       setupToolListeners();

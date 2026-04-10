@@ -1,5 +1,5 @@
 import { logger } from "../utils/logger";
-import { getModel, stripCodeFences, tryParseJSON, getTemperature } from "./aiService";
+import { safeGenerate, stripCodeFences, tryParseJSON, getTemperature } from "./aiService";
 import { SCHEMAS } from "../prompts/schemas";
 import {
   buildQuizFromPlanPrompt,
@@ -44,10 +44,10 @@ export async function generateQuizFromPlan(
   }
 
   const prompt = buildQuizFromPlanPrompt(JSON.stringify(plan).slice(0, 8000), crossLessonHint, lang);
-  const result = await getModel().generateContent({
+  const result = await safeGenerate({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: { maxOutputTokens: 2500, temperature: getTemperature("balanced") },
-  });
+  }, { label: "quiz_from_plan", timeoutMs: 45_000 });
   const text = (result.response.text() || "").replace(/```/g, "").trim();
   logAI("QUIZ_FROM_PLAN", prompt.length, text.length, 2500);
 
@@ -77,7 +77,7 @@ export async function generateQuizAnswers(
   if (!contextBlock) throw new Error("lessonId or lectureText+slidesText required");
 
   const prompt = buildQuizAnswersPrompt(contextBlock, plan ? JSON.stringify(plan) : undefined, questions.slice(0, 20));
-  const result = await getModel().generateContent({
+  const result = await safeGenerate({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: {
       maxOutputTokens: 4000,
@@ -85,7 +85,7 @@ export async function generateQuizAnswers(
       responseMimeType: "application/json",
       responseSchema: SCHEMAS.QUIZ_ANSWERS,
     } as any,
-  });
+  }, { label: "quiz_answers", timeoutMs: 60_000 });
   const rawResp = result.response.text() || "";
   logAI("QUIZ_ANSWERS", prompt.length, rawResp.length, 4000);
   const j = tryParseJSON(rawResp);
@@ -101,7 +101,7 @@ export async function evaluateQuizAnswer(
   if (!contextBlock) throw new Error("lessonId or lectureText+slidesText required");
 
   const prompt = buildQuizEvalPrompt(contextBlock, question, studentAnswer, lang);
-  const result = await getModel().generateContent({
+  const result = await safeGenerate({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: {
       maxOutputTokens: 1000,
@@ -109,7 +109,7 @@ export async function evaluateQuizAnswer(
       responseMimeType: "application/json",
       responseSchema: SCHEMAS.QUIZ_EVAL,
     } as any,
-  });
+  }, { label: "quiz_eval", timeoutMs: 30_000 });
   const evalRaw = result.response.text() || "";
   logAI("QUIZ_EVAL", prompt.length, evalRaw.length, 800);
   const j = tryParseJSON(evalRaw);
@@ -126,7 +126,7 @@ export async function evaluateQuizBatch(
 
   const questionsBlock = items.slice(0, 20).map((item, i) => `Q${i + 1}: ${item.q}\nA${i + 1}: ${item.student_answer}`).join("\n\n");
   const prompt = buildQuizEvalBatchPrompt(contextBlock, questionsBlock, lang);
-  const result = await getModel().generateContent({
+  const result = await safeGenerate({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: {
       maxOutputTokens: 4000,
@@ -134,7 +134,7 @@ export async function evaluateQuizBatch(
       responseMimeType: "application/json",
       responseSchema: SCHEMAS.QUIZ_EVAL_BATCH,
     } as any,
-  });
+  }, { label: "quiz_eval_batch", timeoutMs: 60_000 });
   const batchRaw = result.response.text() || "";
   logAI("QUIZ_EVAL_BATCH", prompt.length, batchRaw.length, 4000);
   const j = tryParseJSON(batchRaw);

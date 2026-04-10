@@ -1,34 +1,24 @@
 import { API_BASE } from "../config";
+import { fetchWithAuth } from "./fetchWithAuth";
 import type { StudyServer, ServerMemberInfo, ServerTemplate } from "../types";
 
 const BASE = `${API_BASE}/api/rooms`;
-
-async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  const token = localStorage.getItem("lc_token");
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(url, { headers, ...options });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || res.statusText);
-  }
-  return res.json();
-}
+const request = fetchWithAuth;
 
 export const roomsApi = {
-  create(name: string, description: string, ownerId: string, iconColor?: string, options?: {
+  create(name: string, description: string, iconColor?: string, options?: {
     tags?: string[]; university?: string; isPublic?: boolean; templateId?: string;
   }) {
     return request<StudyServer>(`${BASE}`, {
       method: "POST",
-      body: JSON.stringify({ name, description, ownerId, iconColor, ...options }),
+      body: JSON.stringify({ name, description, iconColor, ...options }),
     });
   },
 
-  createSolo(name: string, ownerId: string, options?: { topic?: string; templateId?: string; tags?: string[] }) {
+  createSolo(name: string, options?: { topic?: string; templateId?: string; tags?: string[] }) {
     return request<StudyServer>(`${BASE}/solo`, {
       method: "POST",
-      body: JSON.stringify({ name, ownerId, ...options }),
+      body: JSON.stringify({ name, ...options }),
     });
   },
 
@@ -51,84 +41,79 @@ export const roomsApi = {
     return request<StudyServer>(`${BASE}/invite/${code}`);
   },
 
-  getUserRooms(userId: string) {
-    return request<StudyServer[]>(`${BASE}/user/${userId}`);
+  getUserRooms() {
+    return request<StudyServer[]>(`${BASE}/user/me`);
   },
 
-  update(id: string, userId: string, updates: Record<string, any>) {
+  update(id: string, updates: Record<string, any>) {
     return request<StudyServer>(`${BASE}/${id}`, {
       method: "PATCH",
-      body: JSON.stringify({ userId, ...updates }),
+      body: JSON.stringify(updates),
     });
   },
 
-  updateTopic(id: string, userId: string, topic: string) {
+  updateTopic(id: string, topic: string) {
     return request<StudyServer>(`${BASE}/${id}/topic`, {
       method: "PATCH",
-      body: JSON.stringify({ userId, topic }),
+      body: JSON.stringify({ topic }),
     });
   },
 
-  join(id: string, userId: string) {
+  join(id: string) {
     return request<StudyServer>(`${BASE}/${id}/join`, {
       method: "POST",
-      body: JSON.stringify({ userId }),
     });
   },
 
-  joinByInvite(inviteCode: string, userId: string) {
+  joinByInvite(inviteCode: string) {
     return request<StudyServer>(`${BASE}/join-invite`, {
       method: "POST",
-      body: JSON.stringify({ inviteCode, userId }),
+      body: JSON.stringify({ inviteCode }),
     });
   },
 
-  leave(id: string, userId: string) {
+  leave(id: string) {
     return request<{ success: boolean }>(`${BASE}/${id}/leave`, {
       method: "POST",
-      body: JSON.stringify({ userId }),
     });
   },
 
-  kick(id: string, requesterId: string, targetId: string) {
+  kick(id: string, targetId: string) {
     return request<{ success: boolean }>(`${BASE}/${id}/kick`, {
       method: "POST",
-      body: JSON.stringify({ requesterId, targetId }),
+      body: JSON.stringify({ targetId }),
     });
   },
 
-  delete(id: string, userId: string) {
+  delete(id: string) {
     return request<{ success: boolean }>(`${BASE}/${id}`, {
       method: "DELETE",
-      body: JSON.stringify({ userId }),
     });
   },
 
-  archive(id: string, userId: string) {
+  archive(id: string) {
     return request<StudyServer>(`${BASE}/${id}/archive`, {
       method: "POST",
-      body: JSON.stringify({ userId }),
     });
   },
 
-  unarchive(id: string, userId: string) {
+  unarchive(id: string) {
     return request<StudyServer>(`${BASE}/${id}/unarchive`, {
       method: "POST",
-      body: JSON.stringify({ userId }),
     });
   },
 
-  transferOwnership(id: string, currentOwnerId: string, newOwnerId: string) {
+  transferOwnership(id: string, newOwnerId: string) {
     return request<StudyServer>(`${BASE}/${id}/transfer-ownership`, {
       method: "POST",
-      body: JSON.stringify({ currentOwnerId, newOwnerId }),
+      body: JSON.stringify({ newOwnerId }),
     });
   },
 
-  setMaterial(id: string, userId: string, materialId: string) {
+  setMaterial(id: string, materialId: string) {
     return request<StudyServer>(`${BASE}/${id}/material`, {
       method: "POST",
-      body: JSON.stringify({ userId, materialId }),
+      body: JSON.stringify({ materialId }),
     });
   },
 
@@ -136,10 +121,9 @@ export const roomsApi = {
     return request<ServerMemberInfo[]>(`${BASE}/${id}/members`);
   },
 
-  regenerateInvite(id: string, userId: string) {
+  regenerateInvite(id: string) {
     return request<{ inviteCode: string }>(`${BASE}/${id}/regenerate-invite`, {
       method: "POST",
-      body: JSON.stringify({ userId }),
     });
   },
 };

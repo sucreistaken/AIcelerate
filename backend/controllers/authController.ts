@@ -1,70 +1,77 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import { authService } from "../services/authService";
 import { AuthRequest } from "../middleware/auth";
+import { asyncHandler } from "../utils/asyncHandler";
+import { badRequest } from "../middleware/errorHandler";
+import { setRefreshTokenCookie, clearRefreshTokenCookie, getRefreshTokenFromCookie } from "../utils/cookies";
 
 export const authController = {
-  async register(req: Request, res: Response) {
-    try {
-      const { email, password, nickname } = req.body;
-      if (!email || !password || !nickname) {
-        res.status(400).json({ error: "email, password, and nickname are required" });
-        return;
-      }
-      const result = await authService.register(email, password, nickname);
-      res.status(201).json(result);
-    } catch (err: any) {
-      res.status(err.status || 500).json({ error: err.message });
-    }
-  },
+  register: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { email, password, nickname } = req.body;
+    if (!email || !password || !nickname) throw badRequest("email, password, and nickname are required");
+    const result = await authService.register(email, password, nickname);
 
-  async login(req: Request, res: Response) {
-    try {
-      const { email, password } = req.body;
-      if (!email || !password) {
-        res.status(400).json({ error: "email and password are required" });
-        return;
-      }
-      const result = await authService.login(email, password);
-      res.json(result);
-    } catch (err: any) {
-      res.status(err.status || 500).json({ error: err.message });
-    }
-  },
+    // Set refresh token as HttpOnly cookie, remove from response body
+    setRefreshTokenCookie(res, result.refreshToken);
+    const { refreshToken: _rt, ...safeResult } = result;
+    res.status(201).json(safeResult);
+  }),
 
-  async me(req: AuthRequest, res: Response) {
-    try {
-      const user = await authService.getUser(req.user!.userId);
-      res.json({ user });
-    } catch (err: any) {
-      res.status(err.status || 500).json({ error: err.message });
-    }
-  },
+  login: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { email, password } = req.body;
+    if (!email || !password) throw badRequest("email and password are required");
+    const result = await authService.login(email, password);
 
-  async changePassword(req: AuthRequest, res: Response) {
-    try {
-      const { currentPassword, newPassword } = req.body;
-      if (!currentPassword || !newPassword) {
-        res.status(400).json({ error: "currentPassword and newPassword are required" });
-        return;
-      }
-      const result = await authService.changePassword(req.user!.userId, currentPassword, newPassword);
-      res.json(result);
-    } catch (err: any) {
-      res.status(err.status || 500).json({ error: err.message });
-    }
-  },
+    setRefreshTokenCookie(res, result.refreshToken);
+    const { refreshToken: _rt, ...safeResult } = result;
+    res.json(safeResult);
+  }),
 
-  async deleteAccount(req: AuthRequest, res: Response) {
-    try {
-      const { password } = req.body;
-      if (!password) {
-        res.status(400).json({ error: "password is required" });
-        return;
-      }
-      const result = await authService.deleteAccount(req.user!.userId, password);
-      res.json(result);
-    } catch (err: any) {
-      res.status(err.status || 500).json({ error: err.message });
+  refresh: asyncHandler(async (req: AuthRequest, res: Response) => {
+    // Read refresh token from cookie (preferred) or body (fallback for mobile/API clients)
+    const refreshToken = getRefreshTokenFromCookie(req) || req.body.refreshToken;
+    if (!refreshToken) throw badRequest("Refresh token required");
+
+    const result = await authService.refreshToken(refreshToken);
+
+    // Set new rotated refresh token cookie
+    setRefreshTokenCookie(res, result.refreshToken);
+    const { refreshToken: _rt, ...safeResult } = result;
+    res.json(safeResult);
+  }),
+
+  logout: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const refreshToken = getRefreshTokenFromCookie(req) || req.body.refreshToken;
+    if (refreshToken) {
+      await authService.logout(refreshToken);
     }
-  },
+    clearRefreshTokenCookie(res);
+    res.json({ ok: true });
+  }),
+
+  logoutAll: asyncHandler(async (req: AuthRequest, res: Response) => {
+    await authService.logoutAll(req.user!.userId);
+    clearRefreshTokenCookie(res);
+    res.json({ ok: true });
+  }),
+
+  me: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const user = await authService.getUser(req.user!.userId);
+    res.json({ user });
+  }),
+
+  changePassword: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) throw badRequest("currentPassword and newPassword are required");
+    const result = await authService.changePassword(req.user!.userId, currentPassword, newPassword);
+    res.json(result);
+  }),
+
+  deleteAccount: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { password } = req.body;
+    if (!password) throw badRequest("password is required");
+    const result = await authService.deleteAccount(req.user!.userId, password);
+    clearRefreshTokenCookie(res);
+    res.json(result);
+  }),
 };

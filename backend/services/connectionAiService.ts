@@ -1,5 +1,5 @@
 import { logger } from "../utils/logger";
-import { getModel, getTemperature } from "./aiService";
+import { safeGenerate, getTemperature } from "./aiService";
 import { listLessons } from "../controllers/lessonControllers";
 import { badRequest } from "../middleware/errorHandler";
 import { getLangDirective, type SupportedLang } from "../utils/langDirective";
@@ -44,10 +44,10 @@ Your analysis should:
 
 Write in a clear, educational tone. Use paragraphs, not bullet points.`;
 
-  const result = await getModel().generateContent({
+  const result = await safeGenerate({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: { maxOutputTokens: 2000, temperature: getTemperature("creative") },
-  });
+  }, { label: "connection_deep_dive", timeoutMs: 30_000 });
   const analysis = result.response.text();
   logger.info(`[AI] CONNECTION_DEEP_DIVE | concept=${concept} | ~${Math.ceil(prompt.length / 4)} in, ~${Math.ceil(analysis.length / 4)} out`);
 

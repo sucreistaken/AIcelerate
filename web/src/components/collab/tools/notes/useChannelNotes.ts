@@ -66,7 +66,6 @@ export function useChannelNotes({ channelId, userId, nickname }: UseChannelNotes
           formTitle.trim(),
           formContent.trim(),
           formCategory,
-          userId,
           nickname
         );
         addNoteToStore(channelId, note);
@@ -82,7 +81,7 @@ export function useChannelNotes({ channelId, userId, nickname }: UseChannelNotes
         setSubmitting(false);
       }
     },
-    [channelId, formTitle, formContent, formCategory, userId, nickname, submitting, addNoteToStore]
+    [channelId, formTitle, formContent, formCategory, nickname, submitting, addNoteToStore]
   );
 
   const handlePin = useCallback(

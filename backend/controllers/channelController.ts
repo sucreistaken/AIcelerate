@@ -1,45 +1,39 @@
-import { Request, Response, NextFunction } from "express";
+import { Response } from "express";
 import { channelService } from "../services/channelService";
+import { AuthRequest } from "../middleware/auth";
+import { asyncHandler } from "../utils/asyncHandler";
 
 export const channelController = {
-  async create(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { userId, categoryId, name, type, toolType, lessonId, lessonTitle } = req.body;
-      const channel = await channelService.createForServer(
-        req.params.serverId, userId, categoryId, name, type, toolType, lessonId, lessonTitle
-      );
-      res.status(201).json(channel);
-    } catch (err) { next(err); }
-  },
+  create: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const { categoryId, name, type, toolType, lessonId, lessonTitle } = req.body;
+    const channel = await channelService.createForServer(
+      req.params.serverId, userId, categoryId, name, type, toolType, lessonId, lessonTitle
+    );
+    res.status(201).json(channel);
+  }),
 
-  async getByServer(req: Request, res: Response, next: NextFunction) {
-    try {
-      const channels = await channelService.getByServer(req.params.serverId);
-      res.json(channels);
-    } catch (err) { next(err); }
-  },
+  getByServer: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const channels = await channelService.getByServer(req.params.serverId);
+    res.json(channels);
+  }),
 
-  async get(req: Request, res: Response, next: NextFunction) {
-    try {
-      const channel = await channelService.getById(req.params.serverId, req.params.channelId);
-      res.json(channel);
-    } catch (err) { next(err); }
-  },
+  get: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const channel = await channelService.getById(req.params.serverId, req.params.channelId);
+    res.json(channel);
+  }),
 
-  async update(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { userId, ...updates } = req.body;
-      const channel = await channelService.update(
-        req.params.serverId, req.params.channelId, userId, updates
-      );
-      res.json(channel);
-    } catch (err) { next(err); }
-  },
+  update: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const channel = await channelService.update(
+      req.params.serverId, req.params.channelId, userId, req.body
+    );
+    res.json(channel);
+  }),
 
-  async delete(req: Request, res: Response, next: NextFunction) {
-    try {
-      await channelService.delete(req.params.serverId, req.params.channelId, req.body.userId);
-      res.json({ success: true });
-    } catch (err) { next(err); }
-  },
+  delete: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    await channelService.delete(req.params.serverId, req.params.channelId, userId);
+    res.json({ success: true });
+  }),
 };

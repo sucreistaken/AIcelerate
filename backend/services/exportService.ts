@@ -1,8 +1,8 @@
 import { channelToolRepo } from "../repositories/channelToolRepo";
 
 export const exportService = {
-  exportQuiz(channelId: string) {
-    const data = channelToolRepo.load(channelId);
+  async exportQuiz(channelId: string) {
+    const data = await channelToolRepo.load(channelId);
     if (!data.quiz) return null;
 
     const questions = data.quiz.questions.map(q => ({
@@ -24,8 +24,8 @@ export const exportService = {
     return { questions, scores, generatedAt: data.quiz.generatedAt };
   },
 
-  exportFlashcards(channelId: string) {
-    const data = channelToolRepo.load(channelId);
+  async exportFlashcards(channelId: string) {
+    const data = await channelToolRepo.load(channelId);
     if (!data.flashcards) return null;
 
     return data.flashcards.cards.map(c => ({
@@ -38,8 +38,8 @@ export const exportService = {
     }));
   },
 
-  exportNotes(channelId: string) {
-    const data = channelToolRepo.load(channelId);
+  async exportNotes(channelId: string) {
+    const data = await channelToolRepo.load(channelId);
     if (!data.notes) return null;
 
     return data.notes.items.map(n => ({
@@ -52,8 +52,8 @@ export const exportService = {
     }));
   },
 
-  exportMindMap(channelId: string) {
-    const data = channelToolRepo.load(channelId);
+  async exportMindMap(channelId: string) {
+    const data = await channelToolRepo.load(channelId);
     if (!data.mindMap) return null;
 
     return {
@@ -63,12 +63,12 @@ export const exportService = {
     };
   },
 
-  exportAll(channelId: string) {
+  async exportAll(channelId: string) {
     return {
-      quiz: this.exportQuiz(channelId),
-      flashcards: this.exportFlashcards(channelId),
-      notes: this.exportNotes(channelId),
-      mindMap: this.exportMindMap(channelId),
+      quiz: await this.exportQuiz(channelId),
+      flashcards: await this.exportFlashcards(channelId),
+      notes: await this.exportNotes(channelId),
+      mindMap: await this.exportMindMap(channelId),
       exportedAt: new Date().toISOString(),
     };
   },

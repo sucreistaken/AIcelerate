@@ -1,156 +1,133 @@
-import { Request, Response, NextFunction } from "express";
+import { Response } from "express";
 import { roomService, getRoomTemplates } from "../services/roomService";
+import { AuthRequest } from "../middleware/auth";
+import { asyncHandler } from "../utils/asyncHandler";
 
 export const roomController = {
-  async create(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { name, description, ownerId, iconColor, tags, university, isPublic, templateId } = req.body;
-      const room = await roomService.create(name, description, ownerId, iconColor, {
-        tags, university, isPublic, templateId,
-      });
-      res.status(201).json(room);
-    } catch (err) { next(err); }
-  },
+  create: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const { name, description, iconColor, tags, university, isPublic, templateId } = req.body;
+    const room = await roomService.create(name, description, userId, iconColor, {
+      tags, university, isPublic, templateId,
+    });
+    res.status(201).json(room);
+  }),
 
-  async createSolo(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { name, ownerId, topic, templateId, tags } = req.body;
-      const room = await roomService.createSolo(name, ownerId, { topic, templateId, tags });
-      res.status(201).json(room);
-    } catch (err) { next(err); }
-  },
+  createSolo: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const { name, topic, templateId, tags } = req.body;
+    const room = await roomService.createSolo(name, userId, { topic, templateId, tags });
+    res.status(201).json(room);
+  }),
 
-  async discover(req: Request, res: Response, next: NextFunction) {
-    try {
-      const search = req.query.search as string | undefined;
-      const tag = req.query.tag as string | undefined;
-      const tags = tag ? tag.split(",").map((t) => t.trim()).filter(Boolean) : undefined;
-      const rooms = await roomService.discoverServers(search, tags);
-      res.json(rooms);
-    } catch (err) { next(err); }
-  },
+  discover: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const search = req.query.search as string | undefined;
+    const tag = req.query.tag as string | undefined;
+    const tags = tag ? tag.split(",").map((t) => t.trim()).filter(Boolean) : undefined;
+    const rooms = await roomService.discoverServers(search, tags);
+    res.json(rooms);
+  }),
 
-  getTemplates(_req: Request, res: Response) {
+  getTemplates(_req: AuthRequest, res: Response) {
     res.json(getRoomTemplates());
   },
 
-  async get(req: Request, res: Response, next: NextFunction) {
-    try {
-      const room = await roomService.getById(req.params.id);
-      res.json(room);
-    } catch (err) { next(err); }
-  },
+  get: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const room = await roomService.getById(req.params.id);
+    res.json(room);
+  }),
 
-  async getByInviteCode(req: Request, res: Response, next: NextFunction) {
-    try {
-      const room = await roomService.getByInviteCode(req.params.code);
-      res.json(room);
-    } catch (err) { next(err); }
-  },
+  getByInviteCode: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const room = await roomService.getByInviteCode(req.params.code);
+    res.json(room);
+  }),
 
-  async getUserRooms(req: Request, res: Response, next: NextFunction) {
-    try {
-      const rooms = await roomService.getUserServers(req.params.userId);
-      res.json(rooms);
-    } catch (err) { next(err); }
-  },
+  getUserRooms: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const rooms = await roomService.getUserServers(userId);
+    res.json(rooms);
+  }),
 
-  async update(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { userId, ...updates } = req.body;
-      const room = await roomService.update(req.params.id, userId, updates);
-      res.json(room);
-    } catch (err) { next(err); }
-  },
+  update: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const room = await roomService.update(req.params.id, userId, req.body);
+    res.json(room);
+  }),
 
-  async updateTopic(req: Request, res: Response, next: NextFunction) {
-    try {
-      const room = await roomService.updateTopic(req.params.id, req.body.userId, req.body.topic);
-      res.json(room);
-    } catch (err) { next(err); }
-  },
+  updateTopic: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const room = await roomService.updateTopic(req.params.id, userId, req.body.topic);
+    res.json(room);
+  }),
 
-  async join(req: Request, res: Response, next: NextFunction) {
-    try {
-      const room = await roomService.join(req.params.id, req.body.userId);
-      res.json(room);
-    } catch (err) { next(err); }
-  },
+  join: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const room = await roomService.join(req.params.id, userId);
+    res.json(room);
+  }),
 
-  async joinByInvite(req: Request, res: Response, next: NextFunction) {
-    try {
-      const room = await roomService.joinByInvite(req.body.inviteCode, req.body.userId);
-      res.json(room);
-    } catch (err) { next(err); }
-  },
+  joinByInvite: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const room = await roomService.joinByInvite(req.body.inviteCode, userId);
+    res.json(room);
+  }),
 
-  async leave(req: Request, res: Response, next: NextFunction) {
-    try {
-      await roomService.leave(req.params.id, req.body.userId);
-      res.json({ success: true });
-    } catch (err) { next(err); }
-  },
+  leave: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    await roomService.leave(req.params.id, userId);
+    res.json({ success: true });
+  }),
 
-  async kick(req: Request, res: Response, next: NextFunction) {
-    try {
-      await roomService.kick(req.params.id, req.body.requesterId, req.body.targetId);
-      res.json({ success: true });
-    } catch (err) { next(err); }
-  },
+  kick: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    await roomService.kick(req.params.id, userId, req.body.targetId);
+    res.json({ success: true });
+  }),
 
-  async delete(req: Request, res: Response, next: NextFunction) {
-    try {
-      await roomService.delete(req.params.id, req.body.userId);
-      res.json({ success: true });
-    } catch (err) { next(err); }
-  },
+  delete: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    await roomService.delete(req.params.id, userId);
+    res.json({ success: true });
+  }),
 
-  async archive(req: Request, res: Response, next: NextFunction) {
-    try {
-      const room = await roomService.archive(req.params.id, req.body.userId);
-      res.json(room);
-    } catch (err) { next(err); }
-  },
+  archive: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const room = await roomService.archive(req.params.id, userId);
+    res.json(room);
+  }),
 
-  async unarchive(req: Request, res: Response, next: NextFunction) {
-    try {
-      const room = await roomService.unarchive(req.params.id, req.body.userId);
-      res.json(room);
-    } catch (err) { next(err); }
-  },
+  unarchive: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const room = await roomService.unarchive(req.params.id, userId);
+    res.json(room);
+  }),
 
-  async transferOwnership(req: Request, res: Response, next: NextFunction) {
-    try {
-      const room = await roomService.transferOwnership(req.params.id, req.body.currentOwnerId, req.body.newOwnerId);
-      res.json(room);
-    } catch (err) { next(err); }
-  },
+  transferOwnership: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const room = await roomService.transferOwnership(req.params.id, userId, req.body.newOwnerId);
+    res.json(room);
+  }),
 
-  async setMaterial(req: Request, res: Response, next: NextFunction) {
-    try {
-      const room = await roomService.setMaterial(req.params.id, req.body.userId, req.body.materialId);
-      res.json(room);
-    } catch (err) { next(err); }
-  },
+  setMaterial: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const room = await roomService.setMaterial(req.params.id, userId, req.body.materialId);
+    res.json(room);
+  }),
 
-  async addCategory(req: Request, res: Response, next: NextFunction) {
-    try {
-      const room = await roomService.addCategory(req.params.id, req.body.userId, req.body.name);
-      res.json(room);
-    } catch (err) { next(err); }
-  },
+  addCategory: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const room = await roomService.addCategory(req.params.id, userId, req.body.name);
+    res.json(room);
+  }),
 
-  async regenerateInvite(req: Request, res: Response, next: NextFunction) {
-    try {
-      const code = await roomService.regenerateInvite(req.params.id, req.body.userId);
-      res.json({ inviteCode: code });
-    } catch (err) { next(err); }
-  },
+  regenerateInvite: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const code = await roomService.regenerateInvite(req.params.id, userId);
+    res.json({ inviteCode: code });
+  }),
 
-  async getMembers(req: Request, res: Response, next: NextFunction) {
-    try {
-      const members = await roomService.getMemberProfiles(req.params.id);
-      res.json(members);
-    } catch (err) { next(err); }
-  },
+  getMembers: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const members = await roomService.getMemberProfiles(req.params.id);
+    res.json(members);
+  }),
 };
