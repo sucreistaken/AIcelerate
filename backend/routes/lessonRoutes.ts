@@ -2,7 +2,7 @@ import { Router } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { validate } from "../middleware/validate";
 import {
-  listLessons, getLesson, upsertLesson, updateProgress, deleteLesson, getMemory,
+  listLessons, listLessonsPaginated, getLesson, upsertLesson, updateProgress, deleteLesson, getMemory,
 } from "../controllers/lessonControllers";
 import { getCourseForLesson, removeLessonFromCourse, rebuildKnowledgeIndex } from "../controllers/courseController";
 import { assembleCourseContext } from "../controllers/contextAssembler";
@@ -34,7 +34,15 @@ import { scoreArtifact } from "../services/confidenceService";
 const router = Router();
 
 // ---- Lesson CRUD ----
-router.get("/lessons", (_req, res) => res.json(listLessons()));
+router.get("/lessons", (req, res) => {
+  const cursor = req.query.cursor as string | undefined;
+  const limit = Math.min(Math.max(1, Number(req.query.limit) || 20), 100);
+  // Support legacy: if no cursor/limit params, return all (backward compat)
+  if (!cursor && !req.query.limit) {
+    return res.json(listLessons());
+  }
+  res.json(listLessonsPaginated(cursor, limit));
+});
 
 router.get("/lessons/:id", (req, res) => {
   const l = getLesson(req.params.id);

@@ -56,6 +56,16 @@ export function gatewayTimeout(msg = "Gateway timeout") {
   return new AppError(504, msg, "GATEWAY_TIMEOUT");
 }
 
+export function tooManyRequests(msg = "Too many requests", retryAfterSec?: number) {
+  const err = new AppError(429, msg, "RATE_LIMITED");
+  if (retryAfterSec) (err as any).retryAfter = retryAfterSec;
+  return err;
+}
+
+export function serviceUnavailable(msg = "Service temporarily unavailable") {
+  return new AppError(503, msg, "SERVICE_UNAVAILABLE");
+}
+
 export function errorHandler(err: Error, req: Request, res: Response, _next: NextFunction) {
   if (res.headersSent) return;
 
@@ -84,12 +94,42 @@ export function errorHandler(err: Error, req: Request, res: Response, _next: Nex
     return;
   }
 
-  // Handle AI timeout errors
+  // Handle AI-specific errors
   if (err.message === "AI_TIMEOUT") {
     res.status(504).json({
       ok: false,
       error: "AI yanıt süresi aşıldı. Lütfen tekrar deneyin.",
       code: "AI_TIMEOUT",
+      ...(requestId && { requestId }),
+    });
+    return;
+  }
+
+  if (err.message === "AI_CIRCUIT_OPEN") {
+    res.status(503).json({
+      ok: false,
+      error: "AI servisi geçici olarak devre dışı. Lütfen biraz sonra tekrar deneyin.",
+      code: "AI_CIRCUIT_OPEN",
+      ...(requestId && { requestId }),
+    });
+    return;
+  }
+
+  if (err.message === "AI_RATE_LIMITED") {
+    res.status(429).json({
+      ok: false,
+      error: "AI istek limiti aşıldı. Lütfen biraz bekleyin.",
+      code: "AI_RATE_LIMITED",
+      ...(requestId && { requestId }),
+    });
+    return;
+  }
+
+  if (err.message === "AI_CONTENT_FILTERED") {
+    res.status(422).json({
+      ok: false,
+      error: "AI içerik güvenlik filtresi tarafından engellendi.",
+      code: "AI_CONTENT_FILTERED",
       ...(requestId && { requestId }),
     });
     return;

@@ -1,5 +1,7 @@
 import { Router } from "express";
+import mongoose from "mongoose";
 import { rateLimiter } from "../middleware/rateLimiter";
+import { getAiMetrics } from "../services/aiService";
 
 import lessonRoutes from "./lessonRoutes";
 import uploadRoutes from "./uploadRoutes";
@@ -21,8 +23,21 @@ import loProgressRoutes from "./loProgressRoutes";
 
 const router = Router();
 
-// Health check
-router.get("/health", (_req, res) => res.json({ ok: true }));
+// Health check — includes DB + AI status
+router.get("/health", (_req, res) => {
+  const mongoOk = mongoose.connection.readyState === 1;
+  const status = mongoOk ? 200 : 503;
+  res.status(status).json({
+    ok: mongoOk,
+    mongo: mongoOk ? "connected" : "disconnected",
+    uptime: Math.round(process.uptime()),
+  });
+});
+
+// AI metrics endpoint
+router.get("/health/ai-metrics", (_req, res) => {
+  res.json({ ok: true, data: getAiMetrics() });
+});
 
 // Auth
 router.use("/api", authRoutes);

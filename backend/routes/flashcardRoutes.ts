@@ -39,8 +39,25 @@ router.get("/flashcards/stats", (_req, res) => {
 
 router.get("/flashcards", (req, res) => {
   const lessonId = req.query.lessonId as string | undefined;
-  const cards = getFlashcards(lessonId);
-  res.json({ ok: true, cards });
+  const allCards = getFlashcards(lessonId);
+  const limit = Math.min(Math.max(1, Number(req.query.limit) || 50), 100);
+  const cursor = req.query.cursor as string | undefined;
+
+  // Backward compat: no pagination params → return all
+  if (!cursor && !req.query.limit) {
+    return res.json({ ok: true, cards: allCards });
+  }
+
+  let startIdx = 0;
+  if (cursor) {
+    const idx = allCards.findIndex((c: any) => c.id === cursor);
+    if (idx >= 0) startIdx = idx + 1;
+  }
+  const sliced = allCards.slice(startIdx, startIdx + limit + 1);
+  const hasMore = sliced.length > limit;
+  const items = hasMore ? sliced.slice(0, limit) : sliced;
+  const last = items[items.length - 1];
+  res.json({ ok: true, cards: items, nextCursor: hasMore && last ? (last as any).id : null, hasMore });
 });
 
 router.patch("/flashcards/:cardId", (req, res) => {

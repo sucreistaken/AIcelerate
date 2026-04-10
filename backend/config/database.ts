@@ -2,9 +2,11 @@ import { logger } from "../utils/logger";
 import mongoose from "mongoose";
 import { env } from "./env";
 import { registerGlobalPlugins } from "./mongoose-plugins";
+import { registerQueryMonitor } from "./queryMonitor";
 
 // Register global plugins BEFORE any model is compiled
 registerGlobalPlugins();
+registerQueryMonitor();
 
 const MONGO_OPTIONS: mongoose.ConnectOptions = {
   serverSelectionTimeoutMS: 5000,

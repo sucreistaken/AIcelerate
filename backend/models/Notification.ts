@@ -22,6 +22,7 @@ const notificationSchema = new Schema<INotification>(
   { timestamps: true }
 );
 
-notificationSchema.index({ userId: 1, read: 1 });
+// Compound index for listing user's unread notifications sorted by newest first
+notificationSchema.index({ userId: 1, read: 1, createdAt: -1 });
 
 export const Notification = mongoose.model<INotification>("Notification", notificationSchema);

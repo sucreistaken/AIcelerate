@@ -16,7 +16,7 @@ export const updateServerSchema = z.object({
   iconColor: z.string().optional(),
   tags: z.array(z.string().max(50)).max(10).optional(),
   university: z.string().max(100).optional(),
-  settings: z.record(z.unknown()).optional(),
+  settings: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const joinByInviteSchema = z.object({

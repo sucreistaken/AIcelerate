@@ -15,6 +15,52 @@ import { logger } from "../utils/logger";
 const ACCESS_TOKEN_EXPIRY = "15m";
 const REFRESH_TOKEN_EXPIRY_DAYS = 30;
 
+// --- Password strength validation ---
+function validatePasswordStrength(password: string): void {
+  if (password.length < 8) throw badRequest("Password must be at least 8 characters");
+  if (!/[A-Z]/.test(password)) throw badRequest("Password must contain at least one uppercase letter");
+  if (!/[0-9]/.test(password)) throw badRequest("Password must contain at least one digit");
+  if (!/[^A-Za-z0-9]/.test(password)) throw badRequest("Password must contain at least one special character");
+}
+
+// --- Login lockout ---
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
+const failedLoginAttempts = new Map<string, { count: number; lockedUntil: number }>();
+
+// Cleanup expired lockouts every 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of failedLoginAttempts) {
+    if (entry.lockedUntil <= now) failedLoginAttempts.delete(key);
+  }
+}, 10 * 60 * 1000);
+
+function checkLoginLockout(email: string): void {
+  const entry = failedLoginAttempts.get(email);
+  if (!entry) return;
+  if (entry.lockedUntil > Date.now() && entry.count >= LOGIN_MAX_ATTEMPTS) {
+    const retryMin = Math.ceil((entry.lockedUntil - Date.now()) / 60000);
+    throw new AppError(429, `Too many login attempts. Try again in ${retryMin} minute(s)`, "RATE_LIMITED");
+  }
+  if (entry.lockedUntil <= Date.now()) {
+    failedLoginAttempts.delete(email);
+  }
+}
+
+function recordFailedLogin(email: string): void {
+  const entry = failedLoginAttempts.get(email) || { count: 0, lockedUntil: 0 };
+  entry.count++;
+  if (entry.count >= LOGIN_MAX_ATTEMPTS) {
+    entry.lockedUntil = Date.now() + LOGIN_LOCKOUT_MS;
+  }
+  failedLoginAttempts.set(email, entry);
+}
+
+function clearFailedLogins(email: string): void {
+  failedLoginAttempts.delete(email);
+}
+
 function generateFriendCode(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   const bytes = crypto.randomBytes(8);
@@ -54,7 +100,7 @@ export const authService = {
     const existing = await User.findOne({ email: email.toLowerCase().trim() });
     if (existing) throw new AppError(409, "Email already registered", "CONFLICT");
 
-    if (password.length < 6) throw badRequest("Password must be at least 6 characters");
+    validatePasswordStrength(password);
 
     const passwordHash = await bcrypt.hash(password, 12);
     const friendCode = generateFriendCode();
@@ -74,12 +120,22 @@ export const authService = {
   },
 
   async login(email: string, password: string) {
-    const user = await User.findOne({ email: email.toLowerCase().trim() });
-    if (!user) throw new AppError(401, "Invalid email or password", "UNAUTHORIZED");
+    const normalizedEmail = email.toLowerCase().trim();
+    checkLoginLockout(normalizedEmail);
+
+    const user = await User.findOne({ email: normalizedEmail });
+    if (!user) {
+      recordFailedLogin(normalizedEmail);
+      throw new AppError(401, "Invalid email or password", "UNAUTHORIZED");
+    }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) throw new AppError(401, "Invalid email or password", "UNAUTHORIZED");
+    if (!valid) {
+      recordFailedLogin(normalizedEmail);
+      throw new AppError(401, "Invalid email or password", "UNAUTHORIZED");
+    }
 
+    clearFailedLogins(normalizedEmail);
     const tokens = await createTokenPair(user._id.toString());
     return {
       user: { id: user._id.toString(), email: user.email, profile: user.profile, friendCode: user.friendCode, settings: user.settings },
@@ -139,7 +195,7 @@ export const authService = {
     const valid = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!valid) throw new AppError(401, "Current password is incorrect", "UNAUTHORIZED");
 
-    if (newPassword.length < 6) throw badRequest("New password must be at least 6 characters");
+    validatePasswordStrength(newPassword);
 
     user.passwordHash = await bcrypt.hash(newPassword, 12);
     await user.save();

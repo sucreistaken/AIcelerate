@@ -20,8 +20,14 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
-      - run: npx tsc --noEmit
-      - run: npx vitest run
+      - name: Security audit
+        run: npm audit --audit-level=moderate || true
+      - name: Lint
+        run: npx eslint . --ext .ts
+      - name: Type check
+        run: npx tsc --noEmit
+      - name: Tests with coverage
+        run: npx vitest run --coverage
 
   frontend:
     runs-on: ubuntu-latest

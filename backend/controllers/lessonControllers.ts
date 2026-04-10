@@ -152,6 +152,20 @@ export function listLessons(): Lesson[] {
   return loadLessons();
 }
 
+export function listLessonsPaginated(cursor?: string, limit = 20): { items: Lesson[]; nextCursor: string | null; hasMore: boolean } {
+  const all = loadLessons();
+  let startIdx = 0;
+  if (cursor) {
+    const idx = all.findIndex((l) => l.id === cursor);
+    if (idx >= 0) startIdx = idx + 1;
+  }
+  const sliced = all.slice(startIdx, startIdx + limit + 1);
+  const hasMore = sliced.length > limit;
+  const items = hasMore ? sliced.slice(0, limit) : sliced;
+  const last = items[items.length - 1];
+  return { items, nextCursor: hasMore && last ? last.id : null, hasMore };
+}
+
 // Geriye dönük uyumluluk (eski isim):
 export const getLessons = (): Lesson[] => listLessons();
 

@@ -32,7 +32,13 @@ app.use(helmet({
 }));
 
 // Gzip/Brotli response compression
-app.use(compression());
+app.use(compression({
+  threshold: 1024, // Skip compression for responses < 1KB
+  filter: (req, res) => {
+    if (req.headers["x-no-compression"]) return false;
+    return compression.filter(req, res);
+  },
+}));
 
 // CORS
 app.use(

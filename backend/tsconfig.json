@@ -5,7 +5,14 @@
     "moduleResolution": "node",
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "strict": false
+    "strict": false,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "outDir": "./dist",
+    "rootDir": "."
   },
-  "include": ["server.ts"]
+  "include": ["./**/*.ts"],
+  "exclude": ["node_modules", "dist", "data", "**/*.test.ts", "**/__tests__/**"]
 }

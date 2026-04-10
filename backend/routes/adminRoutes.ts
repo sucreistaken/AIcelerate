@@ -18,11 +18,7 @@ import * as admin from "../controllers/adminController";
 
 const router = Router();
 
-// DEV BYPASS — skip auth in development
-const isDev = process.env.NODE_ENV !== "production";
-if (!isDev) {
-  router.use(requireAuth);
-}
+router.use(requireAuth);
 
 // ---- Stats ----
 router.get(

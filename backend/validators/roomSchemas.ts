@@ -24,7 +24,7 @@ export const updateRoomSchema = z.object({
   tags: z.array(z.string().max(50)).max(10).optional(),
   university: z.string().max(100).optional(),
   isPublic: z.boolean().optional(),
-  settings: z.record(z.unknown()).optional(),
+  settings: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const updateTopicSchema = z.object({
