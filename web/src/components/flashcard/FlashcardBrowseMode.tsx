@@ -12,7 +12,6 @@ function FlashcardBrowseMode() {
   const { cards, fetchAll, deleteCard, loading } = useFlashcardStore();
   const currentLessonId = useLessonStore((s) => s.currentLessonId);
   const [filter, setFilter] = useState<string>("all");
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [editingCard, setEditingCard] = useState<{ id: string; front: string; back: string } | null>(null);
   const [editSaving, setEditSaving] = useState(false);
 
@@ -34,28 +33,9 @@ function FlashcardBrowseMode() {
   }, [editingCard, fetchAll, currentLessonId]);
 
   const handleDelete = useCallback((cardId: string) => {
-    setPendingDeleteId(cardId);
-    const toastId = toast((toastT) => (
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <span>{t('flashcard.cardDeleted')}</span>
-        <button
-          style={{ background: "var(--accent-2)", color: "#fff", border: "none", borderRadius: 6, padding: "4px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
-          onClick={() => { toast.dismiss(toastT.id); setPendingDeleteId(null); }}
-        >
-          {t('flashcard.undo')}
-        </button>
-      </div>
-    ), { duration: 5000 });
-
-    setTimeout(() => {
-      setPendingDeleteId((current) => {
-        if (current === cardId) {
-          deleteCard(cardId);
-          return null;
-        }
-        return current;
-      });
-    }, 5000);
+    // Delete immediately
+    deleteCard(cardId);
+    toast.success(t('flashcard.cardDeleted'), { duration: 2000 });
   }, [deleteCard]);
 
   useEffect(() => {
@@ -135,9 +115,8 @@ function FlashcardBrowseMode() {
                       onClick={() => setEditingCard({ id: card.id, front: card.front, back: card.back })}>
                       {t('flashcard.edit')}
                     </button>
-                    <button className="fc-delete-btn" onClick={() => handleDelete(card.id)}
-                      disabled={pendingDeleteId === card.id}>
-                      {pendingDeleteId === card.id ? t('flashcard.deleting') : t('flashcard.delete')}
+                    <button className="fc-delete-btn" onClick={() => handleDelete(card.id)}>
+                      {t('flashcard.delete')}
                     </button>
                   </div>
                 </div>

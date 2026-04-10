@@ -69,27 +69,9 @@ export const useNotificationStore = create<NotificationState>()((set, get) => ({
     },
 
     dismissAll: async () => {
-        const res = await notificationApi.dismissAll();
-        if (res.ok) {
-            set((state) => ({
-                notifications: state.notifications.map((n) => ({
-                    ...n,
-                    dismissed: true,
-                    dismissedAt: new Date().toISOString(),
-                })),
-                unreadCount: 0,
-            }));
-        } else {
-            // Fallback: dismiss locally even if API fails
-            set((state) => ({
-                notifications: state.notifications.map((n) => ({
-                    ...n,
-                    dismissed: true,
-                    dismissedAt: new Date().toISOString(),
-                })),
-                unreadCount: 0,
-            }));
-        }
+        // Optimistic: clear UI immediately
+        set({ notifications: [], unreadCount: 0 });
+        await notificationApi.dismissAll();
     },
 
     setDropdownOpen: (open: boolean) => set({ dropdownOpen: open }),

@@ -110,9 +110,19 @@ export default function NotificationBell() {
           >
             <div className="notification-bell__dropdown-header">
               <span className="notification-bell__dropdown-title">{t("nav.notifications")}</span>
-              {store.unreadCount > 0 && (
-                <span className="notification-bell__dropdown-count">{store.unreadCount} {t("common.unread")}</span>
-              )}
+              <div className="notification-bell__dropdown-header-right">
+                {store.unreadCount > 0 && (
+                  <span className="notification-bell__dropdown-count">{store.unreadCount} {t("common.unread")}</span>
+                )}
+                {displayNotifs.length > 0 && (
+                  <button
+                    className="notification-bell__clear-all"
+                    onClick={(e) => { e.stopPropagation(); store.dismissAll(); }}
+                  >
+                    {t("common.clearAll") || "Tumunu temizle"}
+                  </button>
+                )}
+              </div>
             </div>
             <motion.div
               className="notification-bell__dropdown-list"

@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   listNotifications,
   dismissNotification,
+  dismissAllNotifications,
   getUnreadCount,
   checkAndGenerateNotifications,
 } from "../controllers/notificationController";
@@ -18,6 +19,11 @@ router.post("/notifications/:id/dismiss", (req, res) => {
   const notif = dismissNotification(req.params.id);
   if (!notif) return res.status(404).json({ ok: false, error: "Notification not found" });
   res.json({ ok: true, notification: notif });
+});
+
+router.post("/notifications/dismiss-all", (_req, res) => {
+  const count = dismissAllNotifications();
+  res.json({ ok: true, dismissed: count });
 });
 
 router.get("/notifications/unread-count", (_req, res) => {

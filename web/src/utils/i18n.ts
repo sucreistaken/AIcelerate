@@ -502,6 +502,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'common.course': 'Kurs',
     'common.unread': 'okunmamış',
     'common.noNotifications': 'Bildirim yok',
+    'common.clearAll': 'Tümünü temizle',
 
     // Empty States
     'empty.noLessons': 'Henüz ders yok',
@@ -1455,6 +1456,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'common.course': 'Course',
     'common.unread': 'unread',
     'common.noNotifications': 'No notifications',
+    'common.clearAll': 'Clear all',
 
     // Empty States
     'empty.noLessons': 'No lessons yet',

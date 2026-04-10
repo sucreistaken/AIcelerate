@@ -95,6 +95,22 @@ export function dismissNotification(notifId: string): AppNotification | null {
   return all[idx];
 }
 
+// 2b. Dismiss ALL notifications
+export function dismissAllNotifications(): number {
+  const all = loadNotifications();
+  const now = new Date().toISOString();
+  let count = 0;
+  for (const n of all) {
+    if (!n.dismissed) {
+      n.dismissed = true;
+      n.dismissedAt = now;
+      count++;
+    }
+  }
+  if (count > 0) saveNotifications(all);
+  return count;
+}
+
 // 3. Get unread count
 export function getUnreadCount(): number {
   const all = loadNotifications();
