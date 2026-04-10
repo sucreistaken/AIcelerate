@@ -46,14 +46,23 @@ router.get("/health/ai-metrics", (_req, res) => {
 
 // Dashboard batch endpoint — replaces 7 separate calls with 1
 // All data served from in-memory cache (0 disk I/O)
+// ?lite=true strips transcript/slideText (~50-100KB saved per response)
 router.get("/api/dashboard/init", (req, res) => {
   const courseId = req.query.courseId as string | undefined;
+  const lite = req.query.lite === "true";
   const t0 = performance.now();
   try {
     checkAndGenerateNotifications();
+    let lessons = listLessons();
+    if (lite) {
+      lessons = lessons.map((l: any) => {
+        const { transcript, slideText, ...meta } = l;
+        return meta;
+      });
+    }
     const result = {
       ok: true,
-      lessons: listLessons(),
+      lessons,
       courses: listCourses(),
       unreadCount: getUnreadCount(),
       scheduler: {

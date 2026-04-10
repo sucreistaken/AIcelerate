@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { Course, CourseProgress, WeeklySchedule } from "../types";
 import { courseApi } from "../services/api";
 import { t } from "../utils/i18n";
+import { dedup } from "../utils/dedup";
 
 interface CourseState {
   courses: Course[];
@@ -53,7 +54,7 @@ export const useCourseStore = create<CourseState>()(
       fetchCourses: async () => {
         set({ loading: true, error: null });
         try {
-          const result = await courseApi.getAll();
+          const result = await dedup("courses:getAll", () => courseApi.getAll());
           if (result.ok && result.courses) {
             set({ courses: result.courses, loading: false });
           } else {
@@ -154,6 +155,10 @@ export const useCourseStore = create<CourseState>()(
       },
 
       getCourseForCurrentLesson: (lessonId) => {
+        // Fast path: check current course first (most common case)
+        const current = get().courses.find((c) => c.id === get().currentCourseId);
+        if (current?.lessonIds.includes(lessonId)) return current;
+        // Fallback: scan all courses
         return get().courses.find((c) => c.lessonIds.includes(lessonId)) || null;
       },
 

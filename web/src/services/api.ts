@@ -7,20 +7,30 @@ export type { ApiResponse, LessonData, PlanResponse, TranscribeStartResponse } f
 export { handleResponse } from './httpClient';
 
 // Dashboard batch endpoint — fetches all initial data in 1 request instead of 7
+// Uses singleton promise pattern: concurrent calls share a single in-flight request
 import { API_BASE } from './httpClient';
+
+let _dashboardPromise: Promise<any | null> | null = null;
 
 export const dashboardApi = {
   async init(courseId?: string): Promise<any | null> {
-    try {
-      const url = courseId
-        ? `${API_BASE}/api/dashboard/init?courseId=${encodeURIComponent(courseId)}`
-        : `${API_BASE}/api/dashboard/init`;
-      const res = await fetch(url);
-      if (!res.ok) return null;
-      return await res.json();
-    } catch {
-      return null;
-    }
+    // Dedup: if a request is already in-flight, return the same promise
+    if (_dashboardPromise) return _dashboardPromise;
+    _dashboardPromise = (async () => {
+      try {
+        const params = new URLSearchParams();
+        params.set("lite", "true"); // Skip transcript/slideText for faster dashboard load
+        if (courseId) params.set("courseId", courseId);
+        const res = await fetch(`${API_BASE}/api/dashboard/init?${params}`);
+        if (!res.ok) return null;
+        return await res.json();
+      } catch {
+        return null;
+      } finally {
+        _dashboardPromise = null; // Allow next call after completion
+      }
+    })();
+    return _dashboardPromise;
   },
 };
 

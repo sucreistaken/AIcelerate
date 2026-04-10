@@ -28,4 +28,8 @@ const lessonSchema = new Schema(
   { timestamps: true, _id: false }
 );
 
+// ── Indexes for frequent queries ──
+lessonSchema.index({ courseId: 1, createdAt: -1 }); // "All lessons for course X" (newest first)
+lessonSchema.index({ courseCode: 1 });                // Lookup by course code
+
 export const LessonModel = mongoose.model("Lesson", lessonSchema);

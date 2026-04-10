@@ -28,4 +28,8 @@ const shareSchema = new Schema(
   { timestamps: true, _id: false }
 );
 
+// ── Indexes for frequent queries ──
+shareSchema.index({ lessonId: 1 });                        // Shares for a lesson
+shareSchema.index({ createdBy: 1, createdAt: -1 });        // User's shares (newest first)
+
 export const ShareModel = mongoose.model("Share", shareSchema);

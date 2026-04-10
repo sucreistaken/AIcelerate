@@ -26,4 +26,9 @@ const flashcardSchema = new Schema(
   { timestamps: true, _id: false }
 );
 
+// ── Indexes for frequent queries ──
+flashcardSchema.index({ lessonId: 1 });                    // Per-lesson flashcard fetch
+flashcardSchema.index({ lessonId: 1, state: 1 });          // SM-2: "due cards for lesson X"
+flashcardSchema.index({ state: 1, nextReviewDate: 1 });    // Global due cards query
+
 export const FlashcardModel = mongoose.model("Flashcard", flashcardSchema);

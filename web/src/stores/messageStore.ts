@@ -134,6 +134,15 @@ export const useMessageStore = create<MessageState>((set, get) => ({
     if (get()._listenersAttached) return;
     const socket = getCollabSocket();
 
+    // Remove any stale listeners before re-attaching (prevents accumulation on reconnect)
+    socket.off("msg:new");
+    socket.off("msg:edited");
+    socket.off("msg:deleted");
+    socket.off("msg:reacted");
+    socket.off("msg:pinned");
+    socket.off("typing:start");
+    socket.off("typing:stop");
+
     socket.on("msg:new", (message: ChannelMessage) => {
       set((s) => {
         const existing = s.messagesByChannel[message.channelId] || [];

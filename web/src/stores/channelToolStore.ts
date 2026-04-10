@@ -166,6 +166,18 @@ export const useChannelToolStore = create<ChannelToolState>((set, get) => ({
   setupListeners: () => {
     const socket = getCollabSocket();
 
+    // Remove stale listeners before re-attaching (prevents accumulation)
+    socket.off("tool:data:update");
+    socket.off("tool:quiz:answered");
+    socket.off("tool:flashcard:added");
+    socket.off("tool:deepdive:newmsg");
+    socket.off("tool:mindmap:updated");
+    socket.off("tool:sprint:updated");
+    socket.off("tool:notes:added");
+    socket.off("tool:notes:edited");
+    socket.off("tool:notes:deleted");
+    socket.off("tool:notes:pinned");
+
     socket.on("tool:data:update", (data: { channelId: string; toolData: ChannelToolData }) => {
       get().setToolData(data.channelId, data.toolData);
     });

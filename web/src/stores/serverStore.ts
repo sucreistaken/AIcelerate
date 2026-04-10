@@ -285,6 +285,13 @@ export const useServerStore = create<ServerState>((set, get) => ({
     if (get()._listenersAttached) return;
     const socket = getCollabSocket();
 
+    // Remove stale listeners before re-attaching (prevents accumulation on reconnect)
+    socket.off("server:member:joined");
+    socket.off("server:member:left");
+    socket.off("presence:update");
+    socket.off("channel:lesson:linked");
+    socket.off("channel:lesson:unlinked");
+
     socket.on("server:member:joined", (data: { serverId: string; member: ServerMemberInfo }) => {
       const { activeServerId } = get();
       if (data.serverId === activeServerId) {

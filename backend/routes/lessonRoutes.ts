@@ -199,7 +199,7 @@ router.post("/plan-from-text/stream", async (req, res) => {
     } catch { /* client already gone, that's ok — lesson is saved */ }
     res.end();
   } catch (err: any) {
-    console.error("[Stream] Error in streaming route:", err.message);
+    logger.error({ err: err.message }, "Stream error in plan generation");
     if (!res.headersSent) {
       res.status(500).json({ ok: false, error: err.message });
     } else {

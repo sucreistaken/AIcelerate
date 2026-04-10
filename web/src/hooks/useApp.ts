@@ -27,11 +27,17 @@ export function useApp() {
   const toggleLeftPanel = useUiStore((s) => s.toggleLeftPanel);
   const authUser = useAuthStore((s) => s.user);
 
-  const courseStore = useCourseStore();
+  // Use selectors to avoid re-rendering on unrelated store changes
+  const courses = useCourseStore((s) => s.courses);
+  const currentCourseId = useCourseStore((s) => s.currentCourseId);
+  const setCourses = useCourseStore((s) => s.setCourses);
+  const fetchCourses = useCourseStore((s) => s.fetchCourses);
 
   const [showSettings, setShowSettings] = useState(false);
-  const currentCourse =
-    courseStore.courses.find((c) => c.id === courseStore.currentCourseId) || null;
+  const currentCourse = useMemo(
+    () => courses.find((c) => c.id === currentCourseId) || null,
+    [courses, currentCourseId]
+  );
 
   const [shareId, setShareId] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
@@ -62,20 +68,19 @@ export function useApp() {
   );
 
   useEffect(() => {
-    // Batch endpoint: 1 request instead of 7 separate calls
+    // Batch endpoint: 1 deduped request instead of 7 separate calls
     dashboardApi.init().then((data) => {
       if (data?.ok) {
         if (data.lessons) lesson.setLessons(data.lessons);
-        if (data.courses) courseStore.setCourses(data.courses);
+        if (data.courses) setCourses(data.courses);
       } else {
-        // Fallback to individual calls if batch fails
         lesson.fetchLessons();
-        courseStore.fetchCourses();
+        fetchCourses();
         notificationApi.check().catch(() => {});
       }
     }).catch(() => {
       lesson.fetchLessons();
-      courseStore.fetchCourses();
+      fetchCourses();
       notificationApi.check().catch(() => {});
     });
   }, []);

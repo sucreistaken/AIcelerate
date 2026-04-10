@@ -21,4 +21,9 @@ const reportSchema = new Schema<IReport>(
   { timestamps: true }
 );
 
+// ── Indexes for frequent queries ──
+reportSchema.index({ status: 1, createdAt: -1 });         // Admin: pending reports (newest first)
+reportSchema.index({ reporterId: 1 });                     // User's reports
+reportSchema.index({ roomId: 1 });                         // Reports per room
+
 export const Report = mongoose.model<IReport>("Report", reportSchema);

@@ -16,13 +16,21 @@ export default defineConfig({
   },
   build: {
     target: "ES2020",
+    sourcemap: false,
+    chunkSizeWarningLimit: 800,
+    // Modern browsers only — skip modulePreload polyfill
+    modulePreload: { polyfill: false },
     rollupOptions: {
       output: {
         manualChunks: {
+          // Core: always loaded
           vendor: ["react", "react-dom", "react-router-dom"],
           state: ["zustand", "socket.io-client"],
           ui: ["framer-motion", "lucide-react"],
-          charts: ["mermaid"],
+          // NOTE: mermaid and html2pdf are NOT listed here intentionally.
+          // They use dynamic import() in their consumers, so Vite auto-splits
+          // them into separate async chunks. Listing them here would force
+          // them into the eager bundle, defeating code-splitting.
         },
       },
     },
