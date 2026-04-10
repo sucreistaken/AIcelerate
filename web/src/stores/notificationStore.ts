@@ -13,6 +13,7 @@ interface NotificationState {
     fetchUnreadCount: () => Promise<void>;
     triggerCheck: () => Promise<void>;
     dismissNotification: (id: string) => Promise<void>;
+    dismissAll: () => Promise<void>;
     setDropdownOpen: (open: boolean) => void;
     toggleDropdown: () => void;
     prependNotification: (notif: AppNotification) => void;
@@ -29,7 +30,8 @@ export const useNotificationStore = create<NotificationState>()((set, get) => ({
         set({ loading: true });
         const res = await notificationApi.getAll();
         if (res.ok && res.notifications) {
-            set({ notifications: res.notifications });
+            const undismissed = res.notifications.filter((n: AppNotification) => !n.dismissed).length;
+            set({ notifications: res.notifications, unreadCount: undismissed });
         }
         set({ loading: false });
     },
@@ -66,8 +68,39 @@ export const useNotificationStore = create<NotificationState>()((set, get) => ({
         }
     },
 
+    dismissAll: async () => {
+        const res = await notificationApi.dismissAll();
+        if (res.ok) {
+            set((state) => ({
+                notifications: state.notifications.map((n) => ({
+                    ...n,
+                    dismissed: true,
+                    dismissedAt: new Date().toISOString(),
+                })),
+                unreadCount: 0,
+            }));
+        } else {
+            // Fallback: dismiss locally even if API fails
+            set((state) => ({
+                notifications: state.notifications.map((n) => ({
+                    ...n,
+                    dismissed: true,
+                    dismissedAt: new Date().toISOString(),
+                })),
+                unreadCount: 0,
+            }));
+        }
+    },
+
     setDropdownOpen: (open: boolean) => set({ dropdownOpen: open }),
-    toggleDropdown: () => set((s) => ({ dropdownOpen: !s.dropdownOpen })),
+    toggleDropdown: () => {
+        const wasOpen = get().dropdownOpen;
+        set({ dropdownOpen: !wasOpen });
+        if (!wasOpen) {
+            // Refresh notifications when opening dropdown
+            get().fetchNotifications();
+        }
+    },
 
     prependNotification: (notif: AppNotification) => {
         set((state) => ({

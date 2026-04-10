@@ -1,277 +1,113 @@
-import { logger } from "../utils/logger";
-import React, { useState, useRef } from "react";
-import { Plan, ModuleT, LearningOutcome, ConfidenceScore } from "../types";
-import { exportToPdf } from "../utils/pdfExport";
-import PaneInfoBanner from "./ui/PaneInfoBanner";
-import { ConfidenceBadge } from "./ui/ConfidenceBadge";
+import { useRef, useState } from "react";
+import { motion } from "framer-motion";
+import { Plan, ConfidenceScore } from "../types";
 import { t } from "../utils/i18n";
-
-/** Yardımcı fonksiyon: Dakikayı okunabilir formata çevirir */
-function prettyMinutes(min?: number) {
-  if (!min && min !== 0) return "";
-  if (min < 60) return `${min} dk`;
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return m ? `${h}s ${m} dk` : `${h}s`;
-}
-
-/** Zorluk Seviyesi Ayarları */
-const diffConfig: Record<string, { labelKey: string; style: React.CSSProperties }> = {
-  Beginner: { labelKey: "plan.diffBeginner", style: { backgroundColor: "var(--success-bg)", color: "var(--success)", border: "1px solid var(--success)" } },
-  Intermediate: { labelKey: "plan.diffIntermediate", style: { backgroundColor: "var(--warning-bg)", color: "var(--warning)", border: "1px solid var(--warning)" } },
-  Advanced: { labelKey: "plan.diffAdvanced", style: { backgroundColor: "var(--danger-bg)", color: "var(--danger)", border: "1px solid var(--danger)" } }
-};
+import PaneInfoBanner from "./ui/PaneInfoBanner";
+import PlanHeader from "./plan/PlanHeader";
+import PlanStats from "./plan/PlanStats";
+import PlanModuleCard from "./plan/PlanModuleCard";
+import PlanLearningOutcomes from "./plan/PlanLearningOutcomes";
+import PlanResources from "./plan/PlanResources";
 
 export default function PlanPane({ plan, confidence }: { plan: Plan; confidence?: ConfidenceScore | null }) {
-  const diffKey = plan.difficulty || "Intermediate";
-  const diff = diffConfig[diffKey] || diffConfig.Intermediate;
-  const [pdfLoading, setPdfLoading] = useState(false);
   const planRef = useRef<HTMLDivElement>(null);
+  const [showAllConcepts, setShowAllConcepts] = useState(false);
 
-  const handleExportPdf = async () => {
-    if (!planRef.current) return;
-    setPdfLoading(true);
-    try {
-      await exportToPdf(planRef.current, plan.topic || "LessonPlan");
-    } catch (err) {
-      logger.error("PDF export error:", err);
-    } finally {
-      setPdfLoading(false);
-    }
-  };
+  const concepts = (plan.key_concepts || []).map((k) =>
+    typeof k === "object" ? (k as any).title || JSON.stringify(k) : k,
+  );
+  const CONCEPT_LIMIT = 12;
+  const visibleConcepts = showAllConcepts ? concepts : concepts.slice(0, CONCEPT_LIMIT);
 
   return (
-    <div className="grid-gap-16" ref={planRef}>
+    <motion.div
+      className="pp"
+      ref={planRef}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.25 }}
+    >
       <PaneInfoBanner
         id="plan"
         title={t("plan.title")}
-        description="AI dersinizi analiz ederek haftalık bir öğrenme planı oluşturur."
-        tips={["Haftalık plan", "Zorluk seviyesi", "Ana kavramlar", "PDF export"]}
+        description="AI dersinizi analiz ederek haftalik bir ogrenme plani olusturur."
+        tips={["Haftalik plan", "Zorluk seviyesi", "Ana kavramlar", "PDF export"]}
       />
-      <header className="lc-section pad-b-10">
-        <div className="plan-header">
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", marginBottom: "6px" }}>
-              <div className="plan-title" style={{ margin: 0 }}>{plan.topic || "Öğrenme Planı"}</div>
-              <button className="btn btn-secondary" onClick={handleExportPdf} disabled={pdfLoading} style={{ fontSize: 12, padding: "4px 10px" }}>
-                {pdfLoading ? "..." : "PDF"}
+
+      <PlanHeader plan={plan} confidence={confidence} planRef={planRef} />
+
+      <PlanStats plan={plan} />
+
+      {/* Key Concepts */}
+      {concepts.length > 0 && (
+        <motion.section
+          className="pp__concepts"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.12 }}
+        >
+          <div className="pp__section-header">
+            <div className="pp__section-icon pp__section-icon--concept">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+              </svg>
+            </div>
+            <h2 className="pp__section-title">{t("plan.keyConcepts")}</h2>
+            <span className="pp__section-count">{concepts.length}</span>
+          </div>
+          <div className="pp__concepts-chips">
+            {visibleConcepts.map((label, i) => (
+              <motion.span
+                key={i}
+                className="pp__concept-chip"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.2, delay: 0.14 + i * 0.02 }}
+              >
+                {label}
+              </motion.span>
+            ))}
+            {concepts.length > CONCEPT_LIMIT && (
+              <button
+                className="pp__concept-toggle"
+                onClick={() => setShowAllConcepts((v) => !v)}
+              >
+                {showAllConcepts ? "Daha az" : `+${concepts.length - CONCEPT_LIMIT} daha`}
               </button>
-              {plan.difficulty && (
-                <span style={{ ...diff.style, fontSize: "12px", fontWeight: "600", padding: "4px 10px", borderRadius: "99px" }}>
-                  {t(diff.labelKey)}
-                </span>
-              )}
-              <ConfidenceBadge score={confidence} compact />
+            )}
+          </div>
+        </motion.section>
+      )}
+
+      <PlanLearningOutcomes outcomes={plan.learning_outcomes || []} />
+
+      {/* Modules */}
+      {(plan.modules || []).length > 0 && (
+        <div className="pp__modules">
+          <div className="pp__section-header">
+            <div className="pp__section-icon pp__section-icon--module">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
+              </svg>
             </div>
-            <div className="plan-meta">
-              {plan.duration_weeks ? `${plan.duration_weeks} hafta` : "Süre: belirtilmedi"}
-              {plan.key_concepts?.length ? ` • ${plan.key_concepts.length} ana kavram` : ""}
-            </div>
+            <h2 className="pp__section-title">Moduller</h2>
+            <span className="pp__section-count">{plan.modules!.length} modul</span>
           </div>
-        </div>
-
-        {/* Anahtar Kavramlar (Çökme Korumalı) */}
-        {plan.key_concepts?.length ? (
-          <div className="lc-chipset">
-            {plan.key_concepts.slice(0, 18).map((k, i) => {
-              // Gelen veri obje ise string'e çevir veya title'ını al
-              const label = typeof k === "object" ? (k as any).title || JSON.stringify(k) : k;
-              return <div key={i} className="lc-chip">{label}</div>;
-            })}
-          </div>
-        ) : null}
-      </header>
-      {plan.learning_outcomes?.length ? (
-  <section className="lc-section">
-    <h3 className="h3 mb-2">Learning Outcomes (Syllabus)</h3>
-    <ul className="ul">
-      {plan.learning_outcomes.map((lo, i) => (
-        <li key={i} className="mb-1">
-          <strong>{lo.code || `LO${i + 1}`}:</strong> {lo.description}
-          {typeof lo.covered === "boolean" && (
-            <span
-              style={{
-                marginLeft: "6px",
-                padding: "2px 8px",
-                borderRadius: "999px",
-                fontSize: "11px",
-                fontWeight: 600,
-                backgroundColor: lo.covered ? "var(--success-bg)" : "var(--danger-bg)",
-                color: lo.covered ? "var(--success)" : "var(--danger)",
-              }}
-            >
-              {lo.covered ? "Covered" : "Not fully covered"}
-            </span>
-          )}
-
-          {/* Hangi dersler bu LO'yu kapsiyor? */}
-          {lo.covered_by_lessons?.length ? (
-            <div style={{ marginTop: "4px", fontSize: "12px", opacity: 0.8 }}>
-              Lessons:&nbsp;
-              {lo.covered_by_lessons.join(", ")}
-            </div>
-          ) : null}
-        </li>
-      ))}
-    </ul>
-  </section>
-) : null}
-
-
-     {(plan.modules || []).map((m, idx) => (
-  <ModuleAccordion
-    key={idx}
-    index={idx}
-    mod={m}
-    defaultOpen={idx === 0}
-    learningOutcomes={plan.learning_outcomes || []}   // YENİ
-  />
-))}
-
-      {/* Kaynaklar (Çökme Korumalı - Sorunun Kaynağı Burasıydı) */}
-      {plan.resources?.length ? (
-        <section className="lc-section">
-          <div className="resources-title">{t("plan.resources")}</div>
-          <ul className="ul">
-            {plan.resources.map((r, i) => {
-              let content;
-              if (typeof r === "string") {
-                content = r;
-              } else if (typeof r === "object" && r !== null) {
-                // Eğer { title: "...", url: "..." } geldiyse
-                content = (
-                  <span>
-                    {(r as any).title} 
-                    {(r as any).url && <a href={(r as any).url} target="_blank" rel="noreferrer" style={{marginLeft: "6px", color: "blue"}}>(Link)</a>}
-                  </span>
-                );
-              } else {
-                content = JSON.stringify(r);
-              }
-              return <li key={i}>{content}</li>;
-            })}
-          </ul>
-        </section>
-      ) : null}
-    </div>
-  );
-}
-
-function ModuleAccordion({
-  mod,
-  index,
-  defaultOpen = false,
-  learningOutcomes = [],
-}: {
-  mod: ModuleT;
-  index: number;
-  defaultOpen?: boolean;
-  learningOutcomes?: LearningOutcome[];
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-
-  return (
-    <section className="lc-acc">
-      <div className="lc-acc-head" onClick={() => setOpen((o) => !o)}>
-        <div>
-          <div className="lc-acc-title">
-            {index + 1}. {mod.title}
-          </div>
-          <div className="lc-acc-sub">{mod.goal}</div>
-        </div>
-        <div className="op-50 fw-700" style={{ fontSize: "18px" }}>
-          {open ? "−" : "+"}
-        </div>
-      </div>
-
-      {open && (
-        <div className="lc-acc-body">
-          <div className="lc-lesson-grid">
-            {mod.lessons?.map((l, li) => {
-              // Bu lesson'i hangi LO'lar kapsiyor?
-              const loTags =
-                learningOutcomes
-                  ?.filter(
-                    (lo) =>
-                      lo.covered_by_lessons &&
-                      lo.covered_by_lessons.some(
-                        (name) =>
-                          name.toLowerCase().trim() ===
-                          String(l.title).toLowerCase().trim()
-                      )
-                  )
-                  .map((lo) => lo.code)
-                  .filter(Boolean) || [];
-
-              return (
-                <div key={li} className="lc-lesson">
-                  <div className="lc-lesson-head">
-                    <div className="fw-800">{l.title}</div>
-                    <div className="lc-badge">
-                      {prettyMinutes(l.study_time_min)}
-                    </div>
-                  </div>
-
-                  {/* LO etiketleri */}
-                  {loTags.length > 0 && (
-                    <div style={{ marginTop: "4px", marginBottom: "4px" }}>
-                      {loTags.map((code) => (
-                        <span
-                          key={code}
-                          style={{
-                            display: "inline-block",
-                            marginRight: "4px",
-                            marginTop: "2px",
-                            padding: "2px 6px",
-                            borderRadius: "999px",
-                            fontSize: "11px",
-                            fontWeight: 600,
-                            backgroundColor: "var(--ring)",
-                            color: "var(--accent-2)",
-                          }}
-                        >
-                          {code}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="lc-obj">{l.objective}</div>
-
-                  <ul className="list">
-                    {l.activities?.map((a, ai) => (
-                      <li key={ai} className="list-item">
-                        <span
-                          className="act-type"
-                          style={{ textTransform: "capitalize" }}
-                        >
-                          {a.type}
-                        </span>
-                        <span className="op-75"> — {a.prompt}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  {l.mini_quiz?.length ? (
-                    <div className="quiz-box">
-                      <div className="quiz-title">Mini Quiz</div>
-                      <ol className="ol">
-                        {l.mini_quiz.map((q, qi) => {
-                          const qText =
-                            typeof q === "object"
-                              ? (q as any).question || JSON.stringify(q)
-                              : q;
-                          return <li key={qi}>{qText}</li>;
-                        })}
-                      </ol>
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
+          {plan.modules!.map((m, idx) => (
+            <PlanModuleCard
+              key={idx}
+              mod={m}
+              index={idx}
+              defaultOpen={idx === 0}
+              learningOutcomes={plan.learning_outcomes || []}
+            />
+          ))}
         </div>
       )}
-    </section>
+
+      <PlanResources resources={plan.resources || []} />
+    </motion.div>
   );
 }

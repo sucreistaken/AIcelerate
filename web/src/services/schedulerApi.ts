@@ -91,6 +91,17 @@ export const notificationApi = {
         }
     },
 
+    async dismissAll(): Promise<{ ok: boolean; error?: string }> {
+        try {
+            const res = await fetch(`${API_BASE}/api/notifications/dismiss-all`, {
+                method: 'POST',
+            });
+            return await res.json();
+        } catch (error) {
+            return { ok: false, error: t('error.updateFailed') };
+        }
+    },
+
     async getUnreadCount(): Promise<{ ok: boolean; count?: number; error?: string }> {
         try {
             const res = await fetch(`${API_BASE}/api/notifications/unread-count`);

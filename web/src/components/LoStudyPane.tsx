@@ -8,43 +8,27 @@ import LoProgressSidebar from "./lo-study/LoProgressSidebar";
 import LoModuleList from "./lo-study/LoModuleList";
 import LoModuleDetail from "./lo-study/LoModuleDetail";
 
-type Props = {
-  modules: LoStudyModule[];
-};
+type Props = { modules: LoStudyModule[] };
 
 export default function LoStudyPane({ modules }: Props) {
   const {
-    loContentRef,
-    active,
-    activeLoId,
-    completedSet,
-    expandedSections,
-    quizRevealed,
-    pdfLoading,
-    progress,
-    completedCount,
-    totalCount,
-    completedTime,
-    totalTime,
-    handleExportPdf,
-    handleToggleComplete,
-    handleSelectModule,
-    toggleSection,
-    toggleQuizAnswer,
+    loContentRef, active, activeLoId, completedSet,
+    expandedSections, quizRevealed, pdfLoading,
+    progress, completedCount, totalCount,
+    completedTime, totalTime, handleExportPdf,
+    handleToggleComplete, handleSelectModule,
+    toggleSection, toggleQuizAnswer,
   } = useLoStudy(modules);
 
   if (!modules || !modules.length) {
     return (
       <motion.div
-        className="lc-section"
+        className="ls"
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ duration: 0.35, ease: "easeOut" }}
       >
-        <EmptyState
-          title={t("loStudy.noModules")}
-          description={t("loStudy.noModulesDesc")}
-        />
+        <EmptyState title={t("loStudy.noModules")} description={t("loStudy.noModulesDesc")} />
       </motion.div>
     );
   }
@@ -52,12 +36,12 @@ export default function LoStudyPane({ modules }: Props) {
   return (
     <motion.div
       ref={loContentRef}
-      className="lo-study-grid"
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+      className="ls"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.25 }}
     >
-      <div className="lo-study-grid__banner">
+      <div className="ls__banner">
         <PaneInfoBanner
           id="lo-study"
           title={t("loStudy.title")}
@@ -66,35 +50,37 @@ export default function LoStudyPane({ modules }: Props) {
         />
       </div>
 
-      <aside className="lo-study-grid__sidebar">
-        <LoProgressSidebar
-          progress={progress}
-          completedCount={completedCount}
-          totalCount={totalCount}
-          completedTime={completedTime}
-          totalTime={totalTime}
-          pdfLoading={pdfLoading}
-          onExportPdf={handleExportPdf}
-        />
-        <LoModuleList
-          modules={modules}
-          activeLoId={activeLoId}
-          completedSet={completedSet}
-          onSelectModule={handleSelectModule}
-        />
-      </aside>
+      <div className="ls__layout">
+        <aside className="ls__sidebar">
+          <LoProgressSidebar
+            progress={progress}
+            completedCount={completedCount}
+            totalCount={totalCount}
+            completedTime={completedTime}
+            totalTime={totalTime}
+            pdfLoading={pdfLoading}
+            onExportPdf={handleExportPdf}
+          />
+          <LoModuleList
+            modules={modules}
+            activeLoId={activeLoId}
+            completedSet={completedSet}
+            onSelectModule={handleSelectModule}
+          />
+        </aside>
 
-      {active && (
-        <LoModuleDetail
-          module={active}
-          isCompleted={completedSet.has(active.loId)}
-          expandedSections={expandedSections}
-          quizRevealed={quizRevealed}
-          onToggleComplete={handleToggleComplete}
-          onToggleSection={toggleSection}
-          onToggleQuizAnswer={toggleQuizAnswer}
-        />
-      )}
+        {active && (
+          <LoModuleDetail
+            module={active}
+            isCompleted={completedSet.has(active.loId)}
+            expandedSections={expandedSections}
+            quizRevealed={quizRevealed}
+            onToggleComplete={handleToggleComplete}
+            onToggleSection={toggleSection}
+            onToggleQuizAnswer={toggleQuizAnswer}
+          />
+        )}
+      </div>
     </motion.div>
   );
 }

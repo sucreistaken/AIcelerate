@@ -18,10 +18,10 @@ const MASTERY_CONFIG: Record<string, { color: string; bg: string }> = {
 };
 
 const RECOMMENDATION_LABELS: Record<string, string> = {
-  study_module: "Modülü çalış",
-  review_flashcards: "Flashcard'ları tekrar et",
-  take_quiz: "Quiz çöz",
-  complete: "Tamamlandı",
+  study_module: "Modulu calis",
+  review_flashcards: "Flashcard'lari tekrar et",
+  take_quiz: "Quiz coz",
+  complete: "Tamamlandi",
 };
 
 function LOCard({ lo, index }: { lo: LOProgress; index: number }) {
@@ -29,54 +29,36 @@ function LOCard({ lo, index }: { lo: LOProgress; index: number }) {
 
   return (
     <motion.div
-      className="lc-card lc-card--outlined lc-card--pad-md"
+      className="lp__card"
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05 }}
+      transition={{ delay: index * 0.04 }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-            <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--muted)" }}>{lo.loId}</span>
-            <Badge
-              size="sm"
-              style={{ backgroundColor: config.bg, color: config.color, border: `1px solid ${config.color}` }}
-            >
+      <div className="lp__card-top">
+        <div className="lp__card-info">
+          <div className="lp__card-id-row">
+            <span className="lp__card-id">{lo.loId}</span>
+            <Badge size="sm" style={{ backgroundColor: config.bg, color: config.color, border: `1px solid ${config.color}` }}>
               {t(`loProgress.${lo.masteryLevel}`)}
             </Badge>
           </div>
-          <p style={{ fontSize: "var(--text-sm)", fontWeight: 500, color: "var(--text)", margin: 0, lineHeight: "var(--lh-normal)" }}>
-            {lo.loTitle}
-          </p>
+          <p className="lp__card-title">{lo.loTitle}</p>
         </div>
-        <ProgressRing
-          progress={lo.overallConfidence}
-          size={48}
-          strokeWidth={4}
-          color={config.color}
-        />
+        <ProgressRing progress={lo.overallConfidence} size={48} strokeWidth={4} color={config.color} />
       </div>
 
-      {/* Metrics row */}
-      <div style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
+      <div className="lp__card-metrics">
         {lo.quizScores.length > 0 && (
-          <div style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)" }}>
-            {t("loProgress.quizScores")}: {lo.quizScores.map(s => `${Math.round(s * 100)}%`).join(", ")}
-          </div>
+          <span className="lp__metric">Quiz: {lo.quizScores.map(s => `${Math.round(s * 100)}%`).join(", ")}</span>
         )}
         {lo.flashcardMastery.total > 0 && (
-          <div style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)" }}>
-            {t("loProgress.flashcardMastery")}: {lo.flashcardMastery.graduated}/{lo.flashcardMastery.total}
-          </div>
+          <span className="lp__metric">FC: {lo.flashcardMastery.graduated}/{lo.flashcardMastery.total}</span>
         )}
-        <div style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>
-          {lo.lessonsContributing.length} ders
-        </div>
+        <span className="lp__metric">{lo.lessonsContributing.length} ders</span>
       </div>
 
-      {/* Recommendation */}
       {lo.masteryLevel !== "mastered" && (
-        <div style={{ marginTop: 8, fontSize: "var(--text-xs)", color: config.color, fontWeight: 500 }}>
+        <div className="lp__card-rec" style={{ color: config.color }}>
           {t("loProgress.recommendation")}: {RECOMMENDATION_LABELS[lo.recommendedNext] || lo.recommendedNext}
         </div>
       )}
@@ -94,9 +76,7 @@ export default function LOProgressPane() {
     setLoading(true);
     try {
       const res = await loProgressApi.get(courseId);
-      if (res.ok && res.loProgress) {
-        setData(res as LODashboardData);
-      }
+      if (res.ok && res.loProgress) setData(res as LODashboardData);
     } finally {
       setLoading(false);
     }
@@ -116,71 +96,78 @@ export default function LOProgressPane() {
   };
 
   if (!courseId) {
-    return <div style={{ textAlign: "center", padding: 40, color: "var(--muted)" }}>Lütfen bir kurs seçin.</div>;
+    return <div className="lp__no-course">Lutfen bir kurs secin.</div>;
   }
 
   return (
-    <div className="grid-gap-16">
+    <motion.div
+      className="lp"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.25 }}
+    >
       <PaneInfoBanner
         id="lo-progress"
         title={t("loProgress.title")}
-        description="Öğrenme çıktıları bazında hakimiyetinizi takip edin. Quiz, flashcard ve ders verilerinden hesaplanır."
-        tips={["ÖÇ hakimiyeti", "Çalışma önceliği", "Otomatik hesaplama"]}
+        description="Ogrenme ciktilari bazinda hakimiyetinizi takip edin. Quiz, flashcard ve ders verilerinden hesaplanir."
+        tips={["OC hakimiyeti", "Calisma onceligi", "Otomatik hesaplama"]}
       />
 
-      {loading && <div style={{ textAlign: "center", padding: 40 }}><Spinner size="lg" /></div>}
+      <motion.div
+        className="lp__hero"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: "easeOut" }}
+      >
+        <div className="lp__hero-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/>
+          </svg>
+        </div>
+        <h1 className="lp__hero-title">{t("loProgress.title")}</h1>
+      </motion.div>
+
+      {loading && <div className="lp__loading"><Spinner size="lg" /></div>}
 
       {!loading && data && (
         <>
-          {/* Overall mastery header */}
-          <div className="lc-card lc-card--elevated lc-card--pad-md" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <motion.div
+            className="lp__mastery-header"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.08 }}
+          >
+            <div className="lp__mastery-left">
               <ProgressRing progress={data.overallMastery} size={64} strokeWidth={5} />
               <div>
-                <div style={{ fontSize: "var(--text-lg)", fontWeight: 700, color: "var(--text)" }}>
-                  {t("loProgress.overallMastery")}
-                </div>
-                <div style={{ fontSize: "var(--text-sm)", color: "var(--muted)" }}>
-                  {data.totalLOs} ÖÇ
-                </div>
+                <div className="lp__mastery-title">{t("loProgress.overallMastery")}</div>
+                <div className="lp__mastery-sub">{data.totalLOs} OC</div>
               </div>
             </div>
-            <button
-              className="lc-button lc-button--secondary lc-button--sm"
-              onClick={handleRefresh}
-            >
+            <button className="lp__refresh-btn" onClick={handleRefresh}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
               {t("loProgress.refresh")}
             </button>
-          </div>
+          </motion.div>
 
-          {/* Study priority */}
           {data.studyPriority.length > 0 && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <span style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--muted)" }}>
-                {t("loProgress.studyPriority")}:
-              </span>
+            <div className="lp__priority">
+              <span className="lp__priority-label">{t("loProgress.studyPriority")}:</span>
               {data.studyPriority.slice(0, 5).map((loId, i) => (
-                <Badge key={loId} variant={i === 0 ? "danger" : i === 1 ? "warning" : "default"} size="sm">
-                  {loId}
-                </Badge>
+                <Badge key={loId} variant={i === 0 ? "danger" : i === 1 ? "warning" : "default"} size="sm">{loId}</Badge>
               ))}
             </div>
           )}
 
-          {/* LO cards grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 12 }}>
-            {data.loProgress.map((lo, i) => (
-              <LOCard key={lo.loId} lo={lo} index={i} />
-            ))}
+          <div className="lp__grid">
+            {data.loProgress.map((lo, i) => <LOCard key={lo.loId} lo={lo} index={i} />)}
           </div>
 
           {data.loProgress.length === 0 && (
-            <div style={{ textAlign: "center", padding: 40, color: "var(--muted)" }}>
-              Bu kurs için henüz öğrenme çıktısı tanımlanmamış.
-            </div>
+            <div className="lp__no-course">Bu kurs icin henuz ogrenme ciktisi tanimlanmamis.</div>
           )}
         </>
       )}
-    </div>
+    </motion.div>
   );
 }
