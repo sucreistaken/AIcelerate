@@ -78,8 +78,24 @@ export async function deepDiveChat(
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: { maxOutputTokens: 2500, temperature: getTemperature("creative") },
     }, { label: "channel_deep_dive", timeoutMs: 45_000 });
-    const aiText = result.response.text();
+    const aiText = (result.response.text() || "").trim();
     logger.info(`[AI] CHANNEL_DEEP_DIVE | ~${Math.ceil(prompt.length / 4)} in, ~${Math.ceil(aiText.length / 4)} out | max=2500`);
+
+    // Guard: don't save empty AI responses (can happen on Gemini safety filter / parse fail)
+    if (!aiText) {
+      await channelToolRepo.save(channelId, data);
+      const fallbackAi: DeepDiveMessage = {
+        id: generateId(),
+        role: "assistant",
+        text: "Üzgünüm, bu soruya yanıt üretemedi. Lütfen tekrar deneyin.",
+        authorId: "ai",
+        authorNickname: "Study AI",
+        timestamp: new Date().toISOString(),
+      };
+      data.deepDive.messages.push(fallbackAi);
+      await channelToolRepo.save(channelId, data);
+      return { userMessage, aiMessage: fallbackAi };
+    }
 
     const aiMessage: DeepDiveMessage = {
       id: generateId(),

@@ -36,7 +36,7 @@ function DeepDiveMessageList({
   return (
     <>
       {displayMessages.map((m, i) => {
-        if (i === 0 && !m.content) return null;
+        if (!m.content) return null;
         const actualIdx = showStarredOnly ? messages.indexOf(m) : i;
         const isUser = m.role === 'user';
         return (

@@ -29,11 +29,14 @@ export function useDeepDive(
   const messages = useChannelToolStore(
     (s) => s.dataByChannel[channelId]?.deepDive?.messages ?? EMPTY_MSGS
   );
-  const addDeepDiveMessages = useChannelToolStore((s) => s.addDeepDiveMessages);
+  // loading lives in Zustand (same store as messages) so updates are ATOMIC
+  const loading = useChannelToolStore((s) => !!s.aiPending[channelId]);
+  const startRequest = useChannelToolStore((s) => s.startDeepDiveRequest);
+  const setAiPending = useChannelToolStore((s) => s.setAiPending);
+  const finishResponse = useChannelToolStore((s) => s.finishDeepDiveResponse);
   const addNoteToStore = useChannelToolStore((s) => s.addNoteToStore);
 
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
   const [savedMsgId, setSavedMsgId] = useState<string | null>(null);
 
   const quickActions = useMemo(() => {
@@ -64,20 +67,28 @@ export function useDeepDive(
     if (!messageText || loading) return;
 
     setInput("");
-    setLoading(true);
+
+    // ATOMIC: add user message + enable typing bubble in ONE set() — zero intermediate renders
+    const tempId = `temp-${Date.now()}`;
+    startRequest(channelId, {
+      id: tempId,
+      role: "user",
+      text: messageText,
+      authorId: "me",
+      authorNickname: nickname,
+      timestamp: new Date().toISOString(),
+    });
 
     try {
       const { userMessage, aiMessage } = await channelToolApi.deepDiveChat(
         channelId, messageText, nickname, topic, serverName
       );
-      // Stop loading BEFORE adding messages — prevents 1-frame flash where
-      // both the typing bubble and the real AI message are visible
-      setLoading(false);
-      addDeepDiveMessages(channelId, [userMessage, aiMessage]);
+      // ATOMIC: remove temp + add real msgs + clear aiPending — ONE Zustand set()
+      finishResponse(channelId, tempId, [userMessage, aiMessage]);
       getCollabSocket().emit("tool:deepdive:msg", { channelId, userMessage, aiMessage });
     } catch (err) {
       logger.error("Deep dive chat failed:", err);
-      setLoading(false);
+      setAiPending(channelId, false); // typing bubble OFF on error
     }
   }
 

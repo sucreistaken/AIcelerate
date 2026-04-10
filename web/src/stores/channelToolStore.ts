@@ -14,15 +14,20 @@ import { getCollabSocket } from "../services/socket";
 interface ChannelToolState {
   dataByChannel: Record<string, ChannelToolData>;
   loading: Record<string, boolean>;
+  /** Per-channel AI pending flag — lives in Zustand so it updates atomically with messages */
+  aiPending: Record<string, boolean>;
   error: string | null;
 
   loadToolData: (channelId: string) => Promise<void>;
   setToolData: (channelId: string, data: ChannelToolData) => void;
+  setAiPending: (channelId: string, pending: boolean) => void;
 
   // Convenience updaters
   updateQuiz: (channelId: string, quiz: ChannelQuizData) => void;
   addFlashcardToStore: (channelId: string, card: ChannelFlashcardItem) => void;
   addDeepDiveMessages: (channelId: string, messages: ChannelDeepDiveMessage[]) => void;
+  /** Atomic: remove temp msg + add real msgs + clear aiPending in ONE set() */
+  finishDeepDiveResponse: (channelId: string, tempId: string, messages: ChannelDeepDiveMessage[]) => void;
   updateMindMap: (channelId: string, mindMap: ChannelMindMapData) => void;
   updateSprint: (channelId: string, sprint: ChannelSprintData) => void;
   addNoteToStore: (channelId: string, note: ChannelNoteItem) => void;
@@ -37,10 +42,41 @@ const EMPTY_TOOL_DATA: ChannelToolData = { channelId: "", toolType: "" };
 export const useChannelToolStore = create<ChannelToolState>((set, get) => ({
   dataByChannel: {},
   loading: {},
+  aiPending: {},
   error: null,
 
+  setAiPending: (channelId, pending) => {
+    set((s) => ({ aiPending: { ...s.aiPending, [channelId]: pending } }));
+  },
+
+  /** Atomic: add messages + set aiPending in ONE render */
+  startDeepDiveRequest: (channelId: string, optimisticMsg: ChannelDeepDiveMessage) => {
+    set((s) => {
+      const existing = s.dataByChannel[channelId] || { ...EMPTY_TOOL_DATA, channelId };
+      const prev = existing.deepDive?.messages ?? [];
+      const existingIds = new Set(prev.map((m: any) => m.id));
+      if (existingIds.has(optimisticMsg.id)) return s;
+      return {
+        dataByChannel: {
+          ...s.dataByChannel,
+          [channelId]: {
+            ...existing,
+            deepDive: { messages: [...prev, optimisticMsg] },
+          },
+        },
+        aiPending: { ...s.aiPending, [channelId]: true },
+      };
+    });
+  },
+
   loadToolData: async (channelId: string) => {
-    set((s) => ({ loading: { ...s.loading, [channelId]: true } }));
+    // Synchronously clear stale in-memory data BEFORE async fetch.
+    // Prevents old messages from previous session showing during load.
+    set((s) => ({
+      dataByChannel: { ...s.dataByChannel, [channelId]: { channelId, toolType: "" } as any },
+      loading: { ...s.loading, [channelId]: true },
+      aiPending: { ...s.aiPending, [channelId]: false },
+    }));
     try {
       const data = await channelToolApi.getToolData(channelId);
       set((s) => ({
@@ -105,6 +141,27 @@ export const useChannelToolStore = create<ChannelToolState>((set, get) => ({
             deepDive: { messages: [...prev, ...newOnly] },
           },
         },
+      };
+    });
+  },
+
+  // ATOMIC: remove temp msg + add real msgs + clear aiPending — single set()
+  finishDeepDiveResponse: (channelId, tempId, messages) => {
+    set((s) => {
+      const existing = s.dataByChannel[channelId] || { ...EMPTY_TOOL_DATA, channelId };
+      const prev = (existing.deepDive?.messages ?? []).filter((m: any) => m.id !== tempId);
+      const existingIds = new Set(prev.map((m: any) => m.id));
+      const newOnly = messages.filter((m) => !existingIds.has(m.id));
+      return {
+        dataByChannel: {
+          ...s.dataByChannel,
+          [channelId]: {
+            ...existing,
+            deepDive: { messages: [...prev, ...newOnly] },
+          },
+        },
+        // Clear aiPending in the SAME set() call — guarantees no intermediate render
+        aiPending: { ...s.aiPending, [channelId]: false },
       };
     });
   },
