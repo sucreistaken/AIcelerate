@@ -70,11 +70,13 @@ export function useDeepDive(
       const { userMessage, aiMessage } = await channelToolApi.deepDiveChat(
         channelId, messageText, nickname, topic, serverName
       );
+      // Stop loading BEFORE adding messages — prevents 1-frame flash where
+      // both the typing bubble and the real AI message are visible
+      setLoading(false);
       addDeepDiveMessages(channelId, [userMessage, aiMessage]);
       getCollabSocket().emit("tool:deepdive:msg", { channelId, userMessage, aiMessage });
     } catch (err) {
       logger.error("Deep dive chat failed:", err);
-    } finally {
       setLoading(false);
     }
   }
