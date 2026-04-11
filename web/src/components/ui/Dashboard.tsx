@@ -438,14 +438,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── XP Charts Row ── */}
-      {hasActivity && (
-        <div className="db-charts-row">
-          <XpSparkline data={sparklineData} />
-          <WeeklyXpBars bars={weeklyXp} />
-        </div>
-      )}
-
       {/* ── Course Progress ── */}
       <CourseProgressCards
         cards={courseCards}

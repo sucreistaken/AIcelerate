@@ -33,6 +33,18 @@ function DeepDiveMessageList({
   saveToNotes,
   send,
 }: Props) {
+  if (showStarredOnly && displayMessages.length === 0) {
+    return (
+      <div className="dd__starred-empty">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.4 }}>
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        </svg>
+        <span>Henuz kaydedilmis mesaj yok.</span>
+        <span style={{ fontSize: 12, opacity: 0.6 }}>Mesajlardaki yildiz ikonuna tiklayarak kaydedin.</span>
+      </div>
+    );
+  }
+
   return (
     <>
       {displayMessages.map((m, i) => {
