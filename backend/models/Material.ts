@@ -13,7 +13,7 @@ export interface IMaterial extends Document {
 
 const materialSchema = new Schema<IMaterial>(
   {
-    roomId: { type: String, required: true, index: true },
+    roomId: { type: String, required: true },
     uploadedBy: { type: String, required: true },
     pdfPath: String,
     audioPath: String,
@@ -22,5 +22,9 @@ const materialSchema = new Schema<IMaterial>(
   },
   { timestamps: true }
 );
+
+// ── Indexes for frequent queries ──
+materialSchema.index({ uploadedBy: 1 });                   // User's uploads
+materialSchema.index({ roomId: 1, createdAt: -1 });        // Room materials (newest first)
 
 export const Material = mongoose.model<IMaterial>("Material", materialSchema);

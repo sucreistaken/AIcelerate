@@ -186,22 +186,22 @@ export const channelToolService = {
   // ── Lock mode ─────────────────────────────────────────────────────────────
   async lockTool(channelId: string, userId: string): Promise<{ locked: boolean; lockedBy: string }> {
     const data = await channelToolRepo.load(channelId);
-    (data as any).locked = true;
-    (data as any).lockedBy = userId;
+    data.locked = true;
+    data.lockedBy = userId;
     await channelToolRepo.save(channelId, data);
     return { locked: true, lockedBy: userId };
   },
 
   async unlockTool(channelId: string): Promise<{ locked: boolean; lockedBy: string | null }> {
     const data = await channelToolRepo.load(channelId);
-    (data as any).locked = false;
-    (data as any).lockedBy = null;
+    data.locked = false;
+    data.lockedBy = null;
     await channelToolRepo.save(channelId, data);
     return { locked: false, lockedBy: null };
   },
 
   async getToolLockStatus(channelId: string): Promise<{ locked: boolean; lockedBy: string | null }> {
     const data = await channelToolRepo.load(channelId);
-    return { locked: !!(data as any).locked, lockedBy: (data as any).lockedBy || null };
+    return { locked: !!data.locked, lockedBy: data.lockedBy || null };
   },
 };

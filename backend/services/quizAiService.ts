@@ -1,5 +1,5 @@
 import { logger } from "../utils/logger";
-import { safeGenerate, stripCodeFences, tryParseJSON, getTemperature } from "./aiService";
+import { safeGenerate, tryParseJSON, getTemperature } from "./aiService";
 import { SCHEMAS } from "../prompts/schemas";
 import {
   buildQuizFromPlanPrompt,
@@ -8,8 +8,10 @@ import {
   buildQuizEvalBatchPrompt,
 } from "../prompts/lessonPrompts";
 import type { SupportedLang } from "../utils/langDirective";
+import type { QuizAnswer, QuizEvalResult, QuizEvalBatchResult } from "../types";
 import { getDigestOrFallback } from "./lessonDigestService";
 import { assembleCourseContext } from "../controllers/contextAssembler";
+import { AppError, badRequest } from "../middleware/errorHandler";
 
 function logAI(label: string, inputLen: number, outputLen: number, maxTokens: number) {
   logger.info(`[AI] ${label} | ~${Math.ceil(inputLen / 4)} in, ~${Math.ceil(outputLen / 4)} out | max=${maxTokens}`);
@@ -35,7 +37,7 @@ function resolveContextBlock(
 }
 
 export async function generateQuizFromPlan(
-  plan: any, lessonId?: string, lang?: SupportedLang
+  plan: Record<string, unknown>, lessonId?: string, lang?: SupportedLang
 ): Promise<string[]> {
   let crossLessonHint = "";
   if (lessonId) {
@@ -71,10 +73,10 @@ export async function generateQuizFromPlan(
 
 export async function generateQuizAnswers(
   questions: string[], lectureText?: string, slidesText?: string,
-  plan?: any, lessonId?: string
-): Promise<any[]> {
+  plan?: Record<string, unknown>, lessonId?: string
+): Promise<QuizAnswer[]> {
   const contextBlock = resolveContextBlock(lessonId, lectureText, slidesText);
-  if (!contextBlock) throw new Error("lessonId or lectureText+slidesText required");
+  if (!contextBlock) throw badRequest("lessonId or lectureText+slidesText required");
 
   const prompt = buildQuizAnswersPrompt(contextBlock, plan ? JSON.stringify(plan) : undefined, questions.slice(0, 20));
   const result = await safeGenerate({
@@ -83,22 +85,22 @@ export async function generateQuizAnswers(
       maxOutputTokens: 4000,
       temperature: getTemperature("structured"),
       responseMimeType: "application/json",
-      responseSchema: SCHEMAS.QUIZ_ANSWERS,
-    } as any,
+      responseSchema: SCHEMAS.QUIZ_ANSWERS as import("@google/generative-ai").ResponseSchema,
+    },
   }, { label: "quiz_answers", timeoutMs: 60_000 });
   const rawResp = result.response.text() || "";
   logAI("QUIZ_ANSWERS", prompt.length, rawResp.length, 4000);
   const j = tryParseJSON(rawResp);
-  if (!j?.answers) throw new Error("JSON parse/schema error");
+  if (!j?.answers) throw new AppError(502, "AI response parse error", "AI_PARSE_ERROR");
   return j.answers;
 }
 
 export async function evaluateQuizAnswer(
   question: string, studentAnswer: string,
   lectureText?: string, slidesText?: string, lessonId?: string, lang?: SupportedLang
-): Promise<any> {
+): Promise<QuizEvalResult> {
   const contextBlock = resolveContextBlock(lessonId, lectureText, slidesText, 14000);
-  if (!contextBlock) throw new Error("lessonId or lectureText+slidesText required");
+  if (!contextBlock) throw badRequest("lessonId or lectureText+slidesText required");
 
   const prompt = buildQuizEvalPrompt(contextBlock, question, studentAnswer, lang);
   const result = await safeGenerate({
@@ -107,22 +109,22 @@ export async function evaluateQuizAnswer(
       maxOutputTokens: 1000,
       temperature: getTemperature("structured"),
       responseMimeType: "application/json",
-      responseSchema: SCHEMAS.QUIZ_EVAL,
-    } as any,
+      responseSchema: SCHEMAS.QUIZ_EVAL as import("@google/generative-ai").ResponseSchema,
+    },
   }, { label: "quiz_eval", timeoutMs: 30_000 });
   const evalRaw = result.response.text() || "";
   logAI("QUIZ_EVAL", prompt.length, evalRaw.length, 800);
   const j = tryParseJSON(evalRaw);
-  if (!j?.grade) throw new Error("JSON parse/schema error");
+  if (!j?.grade) throw new AppError(502, "AI response parse error", "AI_PARSE_ERROR");
   return j;
 }
 
 export async function evaluateQuizBatch(
   items: Array<{ q: string; student_answer: string }>,
   lectureText?: string, slidesText?: string, lessonId?: string, lang?: SupportedLang
-): Promise<any[]> {
+): Promise<QuizEvalBatchResult[]> {
   const contextBlock = resolveContextBlock(lessonId, lectureText, slidesText, 14000);
-  if (!contextBlock) throw new Error("lessonId or lectureText+slidesText required");
+  if (!contextBlock) throw badRequest("lessonId or lectureText+slidesText required");
 
   const questionsBlock = items.slice(0, 20).map((item, i) => `Q${i + 1}: ${item.q}\nA${i + 1}: ${item.student_answer}`).join("\n\n");
   const prompt = buildQuizEvalBatchPrompt(contextBlock, questionsBlock, lang);
@@ -132,12 +134,12 @@ export async function evaluateQuizBatch(
       maxOutputTokens: 4000,
       temperature: getTemperature("structured"),
       responseMimeType: "application/json",
-      responseSchema: SCHEMAS.QUIZ_EVAL_BATCH,
-    } as any,
+      responseSchema: SCHEMAS.QUIZ_EVAL_BATCH as import("@google/generative-ai").ResponseSchema,
+    },
   }, { label: "quiz_eval_batch", timeoutMs: 60_000 });
   const batchRaw = result.response.text() || "";
   logAI("QUIZ_EVAL_BATCH", prompt.length, batchRaw.length, 4000);
   const j = tryParseJSON(batchRaw);
-  if (!j?.results || !Array.isArray(j.results)) throw new Error("JSON parse/schema error");
+  if (!j?.results || !Array.isArray(j.results)) throw new AppError(502, "AI response parse error", "AI_PARSE_ERROR");
   return j.results;
 }

@@ -5,33 +5,30 @@ import mongoose from "mongoose";
  * Applied once at startup — no per-model boilerplate needed.
  */
 export function registerGlobalPlugins() {
-  mongoose.plugin((schema) => {
+  mongoose.plugin((schema: mongoose.Schema) => {
+    const toJsonTransform = (_doc: unknown, ret: Record<string, unknown>) => {
+      if (ret._id) {
+        ret.id = String(ret._id);
+        delete ret._id;
+      }
+      delete ret.__v;
+      return ret;
+    };
+
     // toJSON transform: _id → id, remove __v
-    schema.set("toJSON", {
+    const existingToJSON = schema.get("toJSON") || {};
+    (schema as mongoose.Schema<unknown>).set("toJSON", {
       virtuals: true,
-      transform(_doc: any, ret: any) {
-        if (ret._id) {
-          ret.id = ret._id.toString();
-          delete ret._id;
-        }
-        delete ret.__v;
-        return ret;
-      },
-      ...schema.get("toJSON"), // Allow per-model overrides
+      ...(existingToJSON as Record<string, unknown>),
+      transform: toJsonTransform,
     });
 
     // toObject transform: same as toJSON
-    schema.set("toObject", {
+    const existingToObject = schema.get("toObject") || {};
+    (schema as mongoose.Schema<unknown>).set("toObject", {
       virtuals: true,
-      transform(_doc: any, ret: any) {
-        if (ret._id) {
-          ret.id = ret._id.toString();
-          delete ret._id;
-        }
-        delete ret.__v;
-        return ret;
-      },
-      ...schema.get("toObject"),
+      ...(existingToObject as Record<string, unknown>),
+      transform: toJsonTransform,
     });
   });
 }
@@ -40,17 +37,17 @@ export function registerGlobalPlugins() {
  * Utility: normalize lean() results by converting _id to id.
  * Use after .lean() queries for consistent output.
  */
-export function leanToId<T extends { _id?: any; id?: string }>(doc: T): T & { id: string } {
-  if (!doc) return doc as any;
-  const result = { ...doc, id: (doc._id || doc.id || "").toString() } as any;
+export function leanToId<T extends { _id?: unknown; id?: string }>(doc: T): T & { id: string } {
+  if (!doc) return doc as T & { id: string };
+  const result: Record<string, unknown> = { ...doc, id: String(doc._id || doc.id || "") };
   delete result._id;
   delete result.__v;
-  return result;
+  return result as T & { id: string };
 }
 
 /**
  * Utility: normalize an array of lean() results.
  */
-export function leanArrayToId<T extends { _id?: any; id?: string }>(docs: T[]): (T & { id: string })[] {
+export function leanArrayToId<T extends { _id?: unknown; id?: string }>(docs: T[]): (T & { id: string })[] {
   return docs.map(leanToId);
 }

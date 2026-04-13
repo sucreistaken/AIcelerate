@@ -6,53 +6,59 @@ import {
   listShares,
   deleteShare,
 } from "../controllers/shareController";
-import { upsertLesson } from "../controllers/lessonControllers";
+import { upsertLesson } from "../services/lessonDataService";
+import { requireAuth, AuthRequest } from "../middleware/auth";
+import { asyncHandler } from "../utils/asyncHandler";
+import { validate } from "../middleware/validate";
+import { shareCreateSchema, shareCommentSchema, emptyBodySchema } from "../validators/routeSchemas";
 
 const router = Router();
 
-router.post("/shares", (req, res) => {
-  const { lessonId, createdBy } = req.body as { lessonId: string; createdBy?: string };
-  if (!lessonId) return res.status(400).json({ ok: false, error: "lessonId is required" });
-  const share = createShare(lessonId, createdBy);
+router.post("/shares", requireAuth, validate(shareCreateSchema), asyncHandler(async (req: AuthRequest, res) => {
+  const { lessonId } = req.body as { lessonId: string };
+  const createdBy = req.user!.userId;
+  const share = await createShare(lessonId, createdBy);
   if (!share) return res.status(404).json({ ok: false, error: "Lesson not found" });
-  res.json({ ok: true, share });
-});
+  res.status(201).json({ ok: true, share });
+}));
 
-router.get("/shares/:shareId", (req, res) => {
-  const share = getShare(req.params.shareId);
+router.get("/shares/:shareId", asyncHandler(async (req, res) => {
+  const share = await getShare(req.params.shareId);
   if (!share) return res.status(404).json({ ok: false, error: "Share not found or expired" });
   res.json({ ok: true, share });
-});
+}));
 
-router.post("/shares/:shareId/comments", (req, res) => {
-  const { author, text } = req.body as { author: string; text: string };
-  if (!text) return res.status(400).json({ ok: false, error: "text is required" });
-  const share = addComment(req.params.shareId, author, text);
+router.post("/shares/:shareId/comments", requireAuth, validate(shareCommentSchema), asyncHandler(async (req: AuthRequest, res) => {
+  const author = req.user!.userId;
+  const { text } = req.body as { text: string };
+  const share = await addComment(req.params.shareId, author, text);
   if (!share) return res.status(404).json({ ok: false, error: "Share not found" });
   res.json({ ok: true, share });
-});
+}));
 
-router.get("/shares", (_req, res) => {
-  const shares = listShares();
+router.get("/shares", requireAuth, asyncHandler(async (req: AuthRequest, res) => {
+  const userId = req.user!.userId;
+  const shares = await listShares(userId);
   res.json({ ok: true, shares });
-});
+}));
 
-router.delete("/shares/:shareId", (req, res) => {
-  const ok = deleteShare(req.params.shareId);
+router.delete("/shares/:shareId", requireAuth, validate(emptyBodySchema), asyncHandler(async (req: AuthRequest, res) => {
+  const userId = req.user!.userId;
+  const ok = await deleteShare(req.params.shareId, userId);
   if (!ok) return res.status(404).json({ ok: false, error: "Share not found" });
   res.json({ ok: true });
-});
+}));
 
-router.post("/shares/:shareId/import", (req, res) => {
-  const share = getShare(req.params.shareId);
+router.post("/shares/:shareId/import", requireAuth, validate(emptyBodySchema), asyncHandler(async (req, res) => {
+  const share = await getShare(req.params.shareId);
   if (!share) return res.status(404).json({ ok: false, error: "Share not found" });
-  const newLesson = upsertLesson({
+  const newLesson = await upsertLesson({
     title: `[Imported] ${share.bundle.title}`,
     plan: share.bundle.plan,
     cheatSheet: share.bundle.cheatSheet,
     professorEmphases: share.bundle.emphases,
-  } as any);
-  res.json({ ok: true, lessonId: newLesson.id, lesson: newLesson });
-});
+  });
+  res.status(201).json({ ok: true, lessonId: newLesson.id, lesson: newLesson });
+}));
 
 export default router;

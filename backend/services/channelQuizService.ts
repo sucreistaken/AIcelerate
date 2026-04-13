@@ -3,11 +3,13 @@ import {
   channelToolRepo,
   QuizQuestion,
 } from "../repositories/channelToolRepo";
-import { safeGenerate, stripCodeFences, getTemperature } from "./aiService";
+import { safeGenerate, getTemperature, tryParseJSON, stripCodeFences } from "./aiService";
 import { SCHEMAS } from "../prompts/schemas";
 import { generateId } from "../utils/idGenerator";
 import { buildToolContext } from "./channelContextBuilder";
 import { getLangDirective, type SupportedLang } from "../utils/langDirective";
+import { sanitizeForPrompt } from "../utils/sanitize";
+import { AppError, notFound, serviceUnavailable } from "../middleware/errorHandler";
 
 // ── Quiz: generate ──────────────────────────────────────────────────────────
 export async function generateQuiz(
@@ -39,7 +41,7 @@ export async function generateQuiz(
       ? `Based on the following lecture material, generate questions that test understanding of the actual content:\n\n${toolCtx.context}\n\n`
       : '';
 
-    const prompt = `${getLangDirective(lang)}\n\n${contextBlock}Generate exactly ${count} quiz questions about '${topic}' for a university study group '${serverName}'.
+    const prompt = `${getLangDirective(lang)}\n\n${contextBlock}Generate exactly ${count} quiz questions about '${sanitizeForPrompt(topic)}' for a university study group '${sanitizeForPrompt(serverName)}'.
 
 DIFFICULTY: ${difficulty.toUpperCase()}
 ${difficultyGuide}
@@ -68,19 +70,20 @@ ${toolCtx ? `- Questions MUST be based on the provided lecture material
 
     const result = await safeGenerate({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 3000, temperature: getTemperature("balanced"), responseMimeType: "application/json", responseSchema: SCHEMAS.CHANNEL_QUIZ } as any,
+      generationConfig: { maxOutputTokens: 3000, temperature: getTemperature("balanced"), responseMimeType: "application/json", responseSchema: SCHEMAS.CHANNEL_QUIZ as import("@google/generative-ai").ResponseSchema },
     }, { label: "channel_quiz", timeoutMs: 45_000 });
     const text = result.response.text();
     logger.info(`[AI] CHANNEL_QUIZ | ~${Math.ceil(prompt.length / 4)} in, ~${Math.ceil(text.length / 4)} out | max=3000`);
-    const parsed = JSON.parse(text);
+    const parsed = tryParseJSON(text) ?? tryParseJSON(stripCodeFences(text));
+    if (!parsed) throw new AppError(502, "AI response parse error", "AI_PARSE_ERROR");
 
-    const questions: QuizQuestion[] = (Array.isArray(parsed) ? parsed : []).map((q: any) => ({
+    const questions: QuizQuestion[] = (Array.isArray(parsed) ? parsed : []).map((q: { question: string; options: string[]; correctIndex: number; explanation?: string; type?: string; difficulty?: string }) => ({
       id: generateId(),
       question: q.question,
       options: q.options,
       correctIndex: q.correctIndex,
       explanation: q.explanation || '',
-      type: q.type || (q.options?.length === 2 ? 'tf' : 'mc'),
+      type: (q.type === 'tf' ? 'tf' : 'mc') as 'mc' | 'tf',
       difficulty: q.difficulty || difficulty,
     }));
 
@@ -94,7 +97,7 @@ ${toolCtx ? `- Questions MUST be based on the provided lecture material
     return { data, sourcesSummary: toolCtx?.meta.sourcesSummary || null };
   } catch (err) {
     logger.error("channelToolService.generateQuiz error:", err);
-    throw new Error("Failed to generate quiz");
+    throw serviceUnavailable("Failed to generate quiz");
   }
 }
 
@@ -109,12 +112,12 @@ export async function answerQuiz(
   const data = await channelToolRepo.load(channelId);
 
   if (!data.quiz || !data.quiz.questions.length) {
-    throw new Error("No quiz available");
+    throw notFound("No quiz available");
   }
 
   const question = data.quiz.questions.find((q) => q.id === questionId);
   if (!question) {
-    throw new Error("Question not found");
+    throw notFound("Question not found");
   }
 
   const correct = selectedIndex === question.correctIndex;

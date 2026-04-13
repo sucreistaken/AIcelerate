@@ -1,6 +1,6 @@
 import { logger } from "../utils/logger";
 import { safeGenerate, getTemperature } from "./aiService";
-import { listLessons } from "../controllers/lessonControllers";
+import { listLessons } from "./lessonDataService";
 import { badRequest } from "../middleware/errorHandler";
 import { getLangDirective, type SupportedLang } from "../utils/langDirective";
 
@@ -21,7 +21,7 @@ export async function generateConnectionDeepDive(
     .map((l) => {
       const keyConcepts = l.plan?.key_concepts?.join(", ") || "N/A";
       const emphases = (l.plan?.emphases || l.professorEmphases || [])
-        .map((e: any) => e.statement)
+        .map((e: { statement: string }) => e.statement)
         .filter(Boolean)
         .slice(0, 5)
         .join("; ");

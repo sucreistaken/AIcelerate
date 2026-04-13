@@ -1,4 +1,5 @@
-import { Request, Response, NextFunction } from "express";
+import { Response, NextFunction } from "express";
+import type { AuthRequest } from "./auth";
 import { logger } from "../utils/logger";
 
 /**
@@ -6,7 +7,7 @@ import { logger } from "../utils/logger";
  * Logs method, path, status, duration, and authenticated userId.
  * Skips health-check endpoints to reduce noise.
  */
-export function httpLogger(req: Request, res: Response, next: NextFunction) {
+export function httpLogger(req: AuthRequest, res: Response, next: NextFunction) {
   // Skip health check noise
   if (req.path === "/health" || req.path === "/api/health") {
     return next();
@@ -17,7 +18,7 @@ export function httpLogger(req: Request, res: Response, next: NextFunction) {
   res.on("finish", () => {
     const durationMs = Number(process.hrtime.bigint() - start) / 1_000_000;
     const statusCode = res.statusCode;
-    const userId = (req as any).user?.userId;
+    const userId = req.user?.userId;
 
     const logData = {
       method: req.method,

@@ -7,11 +7,11 @@ import type { IRepository } from "./IRepository";
  * Handles _id <-> id mapping transparently.
  */
 export class MongoRepository<T extends { id: string }> implements IRepository<T> {
-  constructor(private model: Model<any>) {}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Mongoose Model<T> is invariant; widened to accept any Model
+  constructor(protected model: Model<any>) {}
 
   /** Map a Mongoose lean doc (_id, __v) to a plain T with `id`. */
-  private toEntity(doc: any): T {
-    if (!doc) return doc;
+  protected toEntity(doc: Record<string, unknown>): T {
     const { _id, __v, ...rest } = doc;
     return { ...rest, id: String(_id) } as unknown as T;
   }
@@ -26,25 +26,38 @@ export class MongoRepository<T extends { id: string }> implements IRepository<T>
     return doc ? this.toEntity(doc) : null;
   }
 
-  async findBy(predicate: (item: T) => boolean): Promise<T[]> {
-    // Mongoose has no predicate-based query, so we fetch all and filter in memory.
-    const all = await this.findAll();
-    return all.filter(predicate);
+  async findBy(predicateOrFilter: ((item: T) => boolean) | Record<string, unknown>): Promise<T[]> {
+    if (typeof predicateOrFilter === "function") {
+      const predicate = predicateOrFilter as (item: T) => boolean;
+      const all = await this.findAll();
+      return all.filter(predicate);
+    }
+    // MongoDB filter query: push filtering to the database.
+    const docs = await this.model.find(predicateOrFilter).lean();
+    return docs.map((d) => this.toEntity(d as Record<string, unknown>));
   }
 
-  async findOneBy(predicate: (item: T) => boolean): Promise<T | null> {
-    const all = await this.findAll();
-    return all.find(predicate) ?? null;
+  async findOneBy(predicateOrFilter: ((item: T) => boolean) | Record<string, unknown>): Promise<T | null> {
+    if (typeof predicateOrFilter === "function") {
+      const predicate = predicateOrFilter as (item: T) => boolean;
+      const all = await this.findAll();
+      return all.find(predicate) ?? null;
+    }
+    // MongoDB filter query: single-document lookup at DB level.
+    const doc = await this.model.findOne(predicateOrFilter).lean();
+    return doc ? this.toEntity(doc) : null;
   }
 
   async create(item: T): Promise<T> {
-    const { id, ...rest } = item as any;
+    // TODO: type properly — TS can't destructure+spread a generic T cleanly
+    const { id, ...rest } = item as T & Record<string, unknown>;
     const doc = await this.model.create({ _id: id, ...rest });
     return this.toEntity(doc.toObject());
   }
 
   async update(id: string, updates: Partial<T>): Promise<T | null> {
-    const { id: _ignoredId, ...rest } = updates as any;
+    // TODO: type properly — TS can't destructure+spread Partial<T> cleanly
+    const { id: _ignoredId, ...rest } = updates as Partial<T> & Record<string, unknown>;
     const doc = await this.model
       .findByIdAndUpdate(id, { $set: rest }, { new: true })
       .lean();
@@ -61,7 +74,8 @@ export class MongoRepository<T extends { id: string }> implements IRepository<T>
   }
 
   async upsert(item: T): Promise<T> {
-    const { id, ...rest } = item as any;
+    // TODO: type properly — TS can't destructure+spread a generic T cleanly
+    const { id, ...rest } = item as T & Record<string, unknown>;
     const doc = await this.model
       .findByIdAndUpdate(id, { $set: rest }, { new: true, upsert: true })
       .lean();

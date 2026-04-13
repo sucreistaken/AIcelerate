@@ -1,5 +1,5 @@
 import { logger } from "../utils/logger";
-import { safeGenerate, stripCodeFences, tryParseJSON, getTemperature } from "./aiService";
+import { safeGenerate, tryParseJSON, getTemperature } from "./aiService";
 import { SCHEMAS } from "../prompts/schemas";
 import {
   buildMindmapPrompt,
@@ -7,9 +7,10 @@ import {
   buildMindmapNodeDetailPrompt,
 } from "../prompts/lessonPrompts";
 import { assembleCourseContext } from "../controllers/contextAssembler";
-import type { Lesson } from "../controllers/lessonControllers";
+import type { Lesson } from "./lessonDataService";
 import type { NodeDetailResult, PlanModule, PlanEmphasis } from "../types";
 import type { SupportedLang } from "../utils/langDirective";
+import { AppError, notFound } from "../middleware/errorHandler";
 
 function logAI(label: string, inputLen: number, outputLen: number, maxTokens: number) {
   logger.info(`[AI] ${label} | ~${Math.ceil(inputLen / 4)} in, ~${Math.ceil(outputLen / 4)} out | max=${maxTokens}`);
@@ -23,7 +24,7 @@ export async function generateMindmap(lesson: Lesson, lessonId: string, lang?: S
   const highlights = lesson.highlights || [];
 
   // Use digest if available (higher quality, same budget), fallback to raw truncation
-  const digest = (lesson as any).digest;
+  const digest = lesson.digest;
   const transcript = digest?.transcriptDigest
     ? digest.transcriptDigest.substring(0, 2000)
     : (lesson.transcript || "").substring(0, 2000);
@@ -63,7 +64,7 @@ export async function generateMindmapModule(
     }).join("\n");
   } else {
     const targetModule = modules[moduleIndex];
-    if (!targetModule) throw new Error("Module not found");
+    if (!targetModule) throw notFound("Module not found");
     targetTitle = targetModule.title || targetModule.name || `Module ${moduleIndex + 1}`;
     const topics = targetModule.topics || targetModule.content || [];
     targetContent = topics.map(t => typeof t === 'string' ? t : (t.title || t.name || t.description || '')).join("\n");
@@ -82,7 +83,7 @@ export async function generateMindmapModule(
 export async function generateMindmapNodeDetail(
   lesson: Lesson, nodeName: string, action: "explain" | "example" | "quiz" | "all", lang?: SupportedLang
 ): Promise<NodeDetailResult> {
-  const digest = (lesson as any).digest;
+  const digest = lesson.digest;
   const transcript = digest?.transcriptDigest
     ? digest.transcriptDigest.substring(0, 3000)
     : (lesson.transcript || "").substring(0, 3000);
@@ -106,12 +107,12 @@ export async function generateMindmapNodeDetail(
   logAI("MINDMAP_NODE_DETAIL", prompt.length, responseText.length, maxTokens);
 
   const parsed = tryParseJSON(responseText);
-  if (!parsed) throw new Error("Failed to parse AI response");
+  if (!parsed) throw new AppError(502, "Failed to parse AI response", "AI_PARSE_ERROR");
   return { action, ...parsed };
 }
 
 function cleanMindmapCode(rawText: string, title: string): string {
-  let code = rawText.replace(/```mermaid/gi, "").replace(/```/g, "").replace(/\r\n/g, "\n").trim();
+  const code = rawText.replace(/```mermaid/gi, "").replace(/```/g, "").replace(/\r\n/g, "\n").trim();
   const lines = code.split("\n");
   const cleanLines: string[] = [];
   for (const line of lines) {

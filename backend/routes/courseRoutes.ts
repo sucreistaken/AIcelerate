@@ -1,98 +1,28 @@
 import { Router } from "express";
-import { asyncHandler } from "../utils/asyncHandler";
+import { requireAuth } from "../middleware/auth";
 import { validate } from "../middleware/validate";
-import {
-  listCourses, getCourse, createCourse, updateCourse, deleteCourse,
-  addLessonToCourse, removeLessonFromCourse, getCourseLessons,
-  rebuildKnowledgeIndex, getCourseProgress, exportCourseData,
-} from "../controllers/courseController";
-import { upsertLesson } from "../controllers/lessonControllers";
-import { generateCourseChatResponse, generateStudySchedule } from "../services/courseAiService";
-import { notFound } from "../middleware/errorHandler";
+import { rateLimiter } from "../middleware/rateLimiter";
+import { courseController } from "../controllers/courseController";
 import { createCourseSchema, updateCourseSchema, courseChatSchema, studyScheduleSchema } from "../validators/courseSchemas";
+import { emptyBodySchema } from "../validators/routeSchemas";
 
 const router = Router();
 
-router.get("/courses", (_req, res) => {
-  res.json({ ok: true, courses: listCourses() });
-});
+router.get("/courses", requireAuth, courseController.list);
+router.get("/courses/:id", requireAuth, courseController.getById);
+router.post("/courses", requireAuth, validate(createCourseSchema), courseController.create);
+router.patch("/courses/:id", requireAuth, validate(updateCourseSchema), courseController.update);
+router.delete("/courses/:id", requireAuth, validate(emptyBodySchema), courseController.remove);
 
-router.get("/courses/:id", (req, res) => {
-  const course = getCourse(req.params.id);
-  if (!course) throw notFound("Course not found");
-  res.json({ ok: true, course });
-});
+router.post("/courses/:id/lessons/:lessonId", requireAuth, validate(emptyBodySchema), courseController.addLesson);
+router.delete("/courses/:id/lessons/:lessonId", requireAuth, validate(emptyBodySchema), courseController.removeLesson);
+router.get("/courses/:id/lessons", requireAuth, courseController.getLessons);
 
-router.post("/courses", validate(createCourseSchema), (req, res) => {
-  const course = createCourse(req.body);
-  res.json({ ok: true, course });
-});
-
-router.patch("/courses/:id", validate(updateCourseSchema), (req, res) => {
-  const course = updateCourse(req.params.id, req.body);
-  if (!course) throw notFound("Course not found");
-  res.json({ ok: true, course });
-});
-
-router.delete("/courses/:id", (req, res) => {
-  if (!deleteCourse(req.params.id)) throw notFound("Course not found");
-  res.json({ ok: true });
-});
-
-router.post("/courses/:id/lessons/:lessonId", (req, res) => {
-  const course = addLessonToCourse(req.params.id, req.params.lessonId);
-  if (!course) throw notFound("Course not found");
-  upsertLesson({ id: req.params.lessonId, courseId: req.params.id });
-  rebuildKnowledgeIndex(req.params.id);
-  const updatedCourse = getCourse(req.params.id);
-  res.json({ ok: true, course: updatedCourse });
-});
-
-router.delete("/courses/:id/lessons/:lessonId", (req, res) => {
-  const course = removeLessonFromCourse(req.params.id, req.params.lessonId);
-  if (!course) throw notFound("Course not found");
-  upsertLesson({ id: req.params.lessonId, courseId: undefined });
-  rebuildKnowledgeIndex(req.params.id);
-  const updatedCourse = getCourse(req.params.id);
-  res.json({ ok: true, course: updatedCourse });
-});
-
-router.get("/courses/:id/lessons", (req, res) => {
-  res.json({ ok: true, lessons: getCourseLessons(req.params.id) });
-});
-
-router.post("/courses/:id/rebuild-index", (req, res) => {
-  const index = rebuildKnowledgeIndex(req.params.id);
-  if (!index) throw notFound("Course not found");
-  res.json({ ok: true, knowledgeIndex: index });
-});
-
-router.get("/courses/:id/knowledge-index", (req, res) => {
-  const course = getCourse(req.params.id);
-  if (!course) throw notFound("Course not found");
-  res.json({ ok: true, knowledgeIndex: course.knowledgeIndex || null });
-});
-
-router.post("/courses/:id/chat", validate(courseChatSchema), asyncHandler(async (req, res) => {
-  const { text, suggestions } = await generateCourseChatResponse(req.params.id, req.body.message, req.body.history);
-  res.json({ ok: true, text, suggestions });
-}));
-
-router.get("/courses/:id/progress", (req, res) => {
-  const progress = getCourseProgress(req.params.id);
-  if (!progress) throw notFound("Course not found");
-  res.json({ ok: true, progress });
-});
-
-router.post("/courses/:id/study-schedule", validate(studyScheduleSchema), asyncHandler(async (req, res) => {
-  const schedule = await generateStudySchedule(req.params.id, req.body.examDate);
-  res.json({ ok: true, schedule });
-}));
-
-router.get("/courses/:id/export", (req, res) => {
-  const data = exportCourseData(req.params.id);
-  if (!data) throw notFound("Course not found");
-  res.json({ ok: true, export: data });
-});
+router.post("/courses/:id/rebuild-index", requireAuth, validate(emptyBodySchema), courseController.rebuildIndex);
+router.get("/courses/:id/knowledge-index", requireAuth, courseController.getKnowledgeIndex);
+router.post("/courses/:id/chat", requireAuth, rateLimiter("ai:course-chat", 15, 60_000), validate(courseChatSchema), courseController.chat);
+router.get("/courses/:id/progress", requireAuth, courseController.getProgress);
+router.post("/courses/:id/study-schedule", requireAuth, validate(studyScheduleSchema), courseController.studySchedule);
+router.get("/courses/:id/export", requireAuth, courseController.exportData);
 
 export default router;

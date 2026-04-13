@@ -5,8 +5,10 @@ import { safeGenerate, getTemperature } from "./aiService";
 import { SCHEMAS } from "../prompts/schemas";
 import { smartTruncate } from "../utils/smartTruncate";
 import { logger } from "../utils/logger";
-import { getLesson } from "../controllers/lessonControllers";
-import { getCourse, updateCourse } from "../controllers/courseController";
+import { notFound } from "../middleware/errorHandler";
+import { getLesson } from "./lessonDataService";
+import type { Lesson } from "./lessonDataService";
+import { getCourse, updateCourse } from "./courseDataService";
 import type { KnowledgeGraph, ConceptNode, ConceptEdge } from "../types/knowledgeGraph";
 
 function buildGraphPrompt(conceptsByLesson: string): string {
@@ -39,7 +41,7 @@ Return a knowledge graph with nodes and edges.`.trim();
  */
 export async function extractGraphFromLessons(courseId: string): Promise<KnowledgeGraph> {
   const course = getCourse(courseId);
-  if (!course) throw new Error("Course not found");
+  if (!course) throw notFound("Course not found");
 
   const lessonIds = course.lessonIds || [];
   const conceptsByLesson: string[] = [];
@@ -50,8 +52,8 @@ export async function extractGraphFromLessons(courseId: string): Promise<Knowled
 
     const plan = lesson.plan;
     const concepts = plan.key_concepts || [];
-    const emphases = (plan.emphases || []).map((e: any) => e.statement).filter(Boolean);
-    const modules = (plan.modules || []).map((m: any) => m.title).filter(Boolean);
+    const emphases = (plan.emphases || []).map((e: { statement: string }) => e.statement).filter(Boolean);
+    const modules = (plan.modules || []).map((m: { title: string }) => m.title).filter(Boolean);
 
     if (concepts.length || emphases.length) {
       conceptsByLesson.push(
@@ -72,8 +74,8 @@ export async function extractGraphFromLessons(courseId: string): Promise<Knowled
       maxOutputTokens: 4000,
       temperature: getTemperature("structured"),
       responseMimeType: "application/json",
-      responseSchema: SCHEMAS.KNOWLEDGE_GRAPH,
-    } as any,
+      responseSchema: SCHEMAS.KNOWLEDGE_GRAPH as import("@google/generative-ai").ResponseSchema,
+    },
   }, { label: "knowledge_graph", timeoutMs: 60_000 });
 
   const rawText = result.response.text() || "";
@@ -81,16 +83,23 @@ export async function extractGraphFromLessons(courseId: string): Promise<Knowled
 
   logger.info(`[KNOWLEDGE_GRAPH] courseId=${courseId} | nodes=${parsed.nodes?.length || 0} edges=${parsed.edges?.length || 0}`);
 
+  // Batch load all lessons once instead of N+1 lookups
+  const lessonMap = new Map<string, Lesson>();
+  for (const lid of lessonIds) {
+    const lesson = getLesson(lid);
+    if (lesson) lessonMap.set(lid, lesson);
+  }
+
   // Post-process: assign lessonIds to each node based on which lessons mention the concept
-  const nodes: ConceptNode[] = (parsed.nodes || []).map((n: any) => {
+  const nodes: ConceptNode[] = (parsed.nodes || []).map((n: { id: string; name: string; type: ConceptNode["type"] }) => {
     const matchingLessons: string[] = [];
     for (const lid of lessonIds) {
-      const lesson = getLesson(lid);
+      const lesson = lessonMap.get(lid);
       if (!lesson?.plan) continue;
       const allTerms = [
         ...(lesson.plan.key_concepts || []),
-        ...(lesson.plan.modules || []).map((m: any) => m.title),
-      ].map((t: string) => t.toLowerCase());
+        ...(lesson.plan.modules || []).map((m) => m.title || ""),
+      ].map((t) => t.toLowerCase());
       if (allTerms.some(t => t.includes(n.name.toLowerCase()) || n.name.toLowerCase().includes(t))) {
         matchingLessons.push(lid);
       }
@@ -103,24 +112,24 @@ export async function extractGraphFromLessons(courseId: string): Promise<Knowled
   });
 
   const edges: ConceptEdge[] = (parsed.edges || []).filter(
-    (e: any) => e.confidence >= 0.5
+    (e: { confidence: number }) => e.confidence >= 0.5
   );
 
   const graph: KnowledgeGraph = {
     nodes,
     edges,
     builtAt: new Date().toISOString(),
-    version: (course as any).knowledgeGraph?.version ? (course as any).knowledgeGraph.version + 1 : 1,
+    version: course.knowledgeGraph?.version ? course.knowledgeGraph.version + 1 : 1,
   };
 
   // Persist on course
-  updateCourse(courseId, { knowledgeGraph: graph } as any);
+  updateCourse(courseId, { knowledgeGraph: graph });
 
   return graph;
 }
 
 /** Get cached knowledge graph for a course */
 export function getKnowledgeGraph(courseId: string): KnowledgeGraph | null {
-  const course = getCourse(courseId) as any;
+  const course = getCourse(courseId);
   return course?.knowledgeGraph || null;
 }

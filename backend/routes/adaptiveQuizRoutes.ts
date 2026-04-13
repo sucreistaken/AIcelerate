@@ -6,13 +6,16 @@ import {
 } from "../services/adaptiveQuizService";
 import { evaluateQuizAnswer } from "../services/lessonAiService";
 import { notFound, badRequest } from "../middleware/errorHandler";
+import { requireAuth } from "../middleware/auth";
+import { validate } from "../middleware/validate";
+import { rateLimiter } from "../middleware/rateLimiter";
+import { adaptiveQuizStartSchema, adaptiveQuizAnswerSchema, emptyBodySchema } from "../validators/routeSchemas";
 
 const router = Router();
 
 // Start a new adaptive quiz session
-router.post("/adaptive-quiz/start", asyncHandler(async (req, res) => {
+router.post("/adaptive-quiz/start", requireAuth, validate(adaptiveQuizStartSchema), asyncHandler(async (req, res) => {
   const { courseId, lessonIds } = req.body;
-  if (!courseId) throw badRequest("courseId is required");
 
   const state = startSession(courseId, lessonIds);
   const nextQuestion = getNextQuestion(state.sessionId);
@@ -27,7 +30,7 @@ router.post("/adaptive-quiz/start", asyncHandler(async (req, res) => {
 }));
 
 // Get current session state + next question
-router.get("/adaptive-quiz/:sessionId", (req, res) => {
+router.get("/adaptive-quiz/:sessionId", requireAuth, (req, res) => {
   const state = getSession(req.params.sessionId);
   if (!state) throw notFound("Session not found");
 
@@ -45,9 +48,8 @@ router.get("/adaptive-quiz/:sessionId", (req, res) => {
 });
 
 // Submit an answer to the current question
-router.post("/adaptive-quiz/:sessionId/answer", asyncHandler(async (req, res) => {
+router.post("/adaptive-quiz/:sessionId/answer", requireAuth, validate(adaptiveQuizAnswerSchema), rateLimiter("ai:adaptive-answer", 20, 60_000), asyncHandler(async (req, res) => {
   const { itemId, answer } = req.body;
-  if (!itemId || !answer) throw badRequest("itemId and answer are required");
 
   const state = getSession(req.params.sessionId);
   if (!state) throw notFound("Session not found");
@@ -86,7 +88,7 @@ router.post("/adaptive-quiz/:sessionId/answer", asyncHandler(async (req, res) =>
 }));
 
 // Force end a session
-router.post("/adaptive-quiz/:sessionId/end", (req, res) => {
+router.post("/adaptive-quiz/:sessionId/end", requireAuth, validate(emptyBodySchema), (req, res) => {
   const summary = endSession(req.params.sessionId);
   if (!summary) throw notFound("Session not found");
   res.json({ ok: true, summary });

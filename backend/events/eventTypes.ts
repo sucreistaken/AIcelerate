@@ -1,5 +1,6 @@
 export interface EventMap {
   // Message events
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Mongoose toJSON() returns complex type
   "message:sent": { channelId: string; serverId: string; message: any };
   "message:deleted": { channelId: string; messageId: string };
   "message:reacted": { channelId: string; messageId: string; emoji: string; userId: string };
@@ -9,7 +10,7 @@ export interface EventMap {
   "member:left": { serverId: string; userId: string };
 
   // Quiz events
-  "quiz:completed": { channelId: string; serverId: string; participants: any[] };
+  "quiz:completed": { channelId: string; serverId: string; participants: { userId: string; score: number }[] };
 
   // Contribution events
   "contribution:made": {
@@ -24,6 +25,9 @@ export interface EventMap {
   // Server events
   "server:created": { serverId: string; ownerId: string };
   "server:deleted": { serverId: string };
+
+  // Lesson events
+  "lesson:updated": { lessonId: string };
 }
 
 export type EventName = keyof EventMap;

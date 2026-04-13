@@ -31,5 +31,7 @@ const lessonSchema = new Schema(
 // ── Indexes for frequent queries ──
 lessonSchema.index({ courseId: 1, createdAt: -1 }); // "All lessons for course X" (newest first)
 lessonSchema.index({ courseCode: 1 });                // Lookup by course code
+lessonSchema.index({ createdAt: -1 });                // Global lesson listing (newest first)
+lessonSchema.index({ title: "text" }, { name: "lesson_text_search" }); // Full-text search on title
 
 export const LessonModel = mongoose.model("Lesson", lessonSchema);

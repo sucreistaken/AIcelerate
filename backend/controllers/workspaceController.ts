@@ -1,6 +1,7 @@
 // controllers/workspaceController.ts
-import path from "path";
-import { readJSON, writeJSON, ensureDir } from "../utils/file-Handler";
+// Thin controller layer — delegates all persistence to workspaceService (MongoDB).
+
+import { workspaceService } from "../services/workspaceService";
 
 // ====== Types ======
 
@@ -100,242 +101,80 @@ export interface RoomWorkspace {
   notes: SharedNote[];
 }
 
-// ====== Paths ======
-
-const DATA_DIR = path.join(process.cwd(), "backend", "data", "workspaces");
-ensureDir(DATA_DIR);
-
-function workspacePath(roomId: string): string {
-  return path.join(DATA_DIR, `${roomId}.json`);
-}
-
-function defaultWorkspace(): RoomWorkspace {
-  return {
-    deepDive: { messages: [], savedInsights: [] },
-    flashcards: [],
-    mindMapAnnotations: [],
-    notes: [],
-  };
-}
-
-import { generateId as genId } from "../utils/idGenerator";
-
 // ====== Workspace CRUD ======
 
-export function loadWorkspace(roomId: string): RoomWorkspace {
-  const data = readJSON<RoomWorkspace>(workspacePath(roomId));
-  return data || defaultWorkspace();
+export async function loadWorkspace(roomId: string): Promise<RoomWorkspace> {
+  return workspaceService.getWorkspace(roomId);
 }
 
-export function saveWorkspace(roomId: string, workspace: RoomWorkspace): void {
-  writeJSON(workspacePath(roomId), workspace);
-}
-
-export function deleteWorkspaceFile(roomId: string): void {
-  const fs = require("fs");
-  const p = workspacePath(roomId);
-  if (fs.existsSync(p)) fs.unlinkSync(p);
+export async function deleteWorkspaceFile(roomId: string): Promise<void> {
+  return workspaceService.deleteWorkspace(roomId);
 }
 
 // ====== Deep Dive ======
 
-export function addDeepDiveMessage(roomId: string, message: SharedChatMessage): void {
-  const ws = loadWorkspace(roomId);
-  ws.deepDive.messages.push(message);
-  // Limit to 500 messages
-  if (ws.deepDive.messages.length > 500) {
-    ws.deepDive.messages = ws.deepDive.messages.slice(-500);
-  }
-  saveWorkspace(roomId, ws);
+export async function addDeepDiveMessage(roomId: string, message: SharedChatMessage): Promise<void> {
+  return workspaceService.addDeepDiveMessage(roomId, message);
 }
 
-export function addDeepDiveReaction(roomId: string, messageId: string, userId: string): MessageReaction[] {
-  const ws = loadWorkspace(roomId);
-  const msg = ws.deepDive.messages.find((m) => m.id === messageId);
-  if (!msg) return [];
-
-  // Toggle reaction
-  const existingIdx = msg.reactions.findIndex((r) => r.userId === userId);
-  if (existingIdx >= 0) {
-    msg.reactions.splice(existingIdx, 1);
-  } else {
-    msg.reactions.push({ userId, type: "helpful" });
-  }
-  saveWorkspace(roomId, ws);
-  return msg.reactions;
+export async function addDeepDiveReaction(roomId: string, messageId: string, userId: string): Promise<MessageReaction[]> {
+  return workspaceService.addDeepDiveReaction(roomId, messageId, userId);
 }
 
-export function saveInsight(roomId: string, messageId: string, savedBy: string, savedByNickname: string, tags: string[]): SharedInsight | null {
-  const ws = loadWorkspace(roomId);
-  const msg = ws.deepDive.messages.find((m) => m.id === messageId);
-  if (!msg) return null;
-
-  msg.savedAsInsight = true;
-
-  const insight: SharedInsight = {
-    id: genId("insight"),
-    text: msg.text,
-    sourceMessageId: messageId,
-    savedBy,
-    savedByNickname,
-    tags,
-    timestamp: new Date().toISOString(),
-  };
-  ws.deepDive.savedInsights.push(insight);
-  saveWorkspace(roomId, ws);
-  return insight;
+export async function saveInsight(roomId: string, messageId: string, savedBy: string, savedByNickname: string, tags: string[]): Promise<SharedInsight | null> {
+  return workspaceService.saveInsight(roomId, messageId, savedBy, savedByNickname, tags);
 }
 
 // ====== Flashcards ======
 
-export function addFlashcard(roomId: string, card: Omit<SharedFlashcard, "id" | "createdAt" | "votes">): SharedFlashcard {
-  const ws = loadWorkspace(roomId);
-  const newCard: SharedFlashcard = {
-    ...card,
-    id: genId("fc"),
-    createdAt: new Date().toISOString(),
-    votes: [],
-  };
-  ws.flashcards.push(newCard);
-  saveWorkspace(roomId, ws);
-  return newCard;
+export async function addFlashcard(roomId: string, card: Omit<SharedFlashcard, "id" | "createdAt" | "votes">): Promise<SharedFlashcard> {
+  return workspaceService.addFlashcard(roomId, card);
 }
 
-export function updateFlashcard(roomId: string, cardId: string, updates: { front?: string; back?: string; topicName?: string }, editedBy: string, editedByNickname: string): SharedFlashcard | null {
-  const ws = loadWorkspace(roomId);
-  const card = ws.flashcards.find((c) => c.id === cardId);
-  if (!card) return null;
-
-  if (updates.front !== undefined) card.front = updates.front;
-  if (updates.back !== undefined) card.back = updates.back;
-  if (updates.topicName !== undefined) card.topicName = updates.topicName;
-  card.editedBy = editedBy;
-  card.editedByNickname = editedByNickname;
-  card.editedAt = new Date().toISOString();
-
-  saveWorkspace(roomId, ws);
-  return card;
+export async function updateFlashcard(roomId: string, cardId: string, updates: { front?: string; back?: string; topicName?: string }, editedBy: string, editedByNickname: string): Promise<SharedFlashcard | null> {
+  return workspaceService.updateFlashcard(roomId, cardId, updates, editedBy, editedByNickname);
 }
 
-export function deleteFlashcard(roomId: string, cardId: string): boolean {
-  const ws = loadWorkspace(roomId);
-  const idx = ws.flashcards.findIndex((c) => c.id === cardId);
-  if (idx < 0) return false;
-  ws.flashcards.splice(idx, 1);
-  saveWorkspace(roomId, ws);
-  return true;
+export async function deleteFlashcard(roomId: string, cardId: string): Promise<boolean> {
+  return workspaceService.deleteFlashcard(roomId, cardId);
 }
 
-export function voteFlashcard(roomId: string, cardId: string, userId: string, vote: "up" | "down"): FlashcardVote[] {
-  const ws = loadWorkspace(roomId);
-  const card = ws.flashcards.find((c) => c.id === cardId);
-  if (!card) return [];
-
-  const existingIdx = card.votes.findIndex((v) => v.userId === userId);
-  if (existingIdx >= 0) {
-    if (card.votes[existingIdx].vote === vote) {
-      // Same vote: remove it (toggle off)
-      card.votes.splice(existingIdx, 1);
-    } else {
-      // Different vote: update
-      card.votes[existingIdx].vote = vote;
-    }
-  } else {
-    card.votes.push({ userId, vote });
-  }
-
-  saveWorkspace(roomId, ws);
-  return card.votes;
+export async function voteFlashcard(roomId: string, cardId: string, userId: string, vote: "up" | "down"): Promise<FlashcardVote[]> {
+  return workspaceService.voteFlashcard(roomId, cardId, userId, vote);
 }
 
-export function addBulkFlashcards(roomId: string, cards: SharedFlashcard[]): SharedFlashcard[] {
-  const ws = loadWorkspace(roomId);
-  ws.flashcards.push(...cards);
-  saveWorkspace(roomId, ws);
-  return cards;
+export async function addBulkFlashcards(roomId: string, cards: SharedFlashcard[]): Promise<SharedFlashcard[]> {
+  return workspaceService.addBulkFlashcards(roomId, cards);
 }
 
 // ====== Mind Map Annotations ======
 
-export function addMindMapAnnotation(roomId: string, annotation: Omit<MindMapAnnotation, "id" | "timestamp" | "replies">): MindMapAnnotation {
-  const ws = loadWorkspace(roomId);
-  const newAnnotation: MindMapAnnotation = {
-    ...annotation,
-    id: genId("ann"),
-    timestamp: new Date().toISOString(),
-    replies: [],
-  };
-  ws.mindMapAnnotations.push(newAnnotation);
-  saveWorkspace(roomId, ws);
-  return newAnnotation;
+export async function addMindMapAnnotation(roomId: string, annotation: Omit<MindMapAnnotation, "id" | "timestamp" | "replies">): Promise<MindMapAnnotation> {
+  return workspaceService.addMindMapAnnotation(roomId, annotation);
 }
 
-export function addAnnotationReply(roomId: string, annotationId: string, reply: Omit<AnnotationReply, "id" | "timestamp">): AnnotationReply | null {
-  const ws = loadWorkspace(roomId);
-  const annotation = ws.mindMapAnnotations.find((a) => a.id === annotationId);
-  if (!annotation) return null;
-
-  const newReply: AnnotationReply = {
-    ...reply,
-    id: genId("reply"),
-    timestamp: new Date().toISOString(),
-  };
-  annotation.replies.push(newReply);
-  saveWorkspace(roomId, ws);
-  return newReply;
+export async function addAnnotationReply(roomId: string, annotationId: string, reply: Omit<AnnotationReply, "id" | "timestamp">): Promise<AnnotationReply | null> {
+  return workspaceService.addAnnotationReply(roomId, annotationId, reply);
 }
 
-export function getAnnotationsForNode(roomId: string, nodeLabel: string): MindMapAnnotation[] {
-  const ws = loadWorkspace(roomId);
-  return ws.mindMapAnnotations.filter((a) => a.nodeLabel === nodeLabel);
+export async function getAnnotationsForNode(roomId: string, nodeLabel: string): Promise<MindMapAnnotation[]> {
+  return workspaceService.getAnnotationsForNode(roomId, nodeLabel);
 }
 
 // ====== Notes ======
 
-export function addNote(roomId: string, note: Omit<SharedNote, "id" | "createdAt" | "pinned">): SharedNote {
-  const ws = loadWorkspace(roomId);
-  const newNote: SharedNote = {
-    ...note,
-    id: genId("note"),
-    createdAt: new Date().toISOString(),
-    pinned: false,
-  };
-  ws.notes.push(newNote);
-  saveWorkspace(roomId, ws);
-  return newNote;
+export async function addNote(roomId: string, note: Omit<SharedNote, "id" | "createdAt" | "pinned">): Promise<SharedNote> {
+  return workspaceService.addNote(roomId, note);
 }
 
-export function updateNote(roomId: string, noteId: string, updates: { title?: string; content?: string; category?: SharedNote["category"] }, editedBy: string, editedByNickname: string): SharedNote | null {
-  const ws = loadWorkspace(roomId);
-  const note = ws.notes.find((n) => n.id === noteId);
-  if (!note) return null;
-
-  if (updates.title !== undefined) note.title = updates.title;
-  if (updates.content !== undefined) note.content = updates.content;
-  if (updates.category !== undefined) note.category = updates.category;
-  note.editedBy = editedBy;
-  note.editedByNickname = editedByNickname;
-  note.editedAt = new Date().toISOString();
-
-  saveWorkspace(roomId, ws);
-  return note;
+export async function updateNote(roomId: string, noteId: string, updates: { title?: string; content?: string; category?: SharedNote["category"] }, editedBy: string, editedByNickname: string): Promise<SharedNote | null> {
+  return workspaceService.updateNote(roomId, noteId, updates, editedBy, editedByNickname);
 }
 
-export function deleteNote(roomId: string, noteId: string): boolean {
-  const ws = loadWorkspace(roomId);
-  const idx = ws.notes.findIndex((n) => n.id === noteId);
-  if (idx < 0) return false;
-  ws.notes.splice(idx, 1);
-  saveWorkspace(roomId, ws);
-  return true;
+export async function deleteNote(roomId: string, noteId: string): Promise<boolean> {
+  return workspaceService.deleteNote(roomId, noteId);
 }
 
-export function toggleNotePin(roomId: string, noteId: string): boolean | null {
-  const ws = loadWorkspace(roomId);
-  const note = ws.notes.find((n) => n.id === noteId);
-  if (!note) return null;
-
-  note.pinned = !note.pinned;
-  saveWorkspace(roomId, ws);
-  return note.pinned;
+export async function toggleNotePin(roomId: string, noteId: string): Promise<boolean | null> {
+  return workspaceService.toggleNotePin(roomId, noteId);
 }

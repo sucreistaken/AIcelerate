@@ -1,4 +1,4 @@
-import { Response } from "express";
+import { Request, Response } from "express";
 import { env } from "../config/env";
 
 const REFRESH_TOKEN_COOKIE = "lc_rt";
@@ -38,8 +38,8 @@ export function clearRefreshTokenCookie(res: Response): void {
 /**
  * Read the refresh token from the request cookie.
  */
-export function getRefreshTokenFromCookie(req: any): string | undefined {
-  return req.cookies?.[REFRESH_TOKEN_COOKIE];
+export function getRefreshTokenFromCookie(req: Request): string | undefined {
+  return (req as unknown as { cookies?: Record<string, string> }).cookies?.[REFRESH_TOKEN_COOKIE];
 }
 
 export { REFRESH_TOKEN_COOKIE };

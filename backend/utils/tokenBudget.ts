@@ -21,8 +21,9 @@ export async function countTokensAccurate(text: string): Promise<number> {
     const model = getModel();
     const result = await model.countTokens(text);
     return result.totalTokens;
-  } catch (err: any) {
-    logger.warn({ error: err.message }, "Accurate token count failed, using estimation");
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.warn({ error: message }, "Accurate token count failed, using estimation");
     return estimateTokens(text);
   }
 }

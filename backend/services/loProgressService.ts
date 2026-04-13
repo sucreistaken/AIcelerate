@@ -1,10 +1,19 @@
 // services/loProgressService.ts
 // Computes Learning Outcome mastery from quiz scores, flashcard states, and lesson coverage.
 
-import { getCourse, type Course } from "../controllers/courseController";
+import { getCourse } from "./courseDataService";
 import { lessonCache } from "../cache";
 import { logger } from "../utils/logger";
 import type { LOProgress, LODashboardData } from "../types/loProgress";
+import type { Lesson } from "../types/lesson";
+
+// LO Progress weights — externalized for future A/B testing
+const LO_WEIGHTS = {
+  quiz: 0.4,
+  flashcard: 0.3,
+  lesson: 0.2,
+  loModule: 0.1,
+} as const;
 
 type MasteryLevel = LOProgress["masteryLevel"];
 
@@ -58,7 +67,6 @@ export function computeLOProgress(courseId: string): LODashboardData | null {
 
   const ki = course.knowledgeIndex;
   const loCoverage = ki?.loCoverage || [];
-  const lessonIds = course.lessonIds || [];
 
   const loProgressList: LOProgress[] = [];
 
@@ -66,12 +74,12 @@ export function computeLOProgress(courseId: string): LODashboardData | null {
   const allContributingIds = new Set<string>();
   for (let i = 0; i < los.length; i++) {
     const loId = `LO${i + 1}`;
-    const coverageEntry = loCoverage.find((lc: any) => lc.loId === loId);
+    const coverageEntry = loCoverage.find((lc) => lc.loId === loId);
     if (coverageEntry?.coveredByLessons) {
       for (const lid of coverageEntry.coveredByLessons) allContributingIds.add(lid);
     }
   }
-  const lessonMap = new Map<string, any>();
+  const lessonMap = new Map<string, Lesson>();
   for (const lid of allContributingIds) {
     const lesson = lessonCache.get(lid);
     if (lesson) lessonMap.set(lid, lesson);
@@ -82,7 +90,7 @@ export function computeLOProgress(courseId: string): LODashboardData | null {
     const loId = `LO${i + 1}`;
 
     // Find contributing lessons from knowledge index
-    const coverageEntry = loCoverage.find((lc: any) => lc.loId === loId);
+    const coverageEntry = loCoverage.find((lc) => lc.loId === loId);
     const contributingLessons = coverageEntry?.coveredByLessons || [];
 
     // 1. Quiz scores (40% weight)
@@ -105,7 +113,7 @@ export function computeLOProgress(courseId: string): LODashboardData | null {
     for (const lid of contributingLessons) {
       const lesson = lessonMap.get(lid);
       if (!lesson) continue;
-      const progress = lesson.progress as any;
+      const progress = lesson.progress as { flashcardStats?: { total?: number; graduated?: number; learning?: number; new?: number } } | undefined;
       if (progress?.flashcardStats) {
         fcTotal += progress.flashcardStats.total || 0;
         fcGraduated += progress.flashcardStats.graduated || 0;
@@ -127,7 +135,7 @@ export function computeLOProgress(courseId: string): LODashboardData | null {
     let loModuleExists = 0;
     for (const lid of contributingLessons) {
       const lesson = lessonMap.get(lid);
-      if (lesson?.loModules?.modules?.some((m: any) => m.loId === loId)) {
+      if (lesson?.loModules?.modules?.some((m: { loId: string }) => m.loId === loId)) {
         loModuleExists++;
       }
     }
@@ -137,7 +145,7 @@ export function computeLOProgress(courseId: string): LODashboardData | null {
 
     // Weighted overall confidence
     const overallConfidence = Math.min(1, Math.max(0,
-      quizAvg * 0.4 + fcGradRate * 0.3 + lessonCoverage * 0.2 + loModuleRate * 0.1
+      quizAvg * LO_WEIGHTS.quiz + fcGradRate * LO_WEIGHTS.flashcard + lessonCoverage * LO_WEIGHTS.lesson + loModuleRate * LO_WEIGHTS.loModule
     ));
 
     const masteryLevel = computeMasteryLevel(overallConfidence);

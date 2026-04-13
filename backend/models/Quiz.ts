@@ -20,4 +20,8 @@ const quizPackSchema = new Schema(
   { timestamps: true, _id: false }
 );
 
+// ── Indexes for frequent queries ──
+quizPackSchema.index({ "items.lessonId": 1 });    // Per-lesson quiz lookups
+quizPackSchema.index({ createdAt: -1 });           // Recent packs first
+
 export const QuizModel = mongoose.model("Quiz", quizPackSchema);

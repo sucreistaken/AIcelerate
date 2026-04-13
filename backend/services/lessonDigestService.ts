@@ -4,7 +4,7 @@ import { logger } from "../utils/logger";
 // Typical digest: ~4,200 chars (~1,050 tokens) vs full context: ~36,000 chars (~9,000 tokens)
 
 import { safeGenerate, stripCodeFences, tryParseJSON, getTemperature } from "./aiService";
-import { getLesson, upsertLesson } from "../controllers/lessonControllers";
+import { getLesson, upsertLesson } from "./lessonDataService";
 import { smartTruncate } from "../utils/smartTruncate";
 import { SCHEMAS } from "../prompts/schemas";
 
@@ -26,19 +26,19 @@ export async function generateDigest(
   lessonId: string,
   lectureText: string,
   slidesText: string,
-  plan: any
+  plan: Record<string, unknown>
 ): Promise<LessonDigest> {
   const LEC = smartTruncate(lectureText || "", 16000);
   const SLD = smartTruncate(slidesText || "", 12000);
 
   // Extract what we can directly from the plan (no AI needed)
-  const keyConcepts: string[] = plan?.key_concepts || [];
-  const modules = plan?.modules || [];
-  const emphases = plan?.emphases || [];
+  const keyConcepts: string[] = (plan?.key_concepts as string[] | undefined) || [];
+  const modules = (plan?.modules as Array<{ title?: string; goal?: string }> | undefined) || [];
+  const emphases = (plan?.emphases as Array<{ statement?: string }> | undefined) || [];
 
   const modulesSummary = modules
     .slice(0, 6)
-    .map((m: any, i: number) => `${i + 1}. ${m.title || "Module"}: ${m.goal || ""}`)
+    .map((m, i) => `${i + 1}. ${m.title || "Module"}: ${m.goal || ""}`)
     .join("\n");
 
   // Use AI to create compact digests of transcript and slides
@@ -54,7 +54,7 @@ ${SLD}
 ${keyConcepts.join(", ") || "N/A"}
 
 [EMPHASES]
-${emphases.slice(0, 8).map((e: any) => e.statement || e).join("; ") || "N/A"}
+${emphases.slice(0, 8).map((e) => e.statement || String(e)).join("; ") || "N/A"}
 
 Return ONLY valid JSON:
 {
@@ -70,8 +70,8 @@ Return ONLY valid JSON:
         maxOutputTokens: 2500,
         temperature: getTemperature("structured"),
         responseMimeType: "application/json",
-        responseSchema: SCHEMAS.LESSON_DIGEST,
-      } as any,
+        responseSchema: SCHEMAS.LESSON_DIGEST as import("@google/generative-ai").ResponseSchema,
+      },
     }, { label: "lesson_digest", timeoutMs: 45_000 });
 
     const raw = (result.response.text() || "").trim();
@@ -88,12 +88,13 @@ Return ONLY valid JSON:
     };
 
     // Save digest to lesson
-    upsertLesson({ id: lessonId, digest });
+    await upsertLesson({ id: lessonId, digest });
     logger.info(`[Digest] Generated for lesson ${lessonId} (${JSON.stringify(digest).length} chars)`);
 
     return digest;
-  } catch (err: any) {
-    logger.warn(`[Digest] AI generation failed for ${lessonId}, using fallback:`, err?.message);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    logger.warn(`[Digest] AI generation failed for ${lessonId}, using fallback:`, errMsg);
     // Fallback: extract key portions without AI
     const digest: LessonDigest = {
       lessonId,
@@ -104,7 +105,7 @@ Return ONLY valid JSON:
       formulasAndDefinitions: "",
       generatedAt: new Date().toISOString(),
     };
-    upsertLesson({ id: lessonId, digest });
+    await upsertLesson({ id: lessonId, digest });
     return digest;
   }
 }
@@ -162,16 +163,16 @@ export function getDigestOrFallback(lessonId: string): {
     return { context: "", isDigest: false };
   }
 
-  const plan = lesson.plan as any;
+  const plan = lesson.plan;
   const parts: string[] = [];
 
   if (plan?.topic) parts.push(`Topic: ${plan.topic}`);
   if (plan?.key_concepts?.length) parts.push(`Key concepts: ${plan.key_concepts.join(", ")}`);
   if (plan?.modules?.length) {
-    parts.push(`Modules:\n${plan.modules.slice(0, 6).map((m: any) => `- ${m.title}: ${m.goal || ""}`).join("\n")}`);
+    parts.push(`Modules:\n${plan.modules.slice(0, 6).map((m) => `- ${m.title}: ${m.goal || ""}`).join("\n")}`);
   }
   if (plan?.emphases?.length) {
-    parts.push(`Emphases:\n${plan.emphases.slice(0, 8).map((e: any) => `- ${e.statement}`).join("\n")}`);
+    parts.push(`Emphases:\n${plan.emphases.slice(0, 8).map((e) => `- ${e.statement}`).join("\n")}`);
   }
 
   // Include truncated raw text as fallback

@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Response } from "express";
 import {
   listNotifications,
   dismissNotification,
@@ -6,34 +6,43 @@ import {
   getUnreadCount,
   checkAndGenerateNotifications,
 } from "../controllers/notificationController";
+import { requireAuth, AuthRequest } from "../middleware/auth";
+import { asyncHandler } from "../utils/asyncHandler";
+import { validate } from "../middleware/validate";
+import { emptyBodySchema } from "../validators/routeSchemas";
 
 const router = Router();
 
-router.get("/notifications", (req, res) => {
+router.get("/notifications", requireAuth, asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.user!.userId;
   const unread = req.query.unread === "true";
-  const notifications = listNotifications(unread);
+  const notifications = await listNotifications(userId, unread);
   res.json({ ok: true, notifications });
-});
+}));
 
-router.post("/notifications/:id/dismiss", (req, res) => {
-  const notif = dismissNotification(req.params.id);
+router.post("/notifications/:id/dismiss", requireAuth, validate(emptyBodySchema), asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.user!.userId;
+  const notif = await dismissNotification(userId, req.params.id);
   if (!notif) return res.status(404).json({ ok: false, error: "Notification not found" });
   res.json({ ok: true, notification: notif });
-});
+}));
 
-router.post("/notifications/dismiss-all", (_req, res) => {
-  const count = dismissAllNotifications();
+router.post("/notifications/dismiss-all", requireAuth, validate(emptyBodySchema), asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.user!.userId;
+  const count = await dismissAllNotifications(userId);
   res.json({ ok: true, dismissed: count });
-});
+}));
 
-router.get("/notifications/unread-count", (_req, res) => {
-  const count = getUnreadCount();
+router.get("/notifications/unread-count", requireAuth, asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.user!.userId;
+  const count = await getUnreadCount(userId);
   res.json({ ok: true, count });
-});
+}));
 
-router.post("/notifications/check", (req, res) => {
-  const newNotifications = checkAndGenerateNotifications();
-  const count = getUnreadCount();
+router.post("/notifications/check", requireAuth, validate(emptyBodySchema), asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.user!.userId;
+  const newNotifications = await checkAndGenerateNotifications(userId);
+  const count = await getUnreadCount(userId);
 
   const io = req.app.get("io");
   if (io) {
@@ -44,6 +53,6 @@ router.post("/notifications/check", (req, res) => {
   }
 
   res.json({ ok: true, newNotifications, count });
-});
+}));
 
 export default router;

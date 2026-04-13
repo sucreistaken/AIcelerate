@@ -14,6 +14,7 @@ export interface MessageEmbed {
 }
 
 export interface IMessage extends Document {
+  id: string;
   channelId: string;
   roomId: string;
   authorId: string;
@@ -78,8 +79,9 @@ const messageSchema = new Schema<IMessage>(
     timestamps: true,
     toJSON: {
       virtuals: true,
-      transform(_doc, ret) {
-        ret.id = ret._id.toString();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      transform(_doc: any, ret: any) {
+        ret.id = String(ret._id);
         delete ret.__v;
         return ret;
       },
@@ -90,6 +92,7 @@ const messageSchema = new Schema<IMessage>(
 // ── Indexes ────────────────────────────────────────────────────────────────────
 messageSchema.index({ channelId: 1, deleted: 1, createdAt: -1 }); // Main query: messages by channel
 messageSchema.index({ channelId: 1, threadId: 1, createdAt: 1 }); // Thread queries
+messageSchema.index({ channelId: 1, threadId: 1, deleted: 1, createdAt: 1 }); // Optimized thread queries with deleted filter
 messageSchema.index({ roomId: 1 }); // Cascade delete
 messageSchema.index({ authorId: 1 }); // User message lookups
 

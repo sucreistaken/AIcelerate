@@ -14,8 +14,9 @@ export const DEFAULT_PAGE_SIZE = 20;
 export const MAX_PAGE_SIZE = 100;
 
 export function clampLimit(limit?: number): number {
-  const n = Number(limit) || DEFAULT_PAGE_SIZE;
-  return Math.min(Math.max(1, n), MAX_PAGE_SIZE);
+  const n = Number(limit);
+  if (!Number.isFinite(n) || n < 1) return DEFAULT_PAGE_SIZE;
+  return Math.min(n, MAX_PAGE_SIZE);
 }
 
 /**
@@ -31,10 +32,13 @@ export function cursorFilter(cursor?: string, direction: "forward" | "backward" 
  * Build PaginatedResult from a fetched array.
  * Fetch limit+1 items to determine hasMore, then slice.
  */
-export function buildPaginatedResult<T extends { id?: string; _id?: any }>(
+export function buildPaginatedResult<T extends { id?: string; _id?: { toString(): string } }>(
   items: T[],
   limit: number,
 ): PaginatedResult<T> {
+  if (!items || items.length === 0) {
+    return { items: [], nextCursor: null, hasMore: false };
+  }
   const hasMore = items.length > limit;
   const sliced = hasMore ? items.slice(0, limit) : items;
   const last = sliced[sliced.length - 1];

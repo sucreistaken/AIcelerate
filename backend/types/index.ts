@@ -1,8 +1,17 @@
 // ---- Quiz Types ----
-export type QuizPackT = { id: string; items: any[]; createdAt?: string };
+export interface QuizItem {
+  id: string;
+  type: "why" | "tf" | "mc";
+  prompt: string;
+  expectedKeywords?: string[];
+  expectedAnswer?: boolean | string;
+  lessonId?: string;
+}
 
-export function isQuizPack(x: any): x is QuizPackT {
-  return !!x && typeof x.id === "string" && Array.isArray(x.items);
+export type QuizPackT = { id: string; items: QuizItem[]; createdAt?: string };
+
+export function isQuizPack(x: unknown): x is QuizPackT {
+  return !!x && typeof (x as Record<string, unknown>).id === "string" && Array.isArray((x as Record<string, unknown>).items);
 }
 
 // ---- Learning Outcome Alignment Types ----
@@ -65,7 +74,8 @@ export interface LessonPlan {
   emphases?: PlanEmphasis[];
   alignment?: PlanAlignment;
   learning_outcomes?: string[];
-  [key: string]: any; // Allow additional AI-generated fields
+  seed_quiz?: string[];
+  [key: string]: unknown; // Allow additional AI-generated fields (typed as unknown for safety)
 }
 
 // ---- Cheat Sheet Types ----

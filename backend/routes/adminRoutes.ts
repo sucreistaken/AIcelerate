@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
-import { requireAuth, AuthRequest } from "../middleware/auth";
+import { requireAuth } from "../middleware/auth";
 import { requirePermission } from "../middleware/requirePermission";
 import { auditLog } from "../middleware/auditLog";
 import { validate } from "../middleware/validate";
@@ -14,6 +14,7 @@ import {
   sendNotificationSchema,
   auditLogQuerySchema,
 } from "../validators/adminSchemas";
+import { emptyBodySchema } from "../validators/routeSchemas";
 import * as admin from "../controllers/adminController";
 
 const router = Router();
@@ -75,6 +76,7 @@ router.patch(
 router.delete(
   "/users/:id",
   requirePermission("users:delete"),
+  validate(emptyBodySchema),
   auditLog("user.delete"),
   asyncHandler(async (req, res) => {
     const result = await admin.deleteUser(req.params.id);
@@ -96,6 +98,7 @@ router.get(
 router.delete(
   "/courses/:id",
   requirePermission("courses:delete"),
+  validate(emptyBodySchema),
   auditLog("course.delete"),
   asyncHandler(async (req, res) => {
     const result = await admin.deleteCourse(req.params.id);
@@ -117,6 +120,7 @@ router.get(
 router.delete(
   "/lessons/:id",
   requirePermission("lessons:delete"),
+  validate(emptyBodySchema),
   auditLog("lesson.delete"),
   asyncHandler(async (req, res) => {
     const result = await admin.deleteLesson(req.params.id);
@@ -159,6 +163,7 @@ router.patch(
 router.delete(
   "/roles/:id",
   requirePermission("roles:delete"),
+  validate(emptyBodySchema),
   auditLog("role.delete"),
   asyncHandler(async (req, res) => {
     const result = await admin.deleteRole(req.params.id);

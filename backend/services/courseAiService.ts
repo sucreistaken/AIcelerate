@@ -1,10 +1,11 @@
 import { logger } from "../utils/logger";
-import { getModel, safeGenerate, getTemperature } from "./aiService";
-import { getCourse, getCourseProgress } from "../controllers/courseController";
+import { getModel, safeGenerate, getTemperature, tryParseJSON, stripCodeFences } from "./aiService";
+import { getCourse, getCourseProgress } from "./courseDataService";
 import { assembleCourseWideContext } from "../controllers/contextAssembler";
 import { SCHEMAS } from "../prompts/schemas";
-import { notFound } from "../middleware/errorHandler";
+import { notFound, AppError } from "../middleware/errorHandler";
 import { getLangDirective, type SupportedLang } from "../utils/langDirective";
+import { withAiResilience } from "../utils/aiResilience";
 
 export async function generateCourseChatResponse(
   courseId: string,
@@ -16,13 +17,6 @@ export async function generateCourseChatResponse(
   if (!course) throw notFound("Course not found");
 
   const courseCtx = assembleCourseWideContext(courseId);
-  const chat = getModel().startChat({
-    history: history?.map((h) => ({
-      role: h.role === 'user' ? 'user' : 'model',
-      parts: [{ text: h.content }],
-    })) || [],
-    generationConfig: { maxOutputTokens: 2500, temperature: getTemperature("creative") },
-  });
 
   const prompt = `${getLangDirective(lang)}
 === YOUR ROLE ===
@@ -37,8 +31,21 @@ ${message}
 Answer directly, reference specific lessons, end with 3 suggested follow-up questions.
 `;
 
-  const result = await chat.sendMessage(prompt);
-  let text = result.response.text();
+  const timeoutMs = 30_000;
+  const result = await withAiResilience(
+    async (_signal) => {
+      const chat = getModel().startChat({
+        history: history?.map((h) => ({
+          role: h.role === 'user' ? 'user' : 'model',
+          parts: [{ text: h.content }],
+        })) || [],
+        generationConfig: { maxOutputTokens: 2500, temperature: getTemperature("creative") },
+      });
+      return chat.sendMessage(prompt);
+    },
+    { timeoutMs, label: "course_chat" }
+  );
+  const text = result.response.text();
   logger.info(`[AI] COURSE_CHAT | courseId=${courseId} | ~${Math.ceil(prompt.length / 4)} in`);
 
   const suggestionsMatch = text.match(/\*\*Suggested Questions:\*\*\s*([\s\S]*?)$/);
@@ -55,7 +62,7 @@ Answer directly, reference specific lessons, end with 3 suggested follow-up ques
 export async function generateStudySchedule(
   courseId: string,
   examDate?: string
-): Promise<any> {
+): Promise<{ courseId: string; generatedAt: string; examDate?: string; days: unknown[]; tips: unknown[] }> {
   const course = getCourse(courseId);
   if (!course) throw notFound("Course not found");
 
@@ -79,13 +86,14 @@ Return JSON: { "days": [{ "day": "Monday", "slots": [{ "time": "Morning", "activ
       maxOutputTokens: 2000,
       temperature: getTemperature("structured"),
       responseMimeType: "application/json",
-      responseSchema: SCHEMAS.STUDY_SCHEDULE,
-    } as any,
+      responseSchema: SCHEMAS.STUDY_SCHEDULE as import("@google/generative-ai").ResponseSchema,
+    },
   }, { label: "study_schedule", timeoutMs: 30_000 });
 
   const text = result.response.text();
   logger.info(`[AI] STUDY_SCHEDULE | courseId=${courseId} | ~${Math.ceil(prompt.length / 4)} in, ~${Math.ceil(text.length / 4)} out`);
-  const parsed = JSON.parse(text);
+  const parsed = tryParseJSON(text) ?? tryParseJSON(stripCodeFences(text));
+  if (!parsed) throw new AppError(500, "AI response parse error", "LLM_PARSE_ERROR");
 
   return {
     courseId,

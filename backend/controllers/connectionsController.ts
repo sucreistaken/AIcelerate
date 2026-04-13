@@ -1,10 +1,10 @@
 import { logger } from "../utils/logger";
 // controllers/connectionsController.ts
-import { readJSON, writeJSON } from "../utils/file-Handler";
 import { connectionsCache } from "../cache";
 import { listLessons, getMemory } from "./lessonControllers";
+import { GlobalMemoryModel } from "../models/GlobalMemory";
 import { SCHEMAS } from "../prompts/schemas";
-import path from "path";
+import { safeGenerate } from "../services/aiService";
 
 export type ConceptConnection = {
   concept: string;
@@ -15,22 +15,16 @@ export type ConceptConnection = {
   aiInsight?: string;
 };
 
-const DATA_DIR = path.join(process.cwd(), "backend", "data");
-const MEMORY_PATH = path.join(DATA_DIR, "memory.json");
-
-const stripCodeFences = (s: string) =>
-  s.replace(/```json/gi, "").replace(/```/g, "").trim();
-
 // Build connections by scanning all lessons (cached 120s when no AI enrichment)
-export async function buildConnections(model?: any): Promise<ConceptConnection[]> {
-  // Use cached result if available and no AI model provided
-  if (!model) {
-    const cached = connectionsCache.get("connections");
+export async function buildConnections(userId: string, enrich: boolean = false): Promise<ConceptConnection[]> {
+  // Use cached result if available and no AI enrichment requested
+  if (!enrich) {
+    const cached = connectionsCache.get(`connections:${userId}`);
     if (cached) return cached;
   }
 
   const lessons = listLessons();
-  const memory = getMemory();
+  const memory = await getMemory();
 
   // concept -> { lessonIds, lessonTitles }
   const conceptMap = new Map<string, { lessonIds: Set<string>; lessonTitles: Set<string> }>();
@@ -172,7 +166,7 @@ export async function buildConnections(model?: any): Promise<ConceptConnection[]
   connections.sort((a, b) => b.strength - a.strength);
 
   // Generate AI insights for top 20 connections
-  if (model && connections.length > 0) {
+  if (enrich && connections.length > 0) {
     const top = connections.slice(0, 20);
     const batch = top.map((c) => ({
       concept: c.concept,
@@ -188,14 +182,14 @@ Return a JSON array of objects: [{"concept": "...", "insight": "..."}]
 Concepts:
 ${JSON.stringify(batch, null, 2)}`;
 
-      const result = await model.generateContent({
+      const result = await safeGenerate({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: {
           maxOutputTokens: 1500,
           responseMimeType: "application/json",
-          responseSchema: SCHEMAS.CONNECTION_INSIGHTS,
+          responseSchema: SCHEMAS.CONNECTION_INSIGHTS as import("@google/generative-ai").ResponseSchema,
         },
-      });
+      }, { label: "connections_build", timeoutMs: 45_000 });
       const raw = result.response.text();
       logger.info(`[AI] CONNECTION_INSIGHTS | ~${Math.ceil(prompt.length / 4)} in, ~${Math.ceil(raw.length / 4)} out | max=1500`);
       const parsed = JSON.parse(raw);
@@ -217,19 +211,39 @@ ${JSON.stringify(batch, null, 2)}`;
     }
   }
 
-  // Save to memory.json
-  const memData = readJSON<any>(MEMORY_PATH) || {};
-  memData.connections = connections;
-  writeJSON(MEMORY_PATH, memData);
+  // Save connections to MongoDB scoped to user
+  try {
+    await GlobalMemoryModel.findOneAndUpdate(
+      { userId },
+      { $set: { connections } },
+      { upsert: true }
+    );
+  } catch (err) {
+    logger.error("Failed to save connections to MongoDB", err);
+  }
 
-  // Cache the computed result
-  connectionsCache.set("connections", connections);
+  // Cache the computed result (scoped by userId)
+  connectionsCache.set(`connections:${userId}`, connections);
 
   return connections;
 }
 
-// Get existing connections
-export function getConnections(): ConceptConnection[] {
-  const memData = readJSON<any>(MEMORY_PATH) || {};
-  return memData.connections || [];
+// Get existing connections for a user
+export async function getConnections(userId: string): Promise<ConceptConnection[]> {
+  try {
+    const doc = await GlobalMemoryModel.findOne({ userId }).lean();
+    if (doc?.connections?.length) {
+      return doc.connections.map((c: { concept: string; lessonIds?: string[]; lessonTitles?: string[]; strength?: number; relatedConcepts?: string[]; aiInsight?: string }) => ({
+        concept: c.concept,
+        lessonIds: c.lessonIds || [],
+        lessonTitles: c.lessonTitles || [],
+        strength: c.strength || 0,
+        relatedConcepts: c.relatedConcepts || [],
+        aiInsight: c.aiInsight,
+      }));
+    }
+  } catch (err) {
+    logger.error("Failed to load connections from MongoDB", err);
+  }
+  return [];
 }

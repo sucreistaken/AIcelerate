@@ -9,8 +9,8 @@ import type {
   AdaptiveQuizSummary,
 } from "../types/adaptiveQuiz";
 import { uid } from "../utils/idGenerator";
-import { getLesson } from "../controllers/lessonControllers";
-import { getCourse } from "../controllers/courseController";
+import { getLesson } from "./lessonDataService";
+import { getCourse } from "./courseDataService";
 import { logger } from "../utils/logger";
 
 const DEFAULT_CONFIG: AdaptiveQuizConfig = {
@@ -19,8 +19,25 @@ const DEFAULT_CONFIG: AdaptiveQuizConfig = {
   convergenceWindow: 3,
 };
 
+/** Internal session state that extends AdaptiveQuizState with the question pool */
+interface InternalSession extends AdaptiveQuizState {
+  _pool: AdaptiveQuizItem[];
+}
+
 // In-memory session store
-const sessions = new Map<string, AdaptiveQuizState>();
+const sessions = new Map<string, InternalSession>();
+
+// TTL cleanup: remove sessions older than 30 minutes
+const SESSION_TTL_MS = 30 * 60 * 1000;
+const _sessionCleanup = setInterval(() => {
+  const now = Date.now();
+  for (const [id, state] of sessions) {
+    if (now - new Date(state.createdAt).getTime() > SESSION_TTL_MS) {
+      sessions.delete(id);
+    }
+  }
+}, 5 * 60 * 1000);
+_sessionCleanup.unref();
 
 // ── IRT Math ────────────────────────────────────────────────────────────────
 
@@ -105,7 +122,10 @@ export function buildQuestionPool(courseId: string, lessonIds?: string[]): Adapt
 
     // Extract from modules' mini_quiz
     for (const mod of plan.modules || []) {
-      const miniQuiz = (mod as any).lessons?.flatMap((l: any) => l.mini_quiz || []) || [];
+      // TODO: type properly — plan modules have loose schema from AI generation
+      const modRec = mod as unknown as Record<string, unknown>;
+      const lessons = Array.isArray(modRec.lessons) ? (modRec.lessons as Record<string, unknown>[]) : [];
+      const miniQuiz: unknown[] = lessons.flatMap((l) => Array.isArray(l.mini_quiz) ? (l.mini_quiz as unknown[]) : []);
       for (const q of miniQuiz) {
         if (typeof q === "string" && q.length > 10) {
           items.push({
@@ -113,7 +133,7 @@ export function buildQuestionPool(courseId: string, lessonIds?: string[]): Adapt
             question: q,
             expectedAnswer: "",
             difficulty: 0,
-            topicName: (mod as any).title || plan.topic || "",
+            topicName: (typeof modRec.title === "string" ? modRec.title : "") || plan.topic || "",
             lessonId: lid,
             historicalCorrectRate: 0.5,
           });
@@ -159,10 +179,9 @@ export function startSession(courseId: string, lessonIds?: string[]): AdaptiveQu
     createdAt: new Date().toISOString(),
   };
 
-  sessions.set(sessionId, state);
-
   // Store pool alongside session
-  (state as any)._pool = pool;
+  const internalState: InternalSession = { ...state, _pool: pool };
+  sessions.set(sessionId, internalState);
 
   logger.info(`[ADAPTIVE_QUIZ] Session started: ${sessionId} | pool=${pool.length} questions`);
   return state;
@@ -173,14 +192,14 @@ export function getSession(sessionId: string): AdaptiveQuizState | null {
 }
 
 export function getSessionPool(sessionId: string): AdaptiveQuizItem[] {
-  const state = sessions.get(sessionId) as any;
+  const state = sessions.get(sessionId);
   return state?._pool || [];
 }
 
 export function getNextQuestion(sessionId: string): AdaptiveQuizItem | null {
-  const state = sessions.get(sessionId) as any;
+  const state = sessions.get(sessionId);
   if (!state || state.isComplete) return null;
-  return selectNextQuestion(state, state._pool || []);
+  return selectNextQuestion(state, state._pool);
 }
 
 export function submitAnswer(
@@ -189,10 +208,10 @@ export function submitAnswer(
   grade: "correct" | "partial" | "incorrect",
   config: AdaptiveQuizConfig = DEFAULT_CONFIG
 ): AdaptiveQuizState | null {
-  const state = sessions.get(sessionId) as any;
+  const state = sessions.get(sessionId);
   if (!state || state.isComplete) return null;
 
-  const pool: AdaptiveQuizItem[] = state._pool || [];
+  const pool = state._pool;
   const item = pool.find(q => q.id === itemId);
   if (!item) return null;
 
@@ -226,13 +245,13 @@ export function submitAnswer(
 }
 
 export function endSession(sessionId: string): AdaptiveQuizSummary | null {
-  const state = sessions.get(sessionId) as any;
+  const state = sessions.get(sessionId);
   if (!state) return null;
 
   state.isComplete = true;
   state.stoppingReason = state.stoppingReason || "user_stopped";
 
-  const pool: AdaptiveQuizItem[] = state._pool || [];
+  const pool = state._pool;
   const topicMap = new Map<string, { correct: number; total: number }>();
 
   for (const qa of state.questionsAsked) {
@@ -248,9 +267,9 @@ export function endSession(sessionId: string): AdaptiveQuizSummary | null {
     sessionId,
     finalTheta: state.currentTheta,
     totalQuestions: state.questionsAsked.length,
-    correct: state.questionsAsked.filter((q: any) => q.response === "correct").length,
-    partial: state.questionsAsked.filter((q: any) => q.response === "partial").length,
-    incorrect: state.questionsAsked.filter((q: any) => q.response === "incorrect").length,
+    correct: state.questionsAsked.filter((q) => q.response === "correct").length,
+    partial: state.questionsAsked.filter((q) => q.response === "partial").length,
+    incorrect: state.questionsAsked.filter((q) => q.response === "incorrect").length,
     stoppingReason: state.stoppingReason,
     topicBreakdown: Array.from(topicMap.entries()).map(([topicName, stats]) => ({
       topicName,

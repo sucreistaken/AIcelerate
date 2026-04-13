@@ -17,6 +17,7 @@ interface CacheEntry<T> {
 
 export class TTLCache<T> {
   private store = new Map<string, CacheEntry<T>>();
+  private inflight = new Map<string, Promise<T>>();
   private readonly defaultTtlMs: number;
   private readonly maxSize: number;
   private sweepInterval: ReturnType<typeof setInterval>;
@@ -58,14 +59,27 @@ export class TTLCache<T> {
 
   /**
    * Cache-aside pattern: get from cache, or compute and cache the result.
+   * Deduplicates in-flight requests for the same key to prevent duplicate work.
    */
   async getOrSet(key: string, factory: () => Promise<T>, ttlMs?: number): Promise<T> {
     const cached = this.get(key);
     if (cached !== undefined) return cached;
 
-    const value = await factory();
-    this.set(key, value, ttlMs);
-    return value;
+    // Deduplicate in-flight requests for the same key
+    const existing = this.inflight.get(key);
+    if (existing) return existing;
+
+    const promise = factory().then(value => {
+      this.set(key, value, ttlMs);
+      this.inflight.delete(key);
+      return value;
+    }).catch(err => {
+      this.inflight.delete(key);
+      throw err;
+    });
+
+    this.inflight.set(key, promise);
+    return promise;
   }
 
   del(key: string): boolean {
@@ -129,8 +143,18 @@ export class TTLCache<T> {
 
 // ── Pre-configured cache instances ─────────────────────────────────────────────
 
-/** Room data cache: 60s TTL, up to 200 entries */
-export const roomCache = new TTLCache<any>({ ttlMs: 60_000, maxSize: 200 });
+// Lean room shape — plain object returned by Room.findById().lean()
+interface LeanRoom {
+  _id: unknown;
+  id: string;
+  memberIds: string[];
+  ownerId: string;
+  [key: string]: unknown;
+}
+import type { IUser } from "../models/User";
+
+/** Room data cache: 60s TTL, up to 200 entries. Stores lean (plain object) room data. */
+export const roomCache = new TTLCache<LeanRoom>({ ttlMs: 60_000, maxSize: 200 });
 
 /** User profile cache: 30s TTL, up to 500 entries */
-export const userCache = new TTLCache<any>({ ttlMs: 30_000, maxSize: 500 });
+export const userCache = new TTLCache<IUser>({ ttlMs: 30_000, maxSize: 500 });

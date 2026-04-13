@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { AppError, notFound, badRequest, forbidden, conflict, unprocessable, gatewayTimeout, errorHandler } from "../errorHandler";
+import { AppError, AiTimeoutError, notFound, badRequest, forbidden, conflict, unprocessable, gatewayTimeout, errorHandler } from "../errorHandler";
 
 describe("AppError", () => {
   it("creates error with statusCode and message", () => {
@@ -73,7 +73,7 @@ describe("errorHandler middleware", () => {
 
   it("handles AI_TIMEOUT error", () => {
     const res = createMockRes();
-    const err = new Error("AI_TIMEOUT");
+    const err = new AiTimeoutError();
 
     errorHandler(err, mockReq, res, mockNext);
 

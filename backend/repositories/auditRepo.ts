@@ -1,14 +1,17 @@
-import path from "path";
-import { BaseRepository } from "./baseRepository";
+import { MongoRepository } from "./mongoRepository";
+import { AuditLogModel } from "../models/AuditLog";
 import type { AuditEntry, PaginationParams, PaginatedResponse } from "../types/admin";
+import type { IRepository } from "./IRepository";
 
-const DATA_PATH = path.join(process.cwd(), "backend", "data", "audit-log.json");
-
-class AuditRepository extends BaseRepository<AuditEntry> {
+class AuditRepository extends MongoRepository<AuditEntry> {
   constructor() {
-    super(DATA_PATH);
+    super(AuditLogModel);
   }
 
+  /**
+   * Server-side paginated, filtered, sorted audit log query.
+   * All filtering/sorting/pagination is pushed to MongoDB.
+   */
   async findPaginated(
     params: PaginationParams & {
       userId?: string;
@@ -17,61 +20,52 @@ class AuditRepository extends BaseRepository<AuditEntry> {
       endDate?: string;
     }
   ): Promise<PaginatedResponse<AuditEntry>> {
-    let items = await this.findAll();
+    const filter: Record<string, unknown> = {};
 
-    // Filter by userId
-    if (params.userId) {
-      items = items.filter((e) => e.userId === params.userId);
+    if (params.userId) filter.userId = params.userId;
+    if (params.action) filter.action = params.action;
+
+    // Date range filtering on timestamp field
+    if (params.startDate || params.endDate) {
+      const ts: Record<string, string> = {};
+      if (params.startDate) ts.$gte = params.startDate;
+      if (params.endDate) ts.$lte = params.endDate;
+      filter.timestamp = ts;
     }
 
-    // Filter by action
-    if (params.action) {
-      items = items.filter((e) => e.action === params.action);
-    }
-
-    // Filter by date range
-    if (params.startDate) {
-      const start = new Date(params.startDate).getTime();
-      items = items.filter((e) => new Date(e.timestamp).getTime() >= start);
-    }
-    if (params.endDate) {
-      const end = new Date(params.endDate).getTime();
-      items = items.filter((e) => new Date(e.timestamp).getTime() <= end);
-    }
-
-    // Search in action/resource fields
+    // Text search on action and resource
     if (params.search) {
-      const q = params.search.toLowerCase();
-      items = items.filter(
-        (e) =>
-          e.action.toLowerCase().includes(q) ||
-          e.resource.toLowerCase().includes(q)
-      );
+      const regex = { $regex: params.search, $options: "i" };
+      filter.$or = [{ action: regex }, { resource: regex }];
     }
 
-    // Sort newest first by default
-    const sortDir = params.sortDir || "desc";
     const sortBy = params.sortBy || "timestamp";
-    items.sort((a, b) => {
-      const aVal = (a as unknown as Record<string, unknown>)[sortBy];
-      const bVal = (b as unknown as Record<string, unknown>)[sortBy];
-      if (typeof aVal === "string" && typeof bVal === "string") {
-        return sortDir === "asc"
-          ? aVal.localeCompare(bVal)
-          : bVal.localeCompare(aVal);
-      }
-      return 0;
-    });
-
-    const total = items.length;
+    const sortDir = params.sortDir === "asc" ? 1 : -1;
     const page = params.page || 1;
     const limit = params.limit || 20;
-    const totalPages = Math.ceil(total / limit);
-    const start = (page - 1) * limit;
-    const paged = items.slice(start, start + limit);
+    const skip = (page - 1) * limit;
 
-    return { items: paged, total, page, limit, totalPages };
+    const [docs, total] = await Promise.all([
+      AuditLogModel.find(filter)
+        .sort({ [sortBy]: sortDir })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      AuditLogModel.countDocuments(filter),
+    ]);
+
+    const items = docs.map((d) => this.toEntity(d as unknown as Record<string, unknown>));
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 }
 
-export const auditRepo = new AuditRepository();
+export const auditRepo: IRepository<AuditEntry> & {
+  findPaginated: AuditRepository["findPaginated"];
+} = new AuditRepository();

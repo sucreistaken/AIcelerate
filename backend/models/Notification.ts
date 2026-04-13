@@ -12,7 +12,7 @@ export interface INotification extends Document {
 
 const notificationSchema = new Schema<INotification>(
   {
-    userId: { type: String, required: true, index: true },
+    userId: { type: String, required: true },
     type: { type: String, enum: ["mention", "friend_request", "room_invite", "system"], required: true },
     title: { type: String, required: true },
     message: { type: String, required: true },
@@ -24,5 +24,8 @@ const notificationSchema = new Schema<INotification>(
 
 // Compound index for listing user's unread notifications sorted by newest first
 notificationSchema.index({ userId: 1, read: 1, createdAt: -1 });
+
+// TTL index: automatically delete notifications older than 90 days
+notificationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 90 * 24 * 60 * 60 });
 
 export const Notification = mongoose.model<INotification>("Notification", notificationSchema);

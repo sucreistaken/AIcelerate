@@ -8,7 +8,7 @@ vi.mock("../../config/env", () => ({
 const mockGetCourse = vi.fn();
 const mockGetCourseProgress = vi.fn();
 
-vi.mock("../../controllers/courseController", () => ({
+vi.mock("../../services/courseDataService", () => ({
   getCourse: (...args: any[]) => mockGetCourse(...args),
   getCourseProgress: (...args: any[]) => mockGetCourseProgress(...args),
 }));
@@ -20,7 +20,7 @@ vi.mock("../../controllers/contextAssembler", () => ({
   })),
 }));
 
-// Mock aiService — getModel is used by both functions
+// Mock aiService — getModel is used by chat, safeGenerate by schedule
 vi.mock("../aiService", () => ({
   getModel: vi.fn(() => ({
     startChat: vi.fn(() => ({
@@ -30,13 +30,17 @@ vi.mock("../aiService", () => ({
         },
       })),
     })),
-    generateContent: vi.fn(async () => ({
-      response: {
-        text: () => JSON.stringify({ days: [], tips: [] }),
-      },
-    })),
+  })),
+  safeGenerate: vi.fn(async () => ({
+    response: {
+      text: () => JSON.stringify({ days: [], tips: [] }),
+    },
   })),
   getTemperature: vi.fn().mockReturnValue(0.3),
+  tryParseJSON: vi.fn((text: string) => {
+    try { return JSON.parse(text); } catch { return null; }
+  }),
+  stripCodeFences: vi.fn((text: string) => text.replace(/^```[\s\S]*?\n|```$/g, "").trim()),
 }));
 
 // Mock schemas

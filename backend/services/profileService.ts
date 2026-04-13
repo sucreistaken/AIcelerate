@@ -1,7 +1,47 @@
 import crypto from "crypto";
-import { User, IUser } from "../models/User";
+import mongoose from "mongoose";
+import { User } from "../models/User";
 import { eventBus } from "../events/eventBus";
 import { badRequest, notFound } from "../middleware/errorHandler";
+
+interface FriendRequest {
+  from: string;
+  direction: "sent" | "received";
+  createdAt: Date;
+}
+
+interface UserLike {
+  _id?: unknown;
+  id?: unknown;
+  profile?: { nickname?: string; avatar?: string; bio?: string };
+  status?: string;
+  friendIds?: string[];
+  friendRequests?: FriendRequest[];
+  friendCode?: string;
+  roomIds?: string[];
+  dmChannelIds?: string[];
+  settings?: { notifications?: boolean };
+  updatedAt?: Date;
+  createdAt?: Date;
+  toJSON?: () => Record<string, unknown>;
+}
+
+interface ProfileShape {
+  id: string;
+  nickname: string;
+  avatar: string;
+  bio: string;
+  status: string;
+  friendIds: string[];
+  friendRequestsSent: string[];
+  friendRequestsReceived: string[];
+  friendCode: string;
+  serverIds: string[];
+  dmChannelIds: string[];
+  lastActiveAt: Date | undefined;
+  createdAt: Date | undefined;
+  settings: { notifyMentions: boolean; notifyDMs: boolean };
+}
 
 function generateFriendCode(nickname: string): string {
   const tag = crypto.randomInt(1000, 10000).toString();
@@ -10,17 +50,17 @@ function generateFriendCode(nickname: string): string {
 }
 
 // Profile shape returned to frontend (compatible with UserProfile interface)
-function toProfile(user: any): any {
-  const u = user.toJSON ? user.toJSON() : user;
+function toProfile(user: UserLike): ProfileShape {
+  const u: UserLike = user.toJSON ? (user.toJSON() as UserLike) : user;
   return {
-    id: (u._id || u.id).toString(),
+    id: String(u._id || u.id),
     nickname: u.profile?.nickname || "Unknown",
     avatar: u.profile?.avatar || "avatar-1",
     bio: u.profile?.bio || "",
     status: u.status || "offline",
     friendIds: u.friendIds || [],
-    friendRequestsSent: (u.friendRequests || []).filter((r: any) => r.direction === "sent").map((r: any) => r.from),
-    friendRequestsReceived: (u.friendRequests || []).filter((r: any) => r.direction === "received").map((r: any) => r.from),
+    friendRequestsSent: (u.friendRequests || []).filter((r: FriendRequest) => r.direction === "sent").map((r: FriendRequest) => r.from),
+    friendRequestsReceived: (u.friendRequests || []).filter((r: FriendRequest) => r.direction === "received").map((r: FriendRequest) => r.from),
     friendCode: u.friendCode || "",
     serverIds: u.roomIds || [],
     dmChannelIds: u.dmChannelIds || [],
@@ -38,13 +78,13 @@ export const profileService = {
   // This method returns a profile-shaped view for backward compat.
 
   async getById(id: string) {
-    const user = await User.findById(id).select("-passwordHash");
+    const user = await User.findById(id).select("-passwordHash").lean();
     if (!user) throw notFound("Profile not found");
     return toProfile(user);
   },
 
   async getByIdOptional(id: string) {
-    const user = await User.findById(id).select("-passwordHash");
+    const user = await User.findById(id).select("-passwordHash").lean();
     return user ? toProfile(user) : null;
   },
 
@@ -59,7 +99,7 @@ export const profileService = {
 
     let friendCode = generateFriendCode(nickname.trim());
     let attempts = 0;
-    while (await User.exists({ friendCode, _id: { $ne: userId } }) && attempts < 100) {
+    while (await User.exists({ friendCode, _id: { $ne: userId } }) && attempts < 5) {
       friendCode = generateFriendCode(nickname.trim());
       attempts++;
     }
@@ -77,21 +117,22 @@ export const profileService = {
     return toProfile(updated);
   },
 
-  async update(id: string, updates: Record<string, any>) {
-    const user = await User.findById(id);
+  async update(id: string, updates: Record<string, unknown>) {
+    const user = await User.findById(id).select("profile.nickname friendCode").lean();
     if (!user) throw notFound("Profile not found");
 
-    const set: any = {};
-    if (updates.nickname) set["profile.nickname"] = updates.nickname;
+    const set: Record<string, unknown> = {};
+    const nickname = typeof updates.nickname === "string" ? updates.nickname : undefined;
+    if (nickname) set["profile.nickname"] = nickname;
     if (updates.avatar) set["profile.avatar"] = updates.avatar;
     if (updates.bio !== undefined) set["profile.bio"] = updates.bio;
 
     // Regenerate friend code on nickname change
-    if (updates.nickname && updates.nickname !== user.profile.nickname) {
-      let code = generateFriendCode(updates.nickname);
+    if (nickname && nickname !== user.profile.nickname) {
+      let code = generateFriendCode(nickname);
       let attempts = 0;
-      while (await User.exists({ friendCode: code, _id: { $ne: id } }) && attempts < 100) {
-        code = generateFriendCode(updates.nickname);
+      while (await User.exists({ friendCode: code, _id: { $ne: id } }) && attempts < 5) {
+        code = generateFriendCode(nickname);
         attempts++;
       }
       set.friendCode = code;
@@ -110,10 +151,11 @@ export const profileService = {
   },
 
   async sendFriendRequest(fromId: string, friendCode: string) {
-    const sender = await User.findById(fromId);
+    const [sender, target] = await Promise.all([
+      User.findById(fromId),
+      User.findOne({ friendCode }).collation({ locale: "en", strength: 2 }),
+    ]);
     if (!sender) throw notFound("Sender not found");
-
-    const target = await User.findOne({ friendCode: new RegExp(`^${friendCode}$`, "i") });
     if (!target) throw notFound("User not found with that friend code");
     const targetId = target._id.toString();
     if (targetId === fromId) throw badRequest("Cannot add yourself");
@@ -121,52 +163,80 @@ export const profileService = {
 
     // Check existing requests
     const alreadySent = sender.friendRequests.some(
-      (r) => r.from === targetId && (r as any).direction === "sent"
+      (r) => r.from === targetId && r.direction === "sent"
     );
     if (alreadySent) throw badRequest("Friend request already sent");
 
-    // Add outgoing request to sender
-    await User.findByIdAndUpdate(fromId, {
-      $push: { friendRequests: { from: targetId, direction: "sent", createdAt: new Date() } },
-    });
+    // Add outgoing request to sender and incoming request to target atomically
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        await User.findByIdAndUpdate(fromId, {
+          $push: { friendRequests: { from: targetId, direction: "sent", createdAt: new Date() } },
+        }, { session });
 
-    // Add incoming request to target
-    await User.findByIdAndUpdate(targetId, {
-      $push: { friendRequests: { from: fromId, direction: "received", createdAt: new Date() } },
-    });
+        await User.findByIdAndUpdate(targetId, {
+          $push: { friendRequests: { from: fromId, direction: "received", createdAt: new Date() } },
+        }, { session });
+      });
+    } finally {
+      await session.endSession();
+    }
 
     return { success: true, message: `Friend request sent to ${target.profile.nickname}` };
   },
 
   async acceptFriendRequest(userId: string, fromId: string) {
-    // Add to both friendIds
-    await User.findByIdAndUpdate(userId, {
-      $addToSet: { friendIds: fromId },
-      $pull: { friendRequests: { from: fromId } },
-    });
+    // Add to both friendIds atomically
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        await User.findByIdAndUpdate(userId, {
+          $addToSet: { friendIds: fromId },
+          $pull: { friendRequests: { from: fromId } },
+        }, { session });
 
-    await User.findByIdAndUpdate(fromId, {
-      $addToSet: { friendIds: userId },
-      $pull: { friendRequests: { from: userId } },
-    });
+        await User.findByIdAndUpdate(fromId, {
+          $addToSet: { friendIds: userId },
+          $pull: { friendRequests: { from: userId } },
+        }, { session });
+      });
+    } finally {
+      await session.endSession();
+    }
   },
 
   async rejectFriendRequest(userId: string, fromId: string) {
-    await User.findByIdAndUpdate(userId, {
-      $pull: { friendRequests: { from: fromId } },
-    });
-    await User.findByIdAndUpdate(fromId, {
-      $pull: { friendRequests: { from: userId } },
-    });
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        await User.findByIdAndUpdate(userId, {
+          $pull: { friendRequests: { from: fromId } },
+        }, { session });
+
+        await User.findByIdAndUpdate(fromId, {
+          $pull: { friendRequests: { from: userId } },
+        }, { session });
+      });
+    } finally {
+      await session.endSession();
+    }
   },
 
   async removeFriend(userId: string, friendId: string) {
-    await User.findByIdAndUpdate(userId, { $pull: { friendIds: friendId } });
-    await User.findByIdAndUpdate(friendId, { $pull: { friendIds: userId } });
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        await User.findByIdAndUpdate(userId, { $pull: { friendIds: friendId } }, { session });
+        await User.findByIdAndUpdate(friendId, { $pull: { friendIds: userId } }, { session });
+      });
+    } finally {
+      await session.endSession();
+    }
   },
 
   async getFriends(userId: string) {
-    const user = await User.findById(userId);
+    const user = await User.findById(userId).select("friendIds").lean();
     if (!user) throw notFound("Profile not found");
 
     // Single query instead of N+1
@@ -175,7 +245,7 @@ export const profileService = {
       { passwordHash: 0 }
     ).lean();
 
-    return friends.map((f: any) => toProfile(f));
+    return friends.map((f) => toProfile(f as UserLike));
   },
 
   async touchActive(id: string) {

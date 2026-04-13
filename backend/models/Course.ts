@@ -17,4 +17,8 @@ const courseSchema = new Schema(
   { timestamps: true, _id: false }
 );
 
+courseSchema.index({ code: 1 });
+courseSchema.index({ "lessonIds": 1 });
+courseSchema.index({ createdAt: -1 });
+
 export const CourseModel = mongoose.model("Course", courseSchema);

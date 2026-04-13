@@ -46,4 +46,9 @@ const scheduleSchema = new Schema(
   { timestamps: true, _id: false }
 );
 
+// ── Indexes for frequent queries ──
+scheduleSchema.index({ "dailyPlans.date": 1 });               // Lookup by plan date
+scheduleSchema.index({ "streak.lastStudyDate": 1 });           // Active streak queries
+scheduleSchema.index({ "dailyPlans.courseId": 1, "dailyPlans.date": 1 }); // Course-specific daily plan
+
 export const ScheduleModel = mongoose.model("Schedule", scheduleSchema);

@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { generateId, uid } from "../idGenerator";
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
 describe("generateId", () => {
   it("generates a string", () => {
     expect(typeof generateId()).toBe("string");
@@ -16,9 +18,15 @@ describe("generateId", () => {
     expect(id.startsWith("test-")).toBe(true);
   });
 
-  it("has no prefix when not provided", () => {
+  it("returns a valid UUID when no prefix", () => {
     const id = generateId();
-    expect(id.includes("-")).toBe(false);
+    expect(UUID_REGEX.test(id)).toBe(true);
+  });
+
+  it("contains a valid UUID after prefix", () => {
+    const id = generateId("lec");
+    const uuidPart = id.slice("lec-".length);
+    expect(UUID_REGEX.test(uuidPart)).toBe(true);
   });
 });
 
@@ -32,9 +40,8 @@ describe("uid", () => {
     expect(ids.size).toBe(100);
   });
 
-  it("has reasonable length", () => {
+  it("returns a valid UUID", () => {
     const id = uid();
-    expect(id.length).toBeGreaterThan(5);
-    expect(id.length).toBeLessThan(30);
+    expect(UUID_REGEX.test(id)).toBe(true);
   });
 });

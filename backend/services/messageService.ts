@@ -1,4 +1,4 @@
-import { Message, IMessage, MessageEmbed } from "../models/Message";
+import { Message, MessageEmbed, MessageReaction } from "../models/Message";
 import { channelService } from "./channelService";
 import { eventBus } from "../events/eventBus";
 import { badRequest, notFound, forbidden } from "../middleware/errorHandler";
@@ -54,7 +54,7 @@ export const messageService = {
   },
 
   async getMessages(channelId: string, limit = 50, before?: string) {
-    const filter: any = { channelId, deleted: false };
+    const filter: { channelId: string; deleted: boolean; _id?: { $lt: string } } = { channelId, deleted: false };
     if (before) {
       filter._id = { $lt: before };
     }
@@ -75,7 +75,7 @@ export const messageService = {
   },
 
   async edit(channelId: string, messageId: string, userId: string, content: string) {
-    const msg = await Message.findOne({ _id: messageId, channelId });
+    const msg = await Message.findOne({ _id: messageId, channelId }).select("authorId deleted").lean();
     if (!msg) throw notFound("Message not found");
     if (msg.authorId !== userId) throw forbidden("Can only edit your own messages");
     if (msg.deleted) throw badRequest("Cannot edit deleted message");
@@ -92,7 +92,7 @@ export const messageService = {
   },
 
   async delete(channelId: string, messageId: string, userId: string, isAdmin = false) {
-    const msg = await Message.findOne({ _id: messageId, channelId });
+    const msg = await Message.findOne({ _id: messageId, channelId }).select("authorId threadId deleted").lean();
     if (!msg) throw notFound("Message not found");
     if (msg.authorId !== userId && !isAdmin) throw forbidden("Can only delete your own messages");
 
@@ -100,39 +100,57 @@ export const messageService = {
       $set: { deleted: true, content: "" },
     });
 
+    // Decrement parent thread reply count
+    if (msg.threadId) {
+      await Message.findByIdAndUpdate(msg.threadId, { $inc: { replyCount: -1 } });
+    }
+
     eventBus.emit("message:deleted", { channelId, messageId });
   },
 
   async react(channelId: string, messageId: string, emoji: string, userId: string) {
-    const msg = await Message.findOne({ _id: messageId, channelId });
+    const msg = await Message.findOne({ _id: messageId, channelId, deleted: false }).select("reactions").lean();
     if (!msg) throw notFound("Message not found");
 
-    const reactions = [...msg.reactions];
-    const existing = reactions.find((r) => r.emoji === emoji);
+    const existing = msg.reactions.find((r: MessageReaction) => r.emoji === emoji);
+    const hasReacted = existing?.userIds?.includes(userId);
 
-    if (existing) {
-      if (existing.userIds.includes(userId)) {
-        existing.userIds = existing.userIds.filter((id) => id !== userId);
-        if (existing.userIds.length === 0) {
-          reactions.splice(reactions.indexOf(existing), 1);
-        }
-      } else {
-        existing.userIds.push(userId);
+    let updated;
+    if (hasReacted) {
+      // Remove user from reaction
+      updated = await Message.findOneAndUpdate(
+        { _id: messageId, "reactions.emoji": emoji },
+        { $pull: { "reactions.$.userIds": userId } },
+        { new: true }
+      );
+      // Clean up empty reaction entries
+      if (updated) {
+        await Message.findByIdAndUpdate(messageId, {
+          $pull: { reactions: { userIds: { $size: 0 } } },
+        });
+        updated = await Message.findById(messageId);
       }
+    } else if (existing) {
+      // Add user to existing reaction
+      updated = await Message.findOneAndUpdate(
+        { _id: messageId, "reactions.emoji": emoji },
+        { $addToSet: { "reactions.$.userIds": userId } },
+        { new: true }
+      );
     } else {
-      reactions.push({ emoji, userIds: [userId] });
+      // Create new reaction
+      updated = await Message.findByIdAndUpdate(
+        messageId,
+        { $push: { reactions: { emoji, userIds: [userId] } } },
+        { new: true }
+      );
     }
 
-    const updated = await Message.findByIdAndUpdate(messageId, {
-      $set: { reactions },
-    }, { new: true });
-
-    eventBus.emit("message:reacted", { channelId, messageId, emoji, userId });
-    return updated!.toJSON();
+    return updated;
   },
 
   async pin(channelId: string, serverId: string, messageId: string) {
-    const msg = await Message.findOne({ _id: messageId, channelId });
+    const msg = await Message.findOne({ _id: messageId, channelId }).select("pinned").lean();
     if (!msg) throw notFound("Message not found");
 
     const updated = await Message.findByIdAndUpdate(messageId, {

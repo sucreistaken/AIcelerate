@@ -4,8 +4,15 @@ import { roleRepo } from "../repositories/roleRepo";
 import { auditRepo } from "../repositories/auditRepo";
 import { settingsRepo } from "../repositories/settingsRepo";
 import { generateId } from "../utils/idGenerator";
+import { cascadeDeleteUser } from "../services/adminService";
 import { notFound, badRequest, forbidden, conflict } from "../middleware/errorHandler";
-import type { PaginationParams, PaginatedResponse, Permission } from "../types/admin";
+import { logger } from "../utils/logger";
+import type { PaginationParams, Permission } from "../types/admin";
+import type { NotificationType, NotificationSeverity } from "./notificationController";
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 // ---- Dynamic imports for repos that may not exist in all setups ----
 
@@ -22,40 +29,33 @@ async function getLessonRepo() {
 // ---- Stats ----
 
 export async function getStats() {
-  let totalUsers = 0;
-  try {
-    totalUsers = await User.countDocuments();
-  } catch {
-    // MongoDB unavailable
-  }
+  const [usersResult, coursesResult, lessonsResult, auditResult] =
+    await Promise.allSettled([
+      User.countDocuments(),
+      getCourseRepo().then((repo) => repo.count()),
+      getLessonRepo().then((repo) => repo.count()),
+      auditRepo.findPaginated({ page: 1, limit: 10, sortDir: "desc" }),
+    ]);
 
-  let totalCourses = 0;
-  try {
-    const repo = await getCourseRepo();
-    totalCourses = await repo.count();
-  } catch {
-    // courseRepo unavailable
+  if (usersResult.status === "rejected") {
+    logger.error({ err: usersResult.reason }, "Failed to count users — MongoDB unavailable");
   }
-
-  let totalLessons = 0;
-  try {
-    const repo = await getLessonRepo();
-    totalLessons = await repo.count();
-  } catch {
-    // lessonRepo unavailable
+  if (coursesResult.status === "rejected") {
+    logger.error({ err: coursesResult.reason }, "Failed to count courses — courseRepo unavailable");
   }
-
-  const auditResult = await auditRepo.findPaginated({
-    page: 1,
-    limit: 10,
-    sortDir: "desc",
-  });
+  if (lessonsResult.status === "rejected") {
+    logger.error({ err: lessonsResult.reason }, "Failed to count lessons — lessonRepo unavailable");
+  }
+  if (auditResult.status === "rejected") {
+    logger.error({ err: auditResult.reason }, "Failed to fetch audit log");
+  }
 
   return {
-    totalUsers,
-    totalCourses,
-    totalLessons,
-    recentAuditEntries: auditResult.items,
+    totalUsers: usersResult.status === "fulfilled" ? usersResult.value : 0,
+    totalCourses: coursesResult.status === "fulfilled" ? coursesResult.value : 0,
+    totalLessons: lessonsResult.status === "fulfilled" ? lessonsResult.value : 0,
+    recentAuditEntries:
+      auditResult.status === "fulfilled" ? auditResult.value.items : [],
   };
 }
 
@@ -66,9 +66,10 @@ export async function listUsers(params: PaginationParams) {
 
   const filter: Record<string, unknown> = {};
   if (search) {
+    const escapedSearch = escapeRegex(search);
     filter.$or = [
-      { email: { $regex: search, $options: "i" } },
-      { "profile.nickname": { $regex: search, $options: "i" } },
+      { email: { $regex: escapedSearch, $options: "i" } },
+      { "profile.nickname": { $regex: escapedSearch, $options: "i" } },
     ];
   }
 
@@ -120,8 +121,10 @@ export async function setUserRole(id: string, role: string) {
 }
 
 export async function deleteUser(id: string) {
-  const user = await User.findByIdAndDelete(id);
+  const user = await User.findById(id);
   if (!user) throw notFound("User not found");
+
+  await cascadeDeleteUser(id);
   return { deleted: true };
 }
 
@@ -137,20 +140,17 @@ export async function listCourses(params: PaginationParams) {
   if (search) {
     const q = search.toLowerCase();
     items = items.filter(
-      (c: any) =>
+      (c: { name?: string; code?: string }) =>
         (c.name || "").toLowerCase().includes(q) ||
         (c.code || "").toLowerCase().includes(q)
     );
   }
 
   // Sort
-  items.sort((a: any, b: any) => {
-    const aVal = a[sortBy] ?? "";
-    const bVal = b[sortBy] ?? "";
-    if (typeof aVal === "string" && typeof bVal === "string") {
-      return sortDir === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-    }
-    return 0;
+  items.sort((a, b) => {
+    const aVal = String((a as unknown as Record<string, unknown>)[sortBy] ?? "");
+    const bVal = String((b as unknown as Record<string, unknown>)[sortBy] ?? "");
+    return sortDir === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
   });
 
   const total = items.length;
@@ -180,20 +180,17 @@ export async function listLessons(params: PaginationParams) {
   if (search) {
     const q = search.toLowerCase();
     items = items.filter(
-      (l: any) =>
+      (l: { title?: string; id?: string }) =>
         (l.title || "").toLowerCase().includes(q) ||
         (l.id || "").toLowerCase().includes(q)
     );
   }
 
   // Sort
-  items.sort((a: any, b: any) => {
-    const aVal = a[sortBy] ?? "";
-    const bVal = b[sortBy] ?? "";
-    if (typeof aVal === "string" && typeof bVal === "string") {
-      return sortDir === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-    }
-    return 0;
+  items.sort((a, b) => {
+    const aVal = String((a as unknown as Record<string, unknown>)[sortBy] ?? "");
+    const bVal = String((b as unknown as Record<string, unknown>)[sortBy] ?? "");
+    return sortDir === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
   });
 
   const total = items.length;
@@ -312,14 +309,20 @@ export async function sendNotification(data: {
     // Dynamic import — graceful if notification controller is unavailable
     const { createNotification } = await import("./notificationController");
 
-    const notif = createNotification({
-      type: (data.type || "schedule-reminder") as any,
-      title: data.title,
-      message: data.message,
-      severity: (data.severity || "info") as any,
-    });
+    // Send to each target user (or skip if no targets)
+    const targetIds = data.targetUserIds || [];
+    const results = await Promise.all(
+      targetIds.map((uid) =>
+        createNotification(uid, {
+          type: (data.type || "schedule-reminder") as NotificationType,
+          title: data.title,
+          message: data.message,
+          severity: (data.severity || "info") as NotificationSeverity,
+        })
+      )
+    );
 
-    return notif;
+    return results;
   } catch {
     throw badRequest(
       "Notification system is not available"

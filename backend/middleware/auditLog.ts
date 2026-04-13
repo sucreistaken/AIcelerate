@@ -2,6 +2,7 @@ import { Response, NextFunction } from "express";
 import type { AuthRequest } from "./auth";
 import { auditRepo } from "../repositories/auditRepo";
 import { generateId } from "../utils/idGenerator";
+import { logger } from "../utils/logger";
 
 /** Fields to redact from logged request bodies */
 const SENSITIVE_FIELDS = new Set([
@@ -36,7 +37,7 @@ export function auditLog(action: string) {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     const originalJson = res.json.bind(res);
 
-    res.json = function (data: any) {
+    res.json = function (data: unknown) {
       // Only log successful operations (2xx status)
       if (res.statusCode >= 200 && res.statusCode < 300) {
         const entry = {
@@ -53,8 +54,8 @@ export function auditLog(action: string) {
         };
 
         // Fire-and-forget write
-        auditRepo.create(entry).catch(() => {
-          // Swallow audit write errors — never break the request
+        auditRepo.create(entry).catch((err) => {
+          logger.debug({ err: (err as Error).message }, "Audit write failed");
         });
       }
 

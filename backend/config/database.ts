@@ -30,8 +30,8 @@ export async function connectDB(): Promise<void> {
     } catch (err) {
       logger.error({ err }, `MongoDB connection attempt ${attempt}/${MAX_RETRIES} failed`);
       if (attempt === MAX_RETRIES) {
-        logger.warn("Could not connect to MongoDB after all retries.");
-        return;
+        logger.error("FATAL: Could not connect to MongoDB after all retries. Exiting.");
+        process.exit(1);
       }
       await new Promise((r) => setTimeout(r, RETRY_DELAY));
     }

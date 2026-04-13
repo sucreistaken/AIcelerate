@@ -1,13 +1,13 @@
 import crypto from "crypto";
 import mongoose from "mongoose";
-import { Room, IRoom, ServerCategory, DEFAULT_ROLES, PERMISSIONS } from "../models/Room";
+import { Room, ServerCategory, DEFAULT_ROLES } from "../models/Room";
 import { User } from "../models/User";
 import { Channel } from "../models/Channel";
 import { Message } from "../models/Message";
 import { badRequest, notFound, forbidden } from "../middleware/errorHandler";
 import { eventBus } from "../events/eventBus";
 import { getServerTemplates, ServerTemplate } from "./serverTemplates";
-import { leanToId, leanArrayToId } from "../config/mongoose-plugins";
+import { leanArrayToId } from "../config/mongoose-plugins";
 import { roomCache } from "../utils/cache";
 
 export { getServerTemplates as getRoomTemplates };
@@ -23,7 +23,7 @@ function generateInviteCode(): string {
 }
 
 function generateCategoryId(): string {
-  return `cat-${Date.now().toString(36)}-${crypto.randomBytes(2).toString("hex")}`;
+  return `cat-${crypto.randomUUID()}`;
 }
 
 async function uniqueInviteCode(): Promise<string> {
@@ -34,9 +34,17 @@ async function uniqueInviteCode(): Promise<string> {
   return code;
 }
 
-function checkPermission(room: IRoom, userId: string, permission: string): void {
+/** Fields needed for RBAC permission checks — used with .select() */
+const PERM_FIELDS = "ownerId memberRoles roles memberIds settings categories";
+
+/** Lean-safe permission check — works with both hydrated docs and plain objects */
+function checkPermission(room: { ownerId: string; memberRoles?: Map<string, string[]> | Record<string, string[]>; roles: { id: string; permissions: string[] }[] }, userId: string, permission: string): void {
   if (room.ownerId === userId) return;
-  const userRoleIds = room.memberRoles?.get(userId) || [];
+  // memberRoles is a Map on hydrated docs, plain object on lean
+  const memberRoles = room.memberRoles;
+  const userRoleIds: string[] = memberRoles instanceof Map
+    ? memberRoles.get(userId) || []
+    : (memberRoles as Record<string, string[]>)?.[userId] || [];
   const hasPermission = room.roles.some(
     (r) => userRoleIds.includes(r.id) && r.permissions.includes(permission)
   );
@@ -55,88 +63,91 @@ export const roomService = {
   ) {
     if (!name || name.trim().length < 2) throw badRequest("Room name must be at least 2 characters");
 
-    const owner = await User.findById(ownerId);
-    if (!owner) throw notFound("Owner not found");
+    const ownerExists = await User.exists({ _id: ownerId });
+    if (!ownerExists) throw notFound("Owner not found");
 
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-    const inviteCode = await uniqueInviteCode();
+      const inviteCode = await uniqueInviteCode();
 
-    const template = options?.templateId
-      ? getServerTemplates().find((t: ServerTemplate) => t.id === options.templateId)
-      : null;
+      const template = options?.templateId
+        ? getServerTemplates().find((t: ServerTemplate) => t.id === options.templateId)
+        : null;
 
-    const categories: ServerCategory[] = template
-      ? template.categories.map((tc, i) => ({
+      const categories: ServerCategory[] = template
+        ? template.categories.map((tc, i) => ({
           id: generateCategoryId(),
           name: tc.name,
           position: i,
-          channelIds: [],
+          channelIds: [] as string[],
         }))
-      : [
-          { id: generateCategoryId(), name: "Genel", position: 0, channelIds: [] },
-          { id: generateCategoryId(), name: "Çalışma", position: 1, channelIds: [] },
+        : [
+          { id: generateCategoryId(), name: "Genel", position: 0, channelIds: [] as string[] },
+          { id: generateCategoryId(), name: "Çalışma", position: 1, channelIds: [] as string[] },
         ];
 
-    const [room] = await Room.create([{
-      name: name.trim(),
-      description: description?.trim() || "",
-      iconColor: iconColor || "#6C5CE7",
-      inviteCode,
-      ownerId,
-      isPublic: options?.isPublic ?? false,
-      categories,
-      roles: DEFAULT_ROLES,
-      memberIds: [ownerId],
-      memberRoles: new Map([[ownerId, ["role-owner"]]]),
-      settings: { maxMembers: 50, isPublic: options?.isPublic ?? false, defaultRole: "role-member" },
-      tags: options?.tags || [],
-      university: options?.university,
-      memberCount: 1,
-      lastActivityAt: new Date(),
-    }], { session });
+      const [room] = await Room.create([{
+        name: name.trim(),
+        description: description?.trim() || "",
+        iconColor: iconColor || "#6C5CE7",
+        inviteCode,
+        ownerId,
+        isPublic: options?.isPublic ?? false,
+        categories,
+        roles: DEFAULT_ROLES,
+        memberIds: [ownerId],
+        memberRoles: new Map([[ownerId, ["role-owner"]]]),
+        settings: { maxMembers: 50, isPublic: options?.isPublic ?? false, defaultRole: "role-member" },
+        tags: options?.tags || [],
+        university: options?.university,
+        memberCount: 1,
+        lastActivityAt: new Date(),
+      }], { session });
 
-    // Create channels based on template or defaults
-    if (template) {
-      for (let catIdx = 0; catIdx < template.categories.length; catIdx++) {
-        const templateCat = template.categories[catIdx];
-        const serverCat = room.categories[catIdx];
-        for (const ch of templateCat.channels) {
-          const [channel] = await Channel.create([{
-            roomId: room._id.toString(),
-            categoryId: serverCat.id,
-            name: ch.name,
-            type: ch.type,
-            toolType: ch.toolType,
-          }], { session });
-          serverCat.channelIds.push(channel._id.toString());
+      // Create channels in batch (single insertMany instead of sequential create loop)
+      const channelDocs: { roomId: string; categoryId: string; name: string; type: string; toolType?: string }[] = [];
+      const catIndexMap: number[] = []; // track which category each channel belongs to
+
+      if (template) {
+        for (let catIdx = 0; catIdx < template.categories.length; catIdx++) {
+          for (const ch of template.categories[catIdx].channels) {
+            channelDocs.push({
+              roomId: room._id.toString(),
+              categoryId: room.categories[catIdx].id,
+              name: ch.name,
+              type: ch.type,
+              toolType: ch.toolType,
+            });
+            catIndexMap.push(catIdx);
+          }
         }
+      } else {
+        channelDocs.push(
+          { roomId: room._id.toString(), categoryId: room.categories[0].id, name: "genel", type: "text" },
+          { roomId: room._id.toString(), categoryId: room.categories[0].id, name: "duyurular", type: "announcement" },
+          { roomId: room._id.toString(), categoryId: room.categories[1].id, name: "deep-dive", type: "study-tool", toolType: "deep-dive" },
+        );
+        catIndexMap.push(0, 0, 1);
       }
-    } else {
-      const generalCat = room.categories[0];
-      const studyCat = room.categories[1];
 
-      const [generalCh] = await Channel.create([{ roomId: room._id.toString(), categoryId: generalCat.id, name: "genel", type: "text" }], { session });
-      const [duyuruCh] = await Channel.create([{ roomId: room._id.toString(), categoryId: generalCat.id, name: "duyurular", type: "announcement" }], { session });
-      const [deepDiveCh] = await Channel.create([{ roomId: room._id.toString(), categoryId: studyCat.id, name: "deep-dive", type: "study-tool", toolType: "deep-dive" }], { session });
+      const channels = await Channel.insertMany(channelDocs, { session });
+      for (let i = 0; i < channels.length; i++) {
+        room.categories[catIndexMap[i]].channelIds.push(channels[i]._id.toString());
+      }
 
-      generalCat.channelIds = [generalCh._id.toString(), duyuruCh._id.toString()];
-      studyCat.channelIds = [deepDiveCh._id.toString()];
-    }
+      room.markModified("categories");
+      await room.save({ session });
 
-    room.markModified("categories");
-    await room.save({ session });
+      // Add room to owner's User record
+      await User.findByIdAndUpdate(ownerId, { $addToSet: { roomIds: room._id.toString() } }, { session });
 
-    // Add room to owner's User record
-    await User.findByIdAndUpdate(ownerId, { $addToSet: { roomIds: room._id.toString() } }, { session });
+      await session.commitTransaction();
 
-    await session.commitTransaction();
+      eventBus.emit("server:created", { serverId: room._id.toString(), ownerId });
 
-    eventBus.emit("server:created", { serverId: room._id.toString(), ownerId });
-
-    return room.toJSON();
+      return room.toJSON();
     } catch (err) {
       await session.abortTransaction();
       throw err;
@@ -154,7 +165,7 @@ export const roomService = {
   },
 
   async discoverServers(search?: string, tags?: string[]) {
-    const filter: any = { isPublic: true, archivedAt: { $exists: false } };
+    const filter: Record<string, unknown> = { isPublic: true, archivedAt: { $exists: false } };
 
     if (search) {
       filter.$text = { $search: search };
@@ -164,7 +175,8 @@ export const roomService = {
       filter.tags = { $in: tags };
     }
 
-    const sort: any = search
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sort: Record<string, any> = search
       ? { score: { $meta: "textScore" }, lastActivityAt: -1 }
       : { lastActivityAt: -1, memberCount: -1 };
 
@@ -180,16 +192,23 @@ export const roomService = {
 
   async getById(id: string) {
     return roomCache.getOrSet(`room:${id}`, async () => {
-      const room = await Room.findById(id);
-      if (!room) throw notFound("Room not found");
-      return room.toJSON();
+      const doc = await Room.findById(id).lean();
+      if (!doc) throw notFound("Room not found");
+      return Object.assign({}, doc, { id: String(doc._id), memberIds: doc.memberIds, ownerId: doc.ownerId }) as unknown as { _id: unknown; id: string; memberIds: string[]; ownerId: string; [key: string]: unknown };
     });
   },
 
+  /** Batch fetch rooms by IDs with projection. Returns lean documents. */
+  async getByIds(ids: string[], projection?: Record<string, number>) {
+    if (ids.length === 0) return [];
+    const rooms = await Room.find({ _id: { $in: ids } }, projection).lean();
+    return leanArrayToId(rooms);
+  },
+
   async getByInviteCode(code: string) {
-    const room = await Room.findOne({ inviteCode: new RegExp(`^${code}$`, "i") });
+    const room = await Room.findOne({ inviteCode: code.toUpperCase() }).lean();
     if (!room) throw notFound("Invalid invite code");
-    return room.toJSON();
+    return { ...room, id: String(room._id) };
   },
 
   async getUserServers(userId: string) {
@@ -197,13 +216,13 @@ export const roomService = {
     return leanArrayToId(rooms);
   },
 
-  async update(roomId: string, userId: string, updates: Record<string, any>) {
-    const room = await Room.findById(roomId);
+  async update(roomId: string, userId: string, updates: Record<string, unknown>) {
+    const room = await Room.findById(roomId).select(PERM_FIELDS).lean();
     if (!room) throw notFound("Room not found");
     checkPermission(room, userId, "manage_server");
 
     const allowed = ["name", "description", "iconColor", "tags", "university", "isPublic", "settings"];
-    const safeUpdates: any = {};
+    const safeUpdates: Record<string, unknown> = {};
     for (const key of allowed) {
       if (updates[key] !== undefined) safeUpdates[key] = updates[key];
     }
@@ -215,7 +234,7 @@ export const roomService = {
   },
 
   async updateTopic(roomId: string, userId: string, topic: string) {
-    const room = await Room.findById(roomId);
+    const room = await Room.findById(roomId).select(PERM_FIELDS).lean();
     if (!room) throw notFound("Room not found");
     checkPermission(room, userId, "manage_server");
     const updated = await Room.findByIdAndUpdate(roomId, { $set: { description: topic.trim() } }, { new: true });
@@ -223,41 +242,53 @@ export const roomService = {
   },
 
   async join(roomId: string, userId: string) {
-    const room = await Room.findById(roomId);
+    const [room, userExists] = await Promise.all([
+      Room.findById(roomId).select("memberIds settings").lean(),
+      User.exists({ _id: userId }),
+    ]);
     if (!room) throw notFound("Room not found");
-    if (room.memberIds.includes(userId)) return room.toJSON();
-    if (room.memberIds.length >= (room.settings?.maxMembers || 50)) throw badRequest("Room is full");
+    if (!userExists) throw notFound("User not found");
+    if ((room.memberIds as string[]).includes(userId)) {
+      return this.getById(roomId);
+    }
+    if ((room.memberIds as string[]).length >= (room.settings?.maxMembers || 50)) throw badRequest("Room is full");
 
-    const user = await User.findById(userId);
-    if (!user) throw notFound("User not found");
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      await Room.findByIdAndUpdate(roomId, {
+        $addToSet: { memberIds: userId },
+        $set: {
+          [`memberRoles.${userId}`]: [room.settings?.defaultRole || "role-member"],
+        },
+        $inc: { memberCount: 1 },
+      }, { session });
 
-    await Room.findByIdAndUpdate(roomId, {
-      $addToSet: { memberIds: userId },
-      $set: {
-        [`memberRoles.${userId}`]: [room.settings?.defaultRole || "role-member"],
-        memberCount: room.memberIds.length + 1,
-      },
-    });
+      await User.findByIdAndUpdate(userId, { $addToSet: { roomIds: roomId } }, { session });
 
-    await User.findByIdAndUpdate(userId, { $addToSet: { roomIds: roomId } });
+      await session.commitTransaction();
+    } catch (err) {
+      await session.abortTransaction();
+      throw err;
+    } finally {
+      session.endSession();
+    }
 
     roomCache.del(`room:${roomId}`);
     eventBus.emit("member:joined", { serverId: roomId, userId });
-
-    const updated = await Room.findById(roomId);
-    return updated!.toJSON();
+    return this.getById(roomId);
   },
 
   async joinByInvite(inviteCode: string, userId: string) {
-    const room = await Room.findOne({ inviteCode: new RegExp(`^${inviteCode}$`, "i") });
+    const room = await Room.findOne({ inviteCode: inviteCode.toUpperCase() });
     if (!room) throw notFound("Invalid invite code");
     return this.join(room._id.toString(), userId);
   },
 
   async leave(roomId: string, userId: string) {
-    const room = await Room.findById(roomId);
+    const room = await Room.findById(roomId).select("ownerId memberIds").lean();
     if (!room) throw notFound("Room not found");
-    if (!room.memberIds.includes(userId)) throw badRequest("Not a member");
+    if (!(room.memberIds as string[]).includes(userId)) throw badRequest("Not a member");
 
     // Owner leaving: auto-transfer or delete
     if (room.ownerId === userId) {
@@ -265,50 +296,84 @@ export const roomService = {
       if (otherMembers.length > 0) {
         await this.transferOwnership(roomId, userId, otherMembers[0]);
       } else {
-        await Room.findByIdAndDelete(roomId);
-        await Channel.deleteMany({ roomId });
+        const session = await mongoose.startSession();
+        session.startTransaction();
+        try {
+          await Room.findByIdAndDelete(roomId, { session });
+          await Channel.deleteMany({ roomId }, { session });
+          await User.findByIdAndUpdate(userId, { $pull: { roomIds: roomId } }, { session });
+          await session.commitTransaction();
+        } catch (err) {
+          await session.abortTransaction();
+          throw err;
+        } finally {
+          session.endSession();
+        }
+        roomCache.del(`room:${roomId}`);
         return;
       }
     }
 
-    await Room.findByIdAndUpdate(roomId, {
-      $pull: { memberIds: userId },
-      $unset: { [`memberRoles.${userId}`]: "" },
-      $inc: { memberCount: -1 },
-    });
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      await Room.findByIdAndUpdate(roomId, {
+        $pull: { memberIds: userId },
+        $unset: { [`memberRoles.${userId}`]: "" },
+        $inc: { memberCount: -1 },
+      }, { session });
 
-    await User.findByIdAndUpdate(userId, { $pull: { roomIds: roomId } });
+      await User.findByIdAndUpdate(userId, { $pull: { roomIds: roomId } }, { session });
+
+      await session.commitTransaction();
+    } catch (err) {
+      await session.abortTransaction();
+      throw err;
+    } finally {
+      session.endSession();
+    }
 
     roomCache.del(`room:${roomId}`);
     eventBus.emit("member:left", { serverId: roomId, userId });
   },
 
   async kick(roomId: string, requesterId: string, targetId: string) {
-    const room = await Room.findById(roomId);
+    const room = await Room.findById(roomId).select(PERM_FIELDS).lean();
     if (!room) throw notFound("Room not found");
     checkPermission(room, requesterId, "kick_members");
     if (targetId === room.ownerId) throw forbidden("Cannot kick the owner");
     if (targetId === requesterId) throw badRequest("Cannot kick yourself");
 
-    await Room.findByIdAndUpdate(roomId, {
-      $pull: { memberIds: targetId },
-      $unset: { [`memberRoles.${targetId}`]: "" },
-      $inc: { memberCount: -1 },
-    });
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      await Room.findByIdAndUpdate(roomId, {
+        $pull: { memberIds: targetId },
+        $unset: { [`memberRoles.${targetId}`]: "" },
+        $inc: { memberCount: -1 },
+      }, { session });
 
-    await User.findByIdAndUpdate(targetId, { $pull: { roomIds: roomId } });
+      await User.findByIdAndUpdate(targetId, { $pull: { roomIds: roomId } }, { session });
+
+      await session.commitTransaction();
+    } catch (err) {
+      await session.abortTransaction();
+      throw err;
+    } finally {
+      session.endSession();
+    }
 
     roomCache.del(`room:${roomId}`);
     eventBus.emit("member:left", { serverId: roomId, userId: targetId });
   },
 
   async delete(roomId: string, userId: string) {
-    const room = await Room.findById(roomId);
+    const room = await Room.findById(roomId).select("ownerId").lean();
     if (!room) throw notFound("Room not found");
     if (room.ownerId !== userId) throw forbidden("Only the owner can delete the room");
 
     // Collect channel IDs for ToolData cleanup
-    const channelIds = (await Channel.find({ roomId }, { _id: 1 }).lean()).map((c: any) => c._id.toString());
+    const channelIds = (await Channel.find({ roomId }, { _id: 1 }).lean()).map((c) => c._id.toString());
 
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -346,26 +411,30 @@ export const roomService = {
   },
 
   async archive(roomId: string, userId: string) {
-    const room = await Room.findById(roomId);
-    if (!room) throw notFound("Room not found");
-    if (room.ownerId !== userId) throw forbidden("Only the owner can archive the room");
-    const updated = await Room.findByIdAndUpdate(roomId, { $set: { archivedAt: new Date() } }, { new: true });
-    return updated!.toJSON();
+    const updated = await Room.findOneAndUpdate(
+      { _id: roomId, ownerId: userId },
+      { $set: { archivedAt: new Date() } },
+      { new: true }
+    ).lean();
+    if (!updated) throw forbidden("Room not found or only the owner can archive");
+    return { ...updated, id: String(updated._id) };
   },
 
   async unarchive(roomId: string, userId: string) {
-    const room = await Room.findById(roomId);
-    if (!room) throw notFound("Room not found");
-    if (room.ownerId !== userId) throw forbidden("Only the owner can unarchive the room");
-    const updated = await Room.findByIdAndUpdate(roomId, { $unset: { archivedAt: "" } }, { new: true });
-    return updated!.toJSON();
+    const updated = await Room.findOneAndUpdate(
+      { _id: roomId, ownerId: userId },
+      { $unset: { archivedAt: "" } },
+      { new: true }
+    ).lean();
+    if (!updated) throw forbidden("Room not found or only the owner can unarchive");
+    return { ...updated, id: String(updated._id) };
   },
 
   async transferOwnership(roomId: string, currentOwnerId: string, newOwnerId: string) {
-    const room = await Room.findById(roomId);
+    const room = await Room.findById(roomId).select("ownerId memberIds").lean();
     if (!room) throw notFound("Room not found");
     if (room.ownerId !== currentOwnerId) throw forbidden("Only the owner can transfer ownership");
-    if (!room.memberIds.includes(newOwnerId)) throw badRequest("New owner must be a member");
+    if (!(room.memberIds as string[]).includes(newOwnerId)) throw badRequest("New owner must be a member");
 
     const updated = await Room.findByIdAndUpdate(roomId, {
       $set: {
@@ -379,7 +448,7 @@ export const roomService = {
   },
 
   async setMaterial(roomId: string, userId: string, materialId: string) {
-    const room = await Room.findById(roomId);
+    const room = await Room.findById(roomId).select(PERM_FIELDS).lean();
     if (!room) throw notFound("Room not found");
     checkPermission(room, userId, "manage_server");
     const updated = await Room.findByIdAndUpdate(roomId, { $set: { materialId } }, { new: true });
@@ -387,7 +456,7 @@ export const roomService = {
   },
 
   async addCategory(roomId: string, userId: string, name: string) {
-    const room = await Room.findById(roomId);
+    const room = await Room.findById(roomId).select(PERM_FIELDS).lean();
     if (!room) throw notFound("Room not found");
     checkPermission(room, userId, "manage_channels");
 
@@ -395,7 +464,7 @@ export const roomService = {
       id: generateCategoryId(),
       name: name.trim(),
       position: room.categories.length,
-      channelIds: [],
+      channelIds: [] as string[],
     };
 
     const updated = await Room.findByIdAndUpdate(
@@ -408,7 +477,7 @@ export const roomService = {
   },
 
   async regenerateInvite(roomId: string, userId: string) {
-    const room = await Room.findById(roomId);
+    const room = await Room.findById(roomId).select(PERM_FIELDS).lean();
     if (!room) throw notFound("Room not found");
     checkPermission(room, userId, "manage_server");
 
@@ -418,21 +487,21 @@ export const roomService = {
   },
 
   async getMemberProfiles(roomId: string) {
-    const room = await Room.findById(roomId);
+    const room = await Room.findById(roomId).select("memberIds memberRoles").lean();
     if (!room) throw notFound("Room not found");
 
-    // Single query instead of N+1
     const users = await User.find(
       { _id: { $in: room.memberIds } },
-      { passwordHash: 0 }
+      { "profile.nickname": 1, "profile.avatar": 1, status: 1 }
     ).lean();
 
-    return users.map((u: any) => ({
+    const memberRoles = room.memberRoles as unknown as Record<string, string[]> | undefined;
+    return users.map((u) => ({
       id: u._id.toString(),
       nickname: u.profile?.nickname || "Unknown",
       avatar: u.profile?.avatar || "avatar-1",
       status: u.status || "offline",
-      roles: room.memberRoles?.get(u._id.toString()) || [],
+      roles: memberRoles?.[u._id.toString()] || [],
     }));
   },
 

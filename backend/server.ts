@@ -11,15 +11,20 @@ import { Server as SocketServer } from "socket.io";
 
 import { env } from "./config/env";
 import routes from "./routes/index";
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "./config/swagger";
 
 import { setupCollabNamespace } from "./socketHandler";
 import { errorHandler } from "./middleware/errorHandler";
 import { requestContext } from "./middleware/requestContext";
 import { httpLogger } from "./middleware/httpLogger";
-import { startJobProcessor } from "./queues/jobProcessor";
+import { startJobProcessor, stopJobProcessor } from "./queues/jobProcessor";
 import { connectDB } from "./config/database";
+import { connectRedis, disconnectRedis, redisPub, redisSub, isRedisReady } from "./config/redis";
+import { createAdapter } from "@socket.io/redis-adapter";
 import { migrateOrphanLessons } from "./controllers/courseController";
-import { flushAllCaches } from "./cache";
+import { roleRepo } from "./repositories/roleRepo";
+import { flushAllCaches, initAllCaches } from "./cache";
 import { logger } from "./utils/logger";
 
 // ── Express app ────────────────────────────────────────────────────────────────
@@ -65,11 +70,21 @@ app.use(httpLogger);
 // Disable X-Powered-By (redundant with helmet but explicit)
 app.disable("x-powered-by");
 
+// ── API Documentation ─────────────────────────────────────────────────────────
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: ".swagger-ui .topbar { display: none }",
+  customSiteTitle: "AIcelerate API Documentation",
+}));
+app.get("/api-docs.json", (_req, res) => res.json(swaggerSpec));
+
 // ── Routes ─────────────────────────────────────────────────────────────────────
 app.use(routes);
 
 // ── Error handler (must be last middleware) ────────────────────────────────────
 app.use(errorHandler);
+
+// Export app for E2E testing (supertest)
+export { app };
 
 // ── HTTP server + Socket.IO ────────────────────────────────────────────────────
 const httpServer = http.createServer(app);
@@ -102,9 +117,21 @@ try {
   logger.error("Failed to migrate orphan lessons:", err);
 }
 
-// ── Start server (wait for DB connection first) ────────────────────────────────
+// ── Start server (wait for DB + Redis connection first) ───────────────────────
 (async () => {
   await connectDB();
+  await connectRedis();
+
+  // Apply Redis adapter for Socket.IO if Redis connected successfully
+  if (isRedisReady()) {
+    io.adapter(createAdapter(redisPub, redisSub));
+    logger.info("Socket.IO Redis adapter applied");
+  } else {
+    logger.info("Socket.IO using in-memory adapter (Redis unavailable)");
+  }
+
+  await roleRepo.seedDefaults();
+  await initAllCaches();
   httpServer.listen(env.PORT, "0.0.0.0", () => {
     logger.info(`Backend running at http://localhost:${env.PORT} [${env.NODE_ENV}]`);
   });
@@ -138,24 +165,27 @@ async function shutdown(signal: string) {
   isShuttingDown = true;
   logger.info(`${signal} received — starting graceful shutdown…`);
 
-  // 1. Stop accepting new connections
+  // 1. Stop the job processor interval
+  stopJobProcessor();
+
+  // 2. Stop accepting new connections
   httpServer.close(() => {
     logger.info("HTTP server closed");
   });
 
-  // 2. Close Socket.IO (disconnect all clients gracefully)
+  // 3. Close Socket.IO (disconnect all clients gracefully)
   io.close(() => {
     logger.info("Socket.IO closed");
   });
 
-  // 3. Wait for in-flight requests (max 10s)
+  // 4. Wait for in-flight requests (max 10s)
   const forceTimeout = setTimeout(() => {
     logger.warn("Graceful shutdown timed out — forcing exit");
     process.exit(1);
   }, 10_000);
   forceTimeout.unref();
 
-  // 4. Flush all data caches to disk before exit
+  // 5. Flush all data caches to disk before exit
   try {
     await flushAllCaches();
     logger.info("Data caches flushed to disk");
@@ -163,7 +193,14 @@ async function shutdown(signal: string) {
     logger.error("Failed to flush caches:", err);
   }
 
-  // 5. Close DB connection if open
+  // 6. Close Redis connections
+  try {
+    await disconnectRedis();
+  } catch {
+    // Already closed or never connected
+  }
+
+  // 7. Close DB connection if open
   try {
     const mongoose = await import("mongoose");
     if (mongoose.connection.readyState === 1) {

@@ -30,5 +30,7 @@ const flashcardSchema = new Schema(
 flashcardSchema.index({ lessonId: 1 });                    // Per-lesson flashcard fetch
 flashcardSchema.index({ lessonId: 1, state: 1 });          // SM-2: "due cards for lesson X"
 flashcardSchema.index({ state: 1, nextReviewDate: 1 });    // Global due cards query
+flashcardSchema.index({ topicName: 1 });                    // Scheduler groups cards by topic
+flashcardSchema.index({ source: 1 });                       // Filter by source type
 
 export const FlashcardModel = mongoose.model("Flashcard", flashcardSchema);

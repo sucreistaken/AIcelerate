@@ -2,11 +2,12 @@
 // Lightweight self-evaluation pass for AI-generated artifacts.
 // Runs a quick validation prompt to score coverage, accuracy, completeness.
 
-import { safeGenerate, getTemperature } from "./aiService";
+import { safeGenerate, getTemperature, tryParseJSON, stripCodeFences } from "./aiService";
 import { SCHEMAS } from "../prompts/schemas";
 import { smartTruncate } from "../utils/smartTruncate";
 import { logger } from "../utils/logger";
 import type { ConfidenceScore } from "../types";
+import { AppError } from "../middleware/errorHandler";
 
 type ArtifactType = "plan" | "cheatSheet" | "quiz" | "loModules";
 
@@ -55,12 +56,13 @@ export async function scoreArtifact(
       maxOutputTokens: 200,
       temperature: getTemperature("structured"),
       responseMimeType: "application/json",
-      responseSchema: SCHEMAS.CONFIDENCE_SCORE,
-    } as any,
+      responseSchema: SCHEMAS.CONFIDENCE_SCORE as import("@google/generative-ai").ResponseSchema,
+    },
   }, { label: "confidence_score", timeoutMs: 15_000 });
 
   const rawText = result.response.text() || "";
-  const parsed = JSON.parse(rawText);
+  const parsed = tryParseJSON(rawText) ?? tryParseJSON(stripCodeFences(rawText));
+  if (!parsed) throw new AppError(502, "AI confidence score parse error", "AI_PARSE_ERROR");
 
   logger.info(
     `[CONFIDENCE] ${artifactType} | coverage=${parsed.coverage} accuracy=${parsed.accuracy} completeness=${parsed.completeness} flags=${parsed.flags?.length || 0}`

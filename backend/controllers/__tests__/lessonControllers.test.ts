@@ -9,15 +9,24 @@ let memoryStore: any = {
   lastUpdated: new Date().toISOString(),
 };
 
-vi.mock("../../utils/file-Handler", () => ({
-  readJSON: vi.fn((filePath: string) => {
-    if (filePath.includes("memory.json")) return memoryStore;
-    return null;
-  }),
-  writeJSON: vi.fn((filePath: string, data: any) => {
-    if (filePath.includes("memory.json")) memoryStore = data;
-  }),
-  ensureDataFiles: vi.fn(),
+// Mock GlobalMemory model (replaces file-Handler mock)
+vi.mock("../../models/GlobalMemory", () => ({
+  GlobalMemoryModel: {
+    findOne: vi.fn(() => ({
+      lean: vi.fn(() => Promise.resolve(memoryStore)),
+    })),
+    findOneAndUpdate: vi.fn((_filter: any, update: any) => {
+      if (update?.$set) {
+        Object.assign(memoryStore, update.$set);
+      }
+      return Promise.resolve(memoryStore);
+    }),
+  },
+}));
+
+// Mock logger to suppress warnings
+vi.mock("../../utils/logger", () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), child: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })) },
 }));
 
 // Mock the cache module — factory must be self-contained (no external refs)
@@ -130,53 +139,53 @@ describe("lessonControllers", () => {
   });
 
   describe("upsertLesson", () => {
-    it("creates a new lesson when id is not provided", () => {
-      const result = upsertLesson({ title: "New Lecture", transcript: "Hello" });
+    it("creates a new lesson when id is not provided", async () => {
+      const result = await upsertLesson({ title: "New Lecture", transcript: "Hello" });
       expect(result.id).toMatch(/^lec-/);
       expect(result.title).toBe("New Lecture");
       expect(result.transcript).toBe("Hello");
       expect((lessonCache as any)._store.lessons).toHaveLength(1);
     });
 
-    it("creates a new lesson when id is provided but not found", () => {
-      const result = upsertLesson({ id: "lec-new", title: "Brand New" });
+    it("creates a new lesson when id is provided but not found", async () => {
+      const result = await upsertLesson({ id: "lec-new", title: "Brand New" });
       expect(result.id).toBe("lec-new");
       expect(result.title).toBe("Brand New");
       expect((lessonCache as any)._store.lessons).toHaveLength(1);
     });
 
-    it("updates an existing lesson when id matches", () => {
+    it("updates an existing lesson when id matches", async () => {
       (lessonCache as any)._store.lessons = [makeSampleLesson({ id: "lec-1", title: "Old Title" })];
-      const result = upsertLesson({ id: "lec-1", title: "New Title" });
+      const result = await upsertLesson({ id: "lec-1", title: "New Title" });
       expect(result.id).toBe("lec-1");
       expect(result.title).toBe("New Title");
       expect((lessonCache as any)._store.lessons).toHaveLength(1);
     });
 
-    it("preserves existing fields when updating", () => {
+    it("preserves existing fields when updating", async () => {
       (lessonCache as any)._store.lessons = [makeSampleLesson({ id: "lec-1", transcript: "Keep this" })];
-      const result = upsertLesson({ id: "lec-1", title: "Updated" });
+      const result = await upsertLesson({ id: "lec-1", title: "Updated" });
       expect(result.transcript).toBe("Keep this");
     });
 
-    it("merges progress on update", () => {
+    it("merges progress on update", async () => {
       (lessonCache as any)._store.lessons = [
         makeSampleLesson({ id: "lec-1", progress: { lastMode: "quiz", percent: 50 } }),
       ];
-      const result = upsertLesson({ id: "lec-1", progress: { percent: 80 } });
+      const result = await upsertLesson({ id: "lec-1", progress: { percent: 80 } });
       expect(result.progress).toEqual({ lastMode: "quiz", percent: 80 });
     });
 
-    it("sets default values for new lesson without optional fields", () => {
-      const result = upsertLesson({});
+    it("sets default values for new lesson without optional fields", async () => {
+      const result = await upsertLesson({});
       expect(result.title).toBe("Untitled Lecture");
       expect(result.transcript).toBe("");
       expect(result.slideText).toBe("");
       expect(result.highlights).toEqual([]);
     });
 
-    it("updates global memory with highlights", () => {
-      upsertLesson({
+    it("updates global memory with highlights", async () => {
+      await upsertLesson({
         id: "lec-mem",
         title: "Memory Test",
         highlights: ["Important concept"],
@@ -184,8 +193,8 @@ describe("lessonControllers", () => {
       expect(memoryStore.recurringConcepts).toContain("Important concept");
     });
 
-    it("updates global memory with professor emphases", () => {
-      upsertLesson({
+    it("updates global memory with professor emphases", async () => {
+      await upsertLesson({
         id: "lec-emph",
         title: "Emphasis Test",
         professorEmphases: [
@@ -250,9 +259,9 @@ describe("lessonControllers", () => {
   });
 
   describe("addLesson", () => {
-    it("adds a lesson and returns it with timestamps", () => {
+    it("adds a lesson and returns it with timestamps", async () => {
       const lesson = makeSampleLesson({ id: "lec-add" });
-      const result = addLesson(lesson);
+      const result = await addLesson(lesson);
       expect(result.id).toBe("lec-add");
       expect(result.createdAt).toBeDefined();
       expect(result.updatedAt).toBeDefined();

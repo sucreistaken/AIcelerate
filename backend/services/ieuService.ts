@@ -1,7 +1,7 @@
 import { logger } from "../utils/logger";
 import { badRequest, notFound } from "../middleware/errorHandler";
 
-declare const fetch: any;
+
 
 function normalizeCourseCode(raw: string): string {
   return raw.trim().toUpperCase().replace(/\s+/g, "+");

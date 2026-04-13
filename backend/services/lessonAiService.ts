@@ -17,11 +17,13 @@ export { generateMindmap, generateMindmapModule, generateMindmapNodeDetail } fro
 export { generateQuizFromPlan, generateQuizAnswers, evaluateQuizAnswer, evaluateQuizBatch } from "./quizAiService";
 import { getDigestOrFallback } from "./lessonDigestService";
 import { assembleCourseContext } from "../controllers/contextAssembler";
-import type { Lesson } from "../controllers/lessonControllers";
+import type { Lesson } from "./lessonDataService";
 import { smartTruncate } from "../utils/smartTruncate";
 import { getLangDirective } from "../utils/langDirective";
+import { withAiResilience } from "../utils/aiResilience";
 import type { LessonPlan, ChatMessage } from "../types";
 import type { SupportedLang } from "../utils/langDirective";
+import { AppError } from "../middleware/errorHandler";
 
 function logAI(label: string, inputLen: number, outputLen: number, maxTokens: number) {
   logger.info(`[AI] ${label} | ~${Math.ceil(inputLen / 4)} in, ~${Math.ceil(outputLen / 4)} out | max=${maxTokens}`);
@@ -48,21 +50,21 @@ async function callWithRetry<T>(
       if (attempt === maxAttempts - 1) throw err;
     }
   }
-  throw new Error(`${label}: all ${maxAttempts} attempts failed`);
+  throw new AppError(502, `${label}: all ${maxAttempts} attempts failed`, "AI_EXHAUSTED");
 }
 
 // ---- Plan Sub-Call (single focused AI call with schema) ----
 async function planSubCall(
-  prompt: string, schema: any, maxTokens: number, label: string
-): Promise<any> {
+  prompt: string, schema: Record<string, unknown>, maxTokens: number, label: string
+): Promise<Record<string, unknown>> {
   const result = await safeGenerate({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: {
       maxOutputTokens: maxTokens,
       temperature: getTemperature("balanced"),
       responseMimeType: "application/json",
-      responseSchema: schema,
-    } as any,
+      responseSchema: schema as unknown as import("@google/generative-ai").ResponseSchema,
+    },
   }, { label, timeoutMs: 60_000 });
   const rawText = result.response.text() || "";
   logAI(label, prompt.length, rawText.length, maxTokens);
@@ -76,9 +78,9 @@ async function planSubCall(
   // Safe JSON parse with fallback
   const parsed = tryParseJSON(rawText) ?? tryParseJSON(stripCodeFences(rawText));
   if (!parsed) {
-    throw new Error(`${label}: invalid JSON (output ~${estimatedTokens} tokens, limit=${maxTokens})`);
+    throw new AppError(502, `${label}: invalid JSON`, "AI_PARSE_ERROR");
   }
-  return parsed;
+  return parsed as Record<string, unknown>;
 }
 
 // ---- Plan Generation (3 parallel calls) ----
@@ -109,8 +111,8 @@ export async function generatePlan(
   // Merge into unified LessonPlan
   return {
     ...modulesResult,
-    emphases: emphasesResult.emphases,
-    alignment: alignmentResult.alignment,
+    emphases: emphasesResult.emphases as LessonPlan["emphases"],
+    alignment: alignmentResult.alignment as LessonPlan["alignment"],
   };
 }
 
@@ -129,8 +131,13 @@ export async function generatePlanStream(
     : "—";
   const langDir = getLangDirective(lang);
 
+  // Detect client disconnect to stop wasting AI tokens
+  let clientDisconnected = false;
+  res.on("close", () => { clientDisconnected = true; });
+
   const sendEvent = (data: Record<string, unknown>) => {
-    try { res.write(`data: ${JSON.stringify(data)}\n\n`); } catch { /* client gone */ }
+    if (clientDisconnected) return;
+    try { res.write(`data: ${JSON.stringify(data)}\n\n`); } catch { clientDisconnected = true; }
   };
 
   sendEvent({ type: "phase", phase: "analyzing", message: "Analyzing lesson content..." });
@@ -142,16 +149,19 @@ export async function generatePlanStream(
   // Fire all 3 in parallel
   sendEvent({ type: "phase", phase: "generating", message: "Creating learning plan..." });
 
-  let modulesData: any, emphasesData: any, alignmentData: any;
+  let modulesData: Record<string, unknown> | undefined;
+  let emphasesData: Record<string, unknown> | undefined;
+  let alignmentData: Record<string, unknown> | undefined;
 
   const modulesP = callWithRetry(
     () => planSubCall(modulesPrompt, SCHEMAS.PLAN_MODULES, 10000, "PLAN_MODULES"), "PLAN_MODULES"
   ).then(result => {
     modulesData = result;
     // Stream modules progressively as they arrive
-    if (result.modules?.length) {
-      for (let i = 0; i < result.modules.length; i++) {
-        sendEvent({ type: "module", index: i, total: result.modules.length, data: result.modules[i] });
+    const modules = result.modules as unknown[] | undefined;
+    if (modules?.length) {
+      for (let i = 0; i < modules.length; i++) {
+        sendEvent({ type: "module", index: i, total: modules.length, data: modules[i] as Record<string, unknown> });
       }
     }
     sendEvent({ type: "progress", tokens: 0, message: "Modules ready" });
@@ -162,9 +172,10 @@ export async function generatePlanStream(
   ).then(result => {
     emphasesData = result;
     sendEvent({ type: "phase", phase: "emphases", message: "Extracting key insights..." });
-    if (result.emphases?.length) {
-      for (let i = 0; i < result.emphases.length; i++) {
-        sendEvent({ type: "emphasis", index: i, total: result.emphases.length, data: result.emphases[i] });
+    const emphases = result.emphases as unknown[] | undefined;
+    if (emphases?.length) {
+      for (let i = 0; i < emphases.length; i++) {
+        sendEvent({ type: "emphasis", index: i, total: emphases.length, data: emphases[i] as Record<string, unknown> });
       }
     }
   });
@@ -177,16 +188,17 @@ export async function generatePlanStream(
 
   try {
     await Promise.all([modulesP, emphasesP, alignmentP]);
-  } catch (err: any) {
-    sendEvent({ type: "error", message: err?.message || "Plan generation failed" });
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : "Plan generation failed";
+    sendEvent({ type: "error", message: errMsg });
     throw err;
   }
 
   // Merge into unified LessonPlan
   const plan: LessonPlan = {
     ...modulesData,
-    emphases: emphasesData.emphases,
-    alignment: alignmentData.alignment,
+    emphases: emphasesData?.emphases as LessonPlan["emphases"],
+    alignment: alignmentData?.alignment as LessonPlan["alignment"],
   };
 
   return plan;
@@ -229,7 +241,7 @@ export function buildChatContextForLesson(lesson: Lesson, lessonId: string, mess
     lessonContentBlock, courseCtx.crossLessonBlock, courseCtx.progressBlock
   );
 
-  const prompt = buildChatPrompt(context, message, courseCtx.courseId, lang);
+  const prompt = buildChatPrompt(context, message, courseCtx.courseId ?? undefined, lang);
   return { prompt, history: history || [], courseCtx };
 }
 
@@ -261,69 +273,82 @@ export async function generateChatResponseStream(
 
   const compressed = compressHistory(history);
 
-  const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error("AI_TIMEOUT")), timeoutMs)
-  );
-
   let streamResult;
   try {
-    streamResult = await Promise.race([
-      getModel().generateContentStream({
+    streamResult = await withAiResilience(
+      async (_signal) => getModel().generateContentStream({
         contents: [
           ...(compressed.map((h) => ({ role: h.role === 'user' ? 'user' as const : 'model' as const, parts: [{ text: h.content }] }))),
           { role: 'user', parts: [{ text: prompt }] },
         ],
         generationConfig: { maxOutputTokens: 2000, temperature: getTemperature("creative") },
       }),
-      timeoutPromise,
-    ]);
-  } catch (initErr: any) {
-    logger.error({ err: initErr.message }, "AI stream init failed");
+      { timeoutMs, label: "lesson_chat_stream" }
+    );
+  } catch (initErr: unknown) {
+    const initErrMsg = initErr instanceof Error ? initErr.message : String(initErr);
+    logger.error({ err: initErrMsg }, "AI stream init failed");
     res.write(`data: ${JSON.stringify({ type: 'error', message: 'AI bağlantısı başarısız oldu, lütfen tekrar deneyin.' })}\n\n`);
     res.end();
     return;
   }
 
+  // Detect client disconnect to stop consuming AI tokens early
+  let clientDisconnected = false;
+  res.on("close", () => { clientDisconnected = true; });
+
   let fullText = '';
   try {
     for await (const chunk of streamResult.stream) {
+      if (clientDisconnected) break; // Stop consuming AI tokens
       const chunkText = chunk.text();
       if (chunkText) {
         fullText += chunkText;
-        res.write(`data: ${JSON.stringify({ type: 'chunk', text: chunkText })}\n\n`);
+        try {
+          res.write(`data: ${JSON.stringify({ type: 'chunk', text: chunkText })}\n\n`);
+        } catch {
+          clientDisconnected = true;
+          break;
+        }
       }
     }
-  } catch (streamErr: any) {
+  } catch (streamErr: unknown) {
     // Gemini sometimes throws "Failed to parse stream" mid-response.
     // Send whatever we have so far rather than losing the entire response.
-    logger.warn({ err: streamErr.message }, "AI stream interrupted, sending partial response");
+    const streamErrMsg = streamErr instanceof Error ? streamErr.message : String(streamErr);
+    logger.warn({ err: streamErrMsg }, "AI stream interrupted, sending partial response");
     if (!fullText) {
-      res.write(`data: ${JSON.stringify({ type: 'error', message: 'AI yanıt üretemedi, lütfen tekrar deneyin.' })}\n\n`);
-      res.end();
+      if (!clientDisconnected) {
+        res.write(`data: ${JSON.stringify({ type: 'error', message: 'AI yanıt üretemedi, lütfen tekrar deneyin.' })}\n\n`);
+        res.end();
+      }
       return;
     }
   }
 
-  const suggestions = extractSuggestions(fullText);
-  res.write(`data: ${JSON.stringify({ type: 'done', suggestions })}\n\n`);
-  res.end();
+  if (!clientDisconnected) {
+    const suggestions = extractSuggestions(fullText);
+    res.write(`data: ${JSON.stringify({ type: 'done', suggestions })}\n\n`);
+    res.end();
+  }
 }
 
 export async function generateChatResponseSync(
   prompt: string, history: ChatMessage[]
 ): Promise<{ text: string; suggestions: string[] }> {
   const timeoutMs = 30000;
-  const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error("AI_TIMEOUT")), timeoutMs)
-  );
 
   const compressed = compressHistory(history);
-  const chat = getModel().startChat({
-    history: compressed.map((h) => ({ role: h.role === 'user' ? 'user' as const : 'model' as const, parts: [{ text: h.content }] })),
-    generationConfig: { maxOutputTokens: 2000, temperature: getTemperature("creative") },
-  });
-
-  const result = await Promise.race([chat.sendMessage(prompt), timeoutPromise]);
+  const result = await withAiResilience(
+    async (_signal) => {
+      const chat = getModel().startChat({
+        history: compressed.map((h) => ({ role: h.role === 'user' ? 'user' as const : 'model' as const, parts: [{ text: h.content }] })),
+        generationConfig: { maxOutputTokens: 2000, temperature: getTemperature("creative") },
+      });
+      return chat.sendMessage(prompt);
+    },
+    { timeoutMs, label: "lesson_chat_sync" }
+  );
   const text = result.response.text();
   const suggestions = extractSuggestions(text);
   return { text, suggestions };

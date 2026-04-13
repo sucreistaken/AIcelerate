@@ -8,7 +8,7 @@ export const createServerSchema = z.object({
   university: z.string().max(100).optional(),
   isPublic: z.boolean().optional(),
   templateId: z.string().optional(),
-});
+}).strict();
 
 export const updateServerSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -17,16 +17,16 @@ export const updateServerSchema = z.object({
   tags: z.array(z.string().max(50)).max(10).optional(),
   university: z.string().max(100).optional(),
   settings: z.record(z.string(), z.unknown()).optional(),
-});
+}).strict();
 
 export const joinByInviteSchema = z.object({
   inviteCode: z.string().min(1).max(20),
-});
+}).strict();
 
 export const kickSchema = z.object({
   targetId: z.string().min(1),
-});
+}).strict();
 
 export const addCategorySchema = z.object({
   name: z.string().min(1).max(100),
-});
+}).strict();

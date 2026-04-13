@@ -19,6 +19,7 @@ vi.mock("../aiService", () => ({
     generateContent: mockGenerateContent,
     startChat: mockStartChat,
   })),
+  safeGenerate: (...args: any[]) => mockGenerateContent(args[0]),
   getTemperature: vi.fn().mockReturnValue(0.3),
   stripCodeFences: vi.fn((text: string) => {
     return text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();

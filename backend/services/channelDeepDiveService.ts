@@ -5,10 +5,12 @@ import {
 } from "../repositories/channelToolRepo";
 import { safeGenerate, getTemperature } from "./aiService";
 import { channelService } from "./channelService";
-import { getLesson } from "../controllers/lessonControllers";
+import { getLesson } from "./lessonDataService";
 import { generateId } from "../utils/idGenerator";
 import { buildToolContext } from "./channelContextBuilder";
 import { getLangDirective, type SupportedLang } from "../utils/langDirective";
+import { sanitizeForPrompt, sanitizeNickname } from "../utils/sanitize";
+import { serviceUnavailable } from "../middleware/errorHandler";
 
 // ── Deep Dive: chat ─────────────────────────────────────────────────────────
 export async function deepDiveChat(
@@ -56,7 +58,7 @@ export async function deepDiveChat(
         extraInstructions.push(`Common mistakes to warn about:\n${lesson.cheatSheet.pitfalls.map((p: string) => `- ${p}`).join("\n")}`);
       }
       if (lesson?.loModules?.modules) {
-        const traps = lesson.loModules.modules.flatMap((m: any) => m.commonTraps || []);
+        const traps = lesson.loModules.modules.flatMap((m: { commonTraps?: string[] }) => m.commonTraps || []);
         if (traps.length > 0) {
           extraInstructions.push(`Student misconceptions:\n${traps.map((t: string) => `- ${t}`).join("\n")}`);
         }
@@ -72,7 +74,7 @@ export async function deepDiveChat(
       lessonBlock += '\n\n';
     }
 
-    const prompt = `${getLangDirective(lang)}\n\nYou are a study assistant for '${serverName}' helping with '${topic}'.${lessonBlock} Answer clearly and educationally. Previous conversation: ${context}\n\nStudent ${nickname} asks: ${text}`;
+    const prompt = `${getLangDirective(lang)}\n\nYou are a study assistant for '${serverName}' helping with '${topic}'.${lessonBlock} Answer clearly and educationally. Previous conversation: ${context}\n\nStudent ${sanitizeNickname(nickname)} asks: ${sanitizeForPrompt(text)}`;
 
     const result = await safeGenerate({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -87,7 +89,7 @@ export async function deepDiveChat(
       const fallbackAi: DeepDiveMessage = {
         id: generateId(),
         role: "assistant",
-        text: "Üzgünüm, bu soruya yanıt üretemedi. Lütfen tekrar deneyin.",
+        text: lang === "tr" ? "Üzgünüm, bu soruya yanıt üretemedi. Lütfen tekrar deneyin." : "Sorry, could not generate a response. Please try again.",
         authorId: "ai",
         authorNickname: "Study AI",
         timestamp: new Date().toISOString(),
@@ -112,6 +114,6 @@ export async function deepDiveChat(
     return { userMessage, aiMessage };
   } catch (err) {
     logger.error("channelToolService.deepDiveChat error:", err);
-    throw new Error("Failed to generate AI response");
+    throw serviceUnavailable("Failed to generate AI response");
   }
 }

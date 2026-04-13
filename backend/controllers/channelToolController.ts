@@ -2,18 +2,28 @@ import { Request, Response } from "express";
 import { channelToolService } from "../services/channelToolService";
 import { listLessons, getLesson } from "./lessonControllers";
 import { channelService } from "../services/channelService";
+import { roomService } from "../services/roomService";
 import { Channel } from "../models/Channel";
 import { AuthRequest } from "../middleware/auth";
 import { asyncHandler } from "../utils/asyncHandler";
-import { badRequest, notFound } from "../middleware/errorHandler";
+import { badRequest, notFound, forbidden } from "../middleware/errorHandler";
+
+async function verifyMembership(userId: string, serverId: string): Promise<void> {
+  const room = await roomService.getById(serverId);
+  if (!room.memberIds.includes(userId)) throw forbidden("Not a member of this server");
+}
 
 export const channelToolController = {
-  getToolData: asyncHandler(async (req: Request, res: Response) => {
+  getToolData: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const channel = await channelService.getByIdGlobal(req.params.channelId);
+    await verifyMembership(req.user!.userId, channel.roomId);
     const data = await channelToolService.getData(req.params.channelId);
-    res.json(data);
+    res.json({ ok: true, data });
   }),
 
-  generateQuiz: asyncHandler(async (req: Request, res: Response) => {
+  generateQuiz: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const channel = await channelService.getByIdGlobal(req.params.channelId);
+    await verifyMembership(req.user!.userId, channel.roomId);
     const { topic, serverName, count, difficulty, includeTrueFalse } = req.body;
     const { data, sourcesSummary } = await channelToolService.generateQuiz(
       req.params.channelId, topic, serverName, count || 10, { difficulty, includeTrueFalse }
@@ -39,7 +49,9 @@ export const channelToolController = {
     res.json({ ok: true, card });
   }),
 
-  generateFlashcards: asyncHandler(async (req: Request, res: Response) => {
+  generateFlashcards: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const channel = await channelService.getByIdGlobal(req.params.channelId);
+    await verifyMembership(req.user!.userId, channel.roomId);
     const { topic, serverName, count } = req.body;
     const { cards, sourcesSummary } = await channelToolService.generateFlashcards(
       req.params.channelId, topic, serverName, count
@@ -47,7 +59,9 @@ export const channelToolController = {
     res.json({ ok: true, cards, sourcesSummary });
   }),
 
-  extractFlashcards: asyncHandler(async (req: Request, res: Response) => {
+  extractFlashcards: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const channel = await channelService.getByIdGlobal(req.params.channelId);
+    await verifyMembership(req.user!.userId, channel.roomId);
     const result = await channelToolService.extractFlashcardsFromLesson(req.params.channelId);
     res.json({ ok: true, ...result });
   }),
@@ -73,7 +87,9 @@ export const channelToolController = {
     res.json({ ok: true, userMessage, aiMessage });
   }),
 
-  generateMindMap: asyncHandler(async (req: Request, res: Response) => {
+  generateMindMap: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const channel = await channelService.getByIdGlobal(req.params.channelId);
+    await verifyMembership(req.user!.userId, channel.roomId);
     const { topic, serverName } = req.body;
     const { mindMap, sourcesSummary } = await channelToolService.generateMindMap(
       req.params.channelId, topic, serverName
@@ -108,7 +124,10 @@ export const channelToolController = {
     res.json({ ok: true, note });
   }),
 
-  editNote: asyncHandler(async (req: Request, res: Response) => {
+  editNote: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const channel = await channelService.getByIdGlobal(req.params.channelId);
+    await verifyMembership(userId, channel.roomId);
     const { title, content, category } = req.body;
     const note = await channelToolService.editNote(
       req.params.channelId, req.params.noteId, { title, content, category }
@@ -116,12 +135,18 @@ export const channelToolController = {
     res.json({ ok: true, note });
   }),
 
-  deleteNote: asyncHandler(async (req: Request, res: Response) => {
+  deleteNote: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const channel = await channelService.getByIdGlobal(req.params.channelId);
+    await verifyMembership(userId, channel.roomId);
     await channelToolService.deleteNote(req.params.channelId, req.params.noteId);
     res.json({ ok: true });
   }),
 
-  pinNote: asyncHandler(async (req: Request, res: Response) => {
+  pinNote: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const channel = await channelService.getByIdGlobal(req.params.channelId);
+    await verifyMembership(userId, channel.roomId);
     const note = await channelToolService.pinNote(req.params.channelId, req.params.noteId);
     res.json({ ok: true, note });
   }),
@@ -132,7 +157,9 @@ export const channelToolController = {
     res.json({ ok: true, ...result });
   }),
 
-  unlockTool: asyncHandler(async (req: Request, res: Response) => {
+  unlockTool: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const channel = await channelService.getByIdGlobal(req.params.channelId);
+    await verifyMembership(req.user!.userId, channel.roomId);
     const result = await channelToolService.unlockTool(req.params.channelId);
     res.json({ ok: true, ...result });
   }),
@@ -148,22 +175,26 @@ export const channelToolController = {
       hasPlan: !!l.plan,
       courseCode: l.courseCode,
     }));
-    res.json(summaries);
+    res.json({ ok: true, lessons: summaries });
   },
 
-  linkLesson: asyncHandler(async (req: Request, res: Response) => {
+  linkLesson: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
     const { channelId } = req.params;
     const { serverId, lessonId, lessonTitle } = req.body;
     if (!serverId || !lessonId || !lessonTitle) throw badRequest("Missing serverId, lessonId, or lessonTitle");
+    await verifyMembership(userId, serverId);
     const updated = await Channel.findByIdAndUpdate(channelId, { $set: { lessonId, lessonTitle } }, { new: true });
     if (!updated) throw notFound("Channel not found");
     res.json({ ok: true, channel: { ...updated.toJSON(), id: updated._id.toString() } });
   }),
 
-  unlinkLesson: asyncHandler(async (req: Request, res: Response) => {
+  unlinkLesson: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
     const { channelId } = req.params;
     const { serverId } = req.body;
     if (!serverId) throw badRequest("Missing serverId");
+    await verifyMembership(userId, serverId);
     const updated = await Channel.findByIdAndUpdate(channelId, { $unset: { lessonId: "", lessonTitle: "" } }, { new: true });
     if (!updated) throw notFound("Channel not found");
     res.json({ ok: true, channel: { ...updated.toJSON(), id: updated._id.toString() } });
@@ -176,11 +207,11 @@ export const channelToolController = {
     const lesson = getLesson(channel.lessonId);
     if (!lesson) return res.json({ linked: false });
 
-    const modules = lesson.plan?.modules?.map((m: any) => ({
+    const modules = lesson.plan?.modules?.map((m: { title: string; goal?: string }) => ({
       title: m.title, goal: m.goal,
     })) || null;
 
-    const emphases = lesson.professorEmphases?.map((e: any) => ({
+    const emphases = lesson.professorEmphases?.map((e: { statement: string; why: string; evidence?: string; confidence?: number }) => ({
       statement: e.statement, why: e.why, evidence: e.evidence, confidence: e.confidence,
     })) || null;
 
@@ -191,7 +222,7 @@ export const channelToolController = {
     } : null;
 
     const rawLo = lesson.loModules?.modules;
-    const loModules = rawLo?.length ? rawLo.map((m: any) => ({
+    const loModules = rawLo?.length ? rawLo.map((m: { loId: string; loTitle: string; oneLineGist: string; coreIdeas?: string[]; mustRemember?: string[]; commonTraps?: string[]; miniQuiz?: unknown[]; examples?: unknown[] }) => ({
       loId: m.loId, loTitle: m.loTitle, oneLineGist: m.oneLineGist,
       coreIdeas: m.coreIdeas || [], mustRemember: m.mustRemember || [],
       commonTraps: m.commonTraps || [], miniQuiz: m.miniQuiz || [],
@@ -199,7 +230,7 @@ export const channelToolController = {
     })) : null;
 
     const learningOutcomes = lesson.plan?.learning_outcomes?.length
-      ? lesson.plan.learning_outcomes.map((lo: any) => ({ code: lo.code, description: lo.description }))
+      ? lesson.plan.learning_outcomes.map((lo: string) => ({ code: lo, description: lo }))
       : null;
 
     res.json({
@@ -239,8 +270,8 @@ export const channelToolController = {
       emphasesCount: lesson.professorEmphases?.length || 0,
       loModuleCount: loMods?.length || 0,
       quickQuizCount: cs?.quickQuiz?.length || 0,
-      miniQuizCount: loMods?.reduce((sum: number, m: any) => sum + (m.miniQuiz?.length || 0), 0) || 0,
-      mustRememberCount: loMods?.reduce((sum: number, m: any) => sum + (m.mustRemember?.length || 0), 0) || 0,
+      miniQuizCount: loMods?.reduce((sum: number, m: { miniQuiz?: unknown[] }) => sum + (m.miniQuiz?.length || 0), 0) || 0,
+      mustRememberCount: loMods?.reduce((sum: number, m: { mustRemember?: string[] }) => sum + (m.mustRemember?.length || 0), 0) || 0,
       formulaCount: cs?.formulas?.length || 0,
       pitfallCount: cs?.pitfalls?.length || 0,
     });

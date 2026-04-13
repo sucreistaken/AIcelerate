@@ -2,9 +2,11 @@ import { logger } from "../utils/logger";
 import { channelToolRepo } from "../repositories/channelToolRepo";
 import { safeGenerate, stripCodeFences, getTemperature } from "./aiService";
 import { channelService } from "./channelService";
-import { getLesson } from "../controllers/lessonControllers";
+import { getLesson } from "./lessonDataService";
 import { buildToolContext } from "./channelContextBuilder";
 import { getLangDirective, type SupportedLang } from "../utils/langDirective";
+import { sanitizeForPrompt } from "../utils/sanitize";
+import { serviceUnavailable } from "../middleware/errorHandler";
 
 // ── Mind Map: generate ──────────────────────────────────────────────────────
 export async function generateMindMap(
@@ -23,7 +25,7 @@ export async function generateMindMap(
       const lesson = getLesson((await channelService.getByIdGlobal(channelId)).lessonId!);
       const structureHints: string[] = [];
       if (lesson?.plan?.modules?.length) {
-        structureHints.push(`Use these as main branches: ${lesson.plan.modules.map((m: any) => m.title).join(", ")}`);
+        structureHints.push(`Use these as main branches: ${lesson.plan.modules.map((m: { title: string }) => m.title).join(", ")}`);
       }
       if (lesson?.plan?.key_concepts?.length) {
         structureHints.push(`Connecting themes: ${lesson.plan.key_concepts.join(", ")}`);
@@ -34,7 +36,7 @@ export async function generateMindMap(
       }
     }
 
-    const prompt = `${getLangDirective(lang)}\n\n${contextBlock}Create a Mermaid.js mindmap diagram about '${topic}' for study group '${serverName}'. Use \`mindmap\` syntax. Return ONLY the Mermaid code, no markdown fences.`;
+    const prompt = `${getLangDirective(lang)}\n\n${contextBlock}Create a Mermaid.js mindmap diagram about '${sanitizeForPrompt(topic)}' for study group '${sanitizeForPrompt(serverName)}'. Use \`mindmap\` syntax. Return ONLY the Mermaid code, no markdown fences.`;
 
     const result = await safeGenerate({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -55,6 +57,6 @@ export async function generateMindMap(
     return { mindMap: data.mindMap, sourcesSummary: toolCtx?.meta.sourcesSummary || null };
   } catch (err) {
     logger.error("channelToolService.generateMindMap error:", err);
-    throw new Error("Failed to generate mind map");
+    throw serviceUnavailable("Failed to generate mind map");
   }
 }

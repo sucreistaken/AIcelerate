@@ -1,27 +1,44 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock controller functions before importing the router
-const mockListLessons = vi.fn();
+vi.mock("../../middleware/auth", () => ({
+  requireAuth: (req: any, _res: any, next: any) => {
+    req.user = { userId: "test-user-id" };
+    next();
+  },
+  AuthRequest: {},
+}));
+
+// Mock service functions that the controller calls internally
+const mockListLessonsForUser = vi.fn();
+const mockListLessonsPaginatedForUser = vi.fn();
 const mockGetLesson = vi.fn();
 const mockUpsertLesson = vi.fn();
 const mockUpdateProgress = vi.fn();
 const mockDeleteLesson = vi.fn();
 const mockGetMemory = vi.fn();
 
-vi.mock("../../controllers/lessonControllers", () => ({
-  listLessons: (...args: any[]) => mockListLessons(...args),
+vi.mock("../../services/lessonDataService", () => ({
+  listLessonsForUser: (...args: any[]) => mockListLessonsForUser(...args),
+  listLessonsPaginatedForUser: (...args: any[]) => mockListLessonsPaginatedForUser(...args),
   getLesson: (...args: any[]) => mockGetLesson(...args),
   upsertLesson: (...args: any[]) => mockUpsertLesson(...args),
   updateProgress: (...args: any[]) => mockUpdateProgress(...args),
   deleteLesson: (...args: any[]) => mockDeleteLesson(...args),
   getMemory: (...args: any[]) => mockGetMemory(...args),
+  // Re-exports used by the controller module
+  listLessons: vi.fn(),
+  listLessonsPaginated: vi.fn(),
+  getLessons: vi.fn(),
+  addLesson: vi.fn(),
+  attachQuizPack: vi.fn(),
+  setQuizScore: vi.fn(),
 }));
 
 const mockGetCourseForLesson = vi.fn();
 const mockRemoveLessonFromCourse = vi.fn();
 const mockRebuildKnowledgeIndex = vi.fn();
 
-vi.mock("../../controllers/courseController", () => ({
+vi.mock("../../services/courseDataService", () => ({
   getCourseForLesson: (...args: any[]) => mockGetCourseForLesson(...args),
   removeLessonFromCourse: (...args: any[]) => mockRemoveLessonFromCourse(...args),
   rebuildKnowledgeIndex: (...args: any[]) => mockRebuildKnowledgeIndex(...args),
@@ -118,6 +135,7 @@ function mockReq(overrides: Record<string, any> = {}) {
     params: {},
     body: {},
     query: {},
+    user: { userId: "test-user-id" },
     ...overrides,
   } as any;
 }
@@ -130,6 +148,14 @@ function mockRes() {
   return res;
 }
 
+/** Calls an asyncHandler-wrapped route handler and re-throws any error passed to next() */
+async function callHandler(handler: Function, req: any, res: any): Promise<void> {
+  let caughtError: unknown;
+  const next = (err?: unknown) => { caughtError = err; };
+  await handler(req, res, next);
+  if (caughtError) throw caughtError;
+}
+
 describe("lessonRoutes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -137,108 +163,114 @@ describe("lessonRoutes", () => {
 
   // ---- GET /lessons ----
   describe("GET /lessons", () => {
-    it("returns all lessons", () => {
+    it("returns all lessons for user", async () => {
       const lessons = [{ id: "lec-1", title: "A" }, { id: "lec-2", title: "B" }];
-      mockListLessons.mockReturnValue(lessons);
+      mockListLessonsForUser.mockReturnValue(lessons);
 
       const req = mockReq();
       const res = mockRes();
-      const handler = findHandler("get", "/lessons");
+      await findHandler("get", "/lessons")(req, res);
 
-      handler(req, res);
-
-      expect(mockListLessons).toHaveBeenCalledOnce();
-      expect(res.json).toHaveBeenCalledWith(lessons);
+      expect(mockListLessonsForUser).toHaveBeenCalledWith("test-user-id");
+      expect(res.json).toHaveBeenCalledWith({ ok: true, lessons });
     });
 
-    it("returns empty array when no lessons exist", () => {
-      mockListLessons.mockReturnValue([]);
+    it("returns empty array when no lessons exist", async () => {
+      mockListLessonsForUser.mockReturnValue([]);
 
       const req = mockReq();
       const res = mockRes();
-      findHandler("get", "/lessons")(req, res);
+      await findHandler("get", "/lessons")(req, res);
 
-      expect(res.json).toHaveBeenCalledWith([]);
+      expect(res.json).toHaveBeenCalledWith({ ok: true, lessons: [] });
     });
   });
 
   // ---- GET /lessons/:id ----
   describe("GET /lessons/:id", () => {
-    it("returns a lesson when found", () => {
-      const lesson = { id: "lec-42", title: "Calculus" };
+    it("returns a lesson when found", async () => {
+      const lesson = { id: "lec-42", title: "Calculus", userId: "test-user-id" };
       mockGetLesson.mockReturnValue(lesson);
 
       const req = mockReq({ params: { id: "lec-42" } });
       const res = mockRes();
-      findHandler("get", "/lessons/:id")(req, res);
+      await findHandler("get", "/lessons/:id")(req, res);
 
       expect(mockGetLesson).toHaveBeenCalledWith("lec-42");
-      expect(res.json).toHaveBeenCalledWith(lesson);
+      expect(res.json).toHaveBeenCalledWith({ ok: true, lesson });
     });
 
-    it("throws AppError 404 when lesson not found", () => {
+    it("throws AppError 404 when lesson not found", async () => {
       mockGetLesson.mockReturnValue(null);
 
       const req = mockReq({ params: { id: "nonexistent" } });
       const res = mockRes();
+      const handler = findHandler("get", "/lessons/:id");
 
-      expect(() => findHandler("get", "/lessons/:id")(req, res)).toThrow(AppError);
-      expect(() => findHandler("get", "/lessons/:id")(req, res)).toThrow("Lesson not found");
+      await expect(callHandler(handler, req, res)).rejects.toThrow(AppError);
+      await expect(callHandler(handler, req, res)).rejects.toThrow("Lesson not found");
     });
   });
 
   // ---- POST /lessons ----
   describe("POST /lessons", () => {
-    it("creates a lesson and returns it", () => {
+    it("creates a lesson and returns 201 with ok:true", async () => {
       const body = { title: "New Lecture", transcript: "Hello" };
       const saved = { id: "lec-100", ...body };
-      mockUpsertLesson.mockReturnValue(saved);
+      mockUpsertLesson.mockResolvedValue(saved);
 
       const req = mockReq({ body });
       const res = mockRes();
-      findHandler("post", "/lessons")(req, res);
+      await findHandler("post", "/lessons")(req, res);
 
-      expect(mockUpsertLesson).toHaveBeenCalledWith(body);
-      expect(res.json).toHaveBeenCalledWith(saved);
+      expect(mockUpsertLesson).toHaveBeenCalledWith({ ...body, userId: "test-user-id" });
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(res.json).toHaveBeenCalledWith({ ok: true, lesson: saved });
     });
   });
 
   // ---- PATCH /lessons/:id/progress ----
   describe("PATCH /lessons/:id/progress", () => {
-    it("updates progress when lesson exists", () => {
+    it("updates progress when lesson exists", async () => {
+      const lesson = { id: "lec-1", userId: "test-user-id" };
       const updated = { id: "lec-1", progress: { lastMode: "quiz", percent: 75 } };
+      mockGetLesson.mockReturnValue(lesson);
       mockUpdateProgress.mockReturnValue(updated);
 
       const req = mockReq({ params: { id: "lec-1" }, body: { lastMode: "quiz", percent: 75 } });
       const res = mockRes();
-      findHandler("patch", "/lessons/:id/progress")(req, res);
+      await findHandler("patch", "/lessons/:id/progress")(req, res);
 
       expect(mockUpdateProgress).toHaveBeenCalledWith("lec-1", req.body);
-      expect(res.json).toHaveBeenCalledWith(updated);
+      expect(res.json).toHaveBeenCalledWith({ ok: true, lesson: updated });
     });
 
-    it("throws 404 when lesson not found for progress update", () => {
-      mockUpdateProgress.mockReturnValue(null);
+    it("throws 404 when lesson not found for progress update", async () => {
+      mockGetLesson.mockReturnValue(null);
 
       const req = mockReq({ params: { id: "nonexistent" }, body: { percent: 50 } });
       const res = mockRes();
+      const handler = findHandler("patch", "/lessons/:id/progress");
 
-      expect(() => findHandler("patch", "/lessons/:id/progress")(req, res)).toThrow(AppError);
+      await expect(callHandler(handler, req, res)).rejects.toThrow(AppError);
     });
   });
 
   // ---- DELETE /lessons/:id ----
   describe("DELETE /lessons/:id", () => {
-    it("deletes a lesson and removes from course", () => {
+    it("deletes a lesson and removes from course", async () => {
+      const lesson = { id: "lec-del", userId: "test-user-id" };
       const course = { id: "course-1", lessonIds: ["lec-del"] };
+      mockGetLesson.mockReturnValue(lesson);
       mockGetCourseForLesson.mockReturnValue(course);
       mockRemoveLessonFromCourse.mockReturnValue(course);
       mockDeleteLesson.mockReturnValue(true);
 
       const req = mockReq({ params: { id: "lec-del" } });
       const res = mockRes();
-      findHandler("delete", "/lessons/:id")(req, res);
+      await findHandler("delete", "/lessons/:id")(req, res);
 
+      expect(mockGetLesson).toHaveBeenCalledWith("lec-del");
       expect(mockGetCourseForLesson).toHaveBeenCalledWith("lec-del");
       expect(mockRemoveLessonFromCourse).toHaveBeenCalledWith("course-1", "lec-del");
       expect(mockRebuildKnowledgeIndex).toHaveBeenCalledWith("course-1");
@@ -246,43 +278,45 @@ describe("lessonRoutes", () => {
       expect(res.json).toHaveBeenCalledWith({ ok: true, deleted: "lec-del" });
     });
 
-    it("deletes a lesson not assigned to any course", () => {
+    it("deletes a lesson not assigned to any course", async () => {
+      const lesson = { id: "lec-orphan", userId: "test-user-id" };
+      mockGetLesson.mockReturnValue(lesson);
       mockGetCourseForLesson.mockReturnValue(null);
       mockDeleteLesson.mockReturnValue(true);
 
       const req = mockReq({ params: { id: "lec-orphan" } });
       const res = mockRes();
-      findHandler("delete", "/lessons/:id")(req, res);
+      await findHandler("delete", "/lessons/:id")(req, res);
 
       expect(mockRemoveLessonFromCourse).not.toHaveBeenCalled();
       expect(mockRebuildKnowledgeIndex).not.toHaveBeenCalled();
       expect(res.json).toHaveBeenCalledWith({ ok: true, deleted: "lec-orphan" });
     });
 
-    it("throws 404 when lesson to delete is not found", () => {
-      mockGetCourseForLesson.mockReturnValue(null);
-      mockDeleteLesson.mockReturnValue(false);
+    it("throws 404 when lesson to delete is not found", async () => {
+      mockGetLesson.mockReturnValue(null);
 
       const req = mockReq({ params: { id: "nonexistent" } });
       const res = mockRes();
+      const handler = findHandler("delete", "/lessons/:id");
 
-      expect(() => findHandler("delete", "/lessons/:id")(req, res)).toThrow(AppError);
-      expect(() => findHandler("delete", "/lessons/:id")(req, res)).toThrow("Lesson not found");
+      await expect(callHandler(handler, req, res)).rejects.toThrow(AppError);
+      await expect(callHandler(handler, req, res)).rejects.toThrow("Lesson not found");
     });
   });
 
   // ---- GET /memory ----
   describe("GET /memory", () => {
-    it("returns global memory", () => {
+    it("returns global memory", async () => {
       const memory = { recurringConcepts: ["OOP"], recentEmphases: [], lastUpdated: "2026-01-01" };
-      mockGetMemory.mockReturnValue(memory);
+      mockGetMemory.mockResolvedValue(memory);
 
       const req = mockReq();
       const res = mockRes();
-      findHandler("get", "/memory")(req, res);
+      await findHandler("get", "/memory")(req, res);
 
       expect(mockGetMemory).toHaveBeenCalledOnce();
-      expect(res.json).toHaveBeenCalledWith(memory);
+      expect(res.json).toHaveBeenCalledWith({ ok: true, memory });
     });
   });
 });

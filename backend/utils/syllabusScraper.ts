@@ -61,9 +61,10 @@ export async function fetchLearningOutcomes(courseCode: string): Promise<string[
 
     return outcomes;
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     // 404 hatası veya network hatası olursa sessizce boş dizi dön
-    logger.warn(`❌ Syllabus çekilemedi (${courseCode}):`, error.message);
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(`❌ Syllabus çekilemedi (${courseCode}):`, message);
     return [];
   }
 }

@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { logger } from "../utils/logger";
 
 function requireEnv(name: string): string {
@@ -10,7 +11,7 @@ function requireEnv(name: string): string {
 }
 
 const NODE_ENV = process.env.NODE_ENV || "development";
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
+const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString("hex");
 
 if (NODE_ENV === "production" && (!process.env.JWT_SECRET || JWT_SECRET === "dev-secret-change-in-production")) {
   logger.error("FATAL: JWT_SECRET must be set to a secure value in production. Exiting.");
@@ -26,5 +27,5 @@ export const env = {
   FRONTEND_URL: process.env.FRONTEND_URL || "http://localhost:5173",
   PYTHON_BIN: process.env.PYTHON_BIN || "python",
   NODE_ENV,
-  USE_MONGODB: process.env.USE_MONGODB || "true",
+  REDIS_URL: process.env.REDIS_URL || "redis://127.0.0.1:6379",
 };

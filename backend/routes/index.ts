@@ -1,14 +1,18 @@
 import { Router } from "express";
+import { requireAuth, type AuthRequest } from "../middleware/auth";
 import mongoose from "mongoose";
 import { rateLimiter } from "../middleware/rateLimiter";
 import { getAiMetrics } from "../services/aiService";
-import { listLessons } from "../controllers/lessonControllers";
+import { listLessons, listLessonsPaginated } from "../services/lessonDataService";
+import type { Lesson } from "../services/lessonDataService";
 import { listCourses } from "../controllers/courseController";
 import { getNextSession, getDailyPlan, getStreak } from "../controllers/schedulerController";
 import { getFlashcardStats } from "../controllers/flashcardController";
 import { checkAndGenerateNotifications, getUnreadCount } from "../controllers/notificationController";
 
 import lessonRoutes from "./lessonRoutes";
+import lessonAiRoutes from "./lessonAiRoutes";
+import lessonQuizRoutes from "./lessonQuizRoutes";
 import uploadRoutes from "./uploadRoutes";
 import quizRoutes from "./quizRoutes";
 import flashcardRoutes from "./flashcardRoutes";
@@ -31,51 +35,67 @@ const router = Router();
 // Health check — includes DB + AI status
 router.get("/health", (_req, res) => {
   const mongoOk = mongoose.connection.readyState === 1;
-  const status = mongoOk ? 200 : 503;
-  res.status(status).json({
-    ok: mongoOk,
-    mongo: mongoOk ? "connected" : "disconnected",
-    uptime: Math.round(process.uptime()),
-  });
+  res.status(mongoOk ? 200 : 503).json({ ok: mongoOk });
 });
 
 // AI metrics endpoint
-router.get("/health/ai-metrics", (_req, res) => {
+router.get("/health/ai-metrics", requireAuth, (_req, res) => {
   res.json({ ok: true, data: getAiMetrics() });
 });
 
 // Dashboard batch endpoint — replaces 7 separate calls with 1
 // All data served from in-memory cache (0 disk I/O)
 // ?lite=true strips transcript/slideText (~50-100KB saved per response)
-router.get("/api/dashboard/init", (req, res) => {
+router.get("/api/dashboard/init", requireAuth, async (req: AuthRequest, res) => {
+  const userId = req.user?.userId;
   const courseId = req.query.courseId as string | undefined;
   const lite = req.query.lite === "true";
   const t0 = performance.now();
   try {
-    checkAndGenerateNotifications();
-    let lessons = listLessons();
+    // Fire-and-forget: don't block the response for notification generation
+    if (userId) checkAndGenerateNotifications(userId).catch(() => { /* fire-and-forget */ });
+
+    const limit = Math.min(Math.max(1, Number(req.query.limit) || 50), 200);
+    const cursor = req.query.cursor as string | undefined;
+    let lessons: Lesson[];
+    try {
+      const paginated = listLessonsPaginated(cursor, limit);
+      lessons = paginated.items;
+    } catch {
+      lessons = listLessons().slice(0, limit);
+    }
+    lessons = lessons.filter((l) => !l.userId || l.userId === userId);
     if (lite) {
-      lessons = lessons.map((l: any) => {
-        const { transcript, slideText, ...meta } = l;
-        return meta;
+      lessons = lessons.map((l) => {
+        const { transcript: _transcript, slideText: _slideText, ...meta } = l;
+        return meta as Lesson;
       });
     }
+
+    // Parallelize independent async calls
+    const [unreadCount, streak, dailyPlan] = await Promise.all([
+      userId ? getUnreadCount(userId) : Promise.resolve(0),
+      getStreak(),
+      getDailyPlan(courseId),
+    ]);
+
     const result = {
       ok: true,
       lessons,
-      courses: listCourses(),
-      unreadCount: getUnreadCount(),
+      courses: listCourses().filter((c: { userId?: string }) => !c.userId || c.userId === userId),
+      unreadCount,
       scheduler: {
         nextSession: getNextSession(courseId),
-        streak: getStreak(),
-        dailyPlan: getDailyPlan(courseId),
+        streak,
+        dailyPlan,
       },
       flashcardStats: getFlashcardStats(),
       _perf: { ms: +(performance.now() - t0).toFixed(2) },
     };
     res.json(result);
-  } catch (err: any) {
-    res.status(500).json({ ok: false, error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ ok: false, error: message });
   }
 });
 
@@ -91,6 +111,8 @@ router.use(
 
 // Core lesson & AI routes
 router.use("/api", lessonRoutes);
+router.use("/api", lessonAiRoutes);
+router.use("/api", lessonQuizRoutes);
 
 // Upload (transcribe, slides)
 router.use("/api", uploadRoutes);

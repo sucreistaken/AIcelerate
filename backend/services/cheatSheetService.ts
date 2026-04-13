@@ -1,6 +1,6 @@
 import { logger } from "../utils/logger";
-import { safeGenerate, stripCodeFences, tryParseJSON, getTemperature } from "./aiService";
-import { getLesson, upsertLesson } from "../controllers/lessonControllers";
+import { safeGenerate, getTemperature, tryParseJSON, stripCodeFences } from "./aiService";
+import { getLesson, upsertLesson } from "./lessonDataService";
 import { assembleCourseContext } from "../controllers/contextAssembler";
 import { buildCondensedContext } from "./loModuleService";
 import { smartTruncate } from "../utils/smartTruncate";
@@ -64,9 +64,11 @@ export async function generateCheatSheet(
 
   const result = await safeGenerate({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: 3000, temperature: getTemperature("balanced"), responseMimeType: "application/json", responseSchema: SCHEMAS.CHEAT_SHEET } as any,
+    generationConfig: { maxOutputTokens: 3000, temperature: getTemperature("balanced"), responseMimeType: "application/json", responseSchema: SCHEMAS.CHEAT_SHEET as import("@google/generative-ai").ResponseSchema },
   }, { label: "cheat_sheet", timeoutMs: 45_000 });
-  const j = JSON.parse(result.response.text());
+  const rawText = result.response.text();
+  const j = tryParseJSON(rawText) ?? tryParseJSON(stripCodeFences(rawText));
+  if (!j) throw new AppError(500, "AI response parse error", "LLM_PARSE_ERROR");
   if (!j?.sections || !Array.isArray(j.sections)) {
     throw new AppError(500, "Cheat sheet JSON/schema error", "LLM_PARSE_ERROR");
   }
@@ -78,7 +80,7 @@ export async function generateCheatSheet(
     quickQuiz: Array.isArray(j.quickQuiz) ? j.quickQuiz : [], language,
   };
 
-  upsertLesson({ id: lessonId, cheatSheet });
+  await upsertLesson({ id: lessonId, cheatSheet });
   logger.info(`[AI] CHEAT_SHEET | lessonId=${lessonId} | lang=${language}`);
   return { cheatSheet, cached: false };
 }

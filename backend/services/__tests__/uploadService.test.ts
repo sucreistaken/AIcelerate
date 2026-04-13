@@ -14,7 +14,7 @@ vi.mock("../../utils/logger", () => ({
 // Mock lessonControllers
 const mockGetLesson = vi.fn();
 const mockUpsertLesson = vi.fn();
-vi.mock("../../controllers/lessonControllers", () => ({
+vi.mock("../../services/lessonDataService", () => ({
   getLesson: (...args: any[]) => mockGetLesson(...args),
   upsertLesson: (...args: any[]) => mockUpsertLesson(...args),
 }));

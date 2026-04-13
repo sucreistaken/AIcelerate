@@ -4,9 +4,9 @@ import { logger } from "../utils/logger";
 export interface Job {
   id: string;
   type: string;
-  payload: any;
+  payload: unknown;
   status: "pending" | "processing" | "completed" | "failed" | "dead";
-  result?: any;
+  result?: unknown;
   error?: string;
   attempts: number;
   maxAttempts: number;
@@ -14,7 +14,7 @@ export interface Job {
   processedAt?: string;
 }
 
-function toJob(doc: IJob): Job {
+function toJob(doc: IJob & { createdAt?: Date }): Job {
   return {
     id: doc._id.toString(),
     type: doc.type,
@@ -24,20 +24,20 @@ function toJob(doc: IJob): Job {
     error: doc.error,
     attempts: doc.attempts,
     maxAttempts: doc.maxAttempts,
-    createdAt: (doc as any).createdAt?.toISOString?.() || new Date().toISOString(),
+    createdAt: doc.createdAt?.toISOString?.() || new Date().toISOString(),
     processedAt: doc.processedAt?.toISOString(),
   };
 }
 
 class MongoJobQueue {
-  async add(type: string, payload: any, maxAttempts = 3): Promise<Job> {
+  async add(type: string, payload: Record<string, unknown>, maxAttempts = 3): Promise<Job> {
     const doc = await JobModel.create({ type, payload, maxAttempts });
     return toJob(doc);
   }
 
-  async getPending(): Promise<Job[]> {
-    const docs = await JobModel.find({ status: "pending" }).sort({ createdAt: 1 }).limit(10).lean();
-    return docs.map((d) => toJob(d as any));
+  async getPending(limit: number = 10): Promise<Job[]> {
+    const docs = await JobModel.find({ status: "pending" }).sort({ createdAt: 1 }).limit(limit).lean();
+    return docs.map((d) => toJob(d as IJob & { createdAt?: Date }));
   }
 
   async markProcessing(id: string): Promise<Job | null> {
@@ -49,32 +49,45 @@ class MongoJobQueue {
     return doc ? toJob(doc) : null;
   }
 
-  async markCompleted(id: string, result?: any): Promise<Job | null> {
+  async markCompleted(id: string, result?: unknown): Promise<Job | null> {
     const doc = await JobModel.findByIdAndUpdate(id, { $set: { status: "completed", result } }, { new: true });
     return doc ? toJob(doc) : null;
   }
 
   async markFailed(id: string, error: string): Promise<Job | null> {
-    const doc = await JobModel.findById(id);
+    // Single atomic aggregation pipeline: increment attempts + conditionally set status
+    // No crash window — one DB round-trip, one atomic write
+    // Source: MongoDB docs recommend single findOneAndUpdate over multi-step read-modify-write
+    const doc = await JobModel.findByIdAndUpdate(
+      id,
+      [
+        { $set: {
+          error,
+          attempts: { $add: ["$attempts", 1] },
+        }},
+        { $set: {
+          status: {
+            $cond: {
+              if: { $gte: [{ $add: ["$attempts", 1] }, "$maxAttempts"] },
+              then: "dead",
+              else: "pending",
+            },
+          },
+        }},
+      ],
+      { new: true, updatePipeline: true },
+    );
     if (!doc) return null;
 
-    const attempts = doc.attempts + 1;
-    // Dead-letter: move to "dead" after maxAttempts
-    const status = attempts >= doc.maxAttempts ? "dead" : "pending";
-    if (status === "dead") {
-      logger.warn({ jobId: id, type: doc.type, attempts }, "Job moved to dead-letter queue");
+    if (doc.status === "dead") {
+      logger.warn({ jobId: id, type: doc.type, attempts: doc.attempts }, "Job moved to dead-letter queue");
     }
-    const updated = await JobModel.findByIdAndUpdate(
-      id,
-      { $set: { status, error, attempts } },
-      { new: true },
-    );
-    return updated ? toJob(updated) : null;
+    return toJob(doc);
   }
 
   async getDeadLetterJobs(): Promise<Job[]> {
     const docs = await JobModel.find({ status: "dead" }).sort({ updatedAt: -1 }).limit(50).lean();
-    return docs.map((d) => toJob(d as any));
+    return docs.map((d) => toJob(d as IJob & { createdAt?: Date }));
   }
 
   async retryDeadJob(id: string): Promise<Job | null> {
@@ -86,10 +99,36 @@ class MongoJobQueue {
     return doc ? toJob(doc) : null;
   }
 
+  async recoverStuckJobs(timeoutMs: number = 5 * 60 * 1000): Promise<number> {
+    const cutoff = new Date(Date.now() - timeoutMs);
+    // Only recover jobs that haven't exceeded maxAttempts
+    // Use $expr to compare attempts < maxAttempts
+    const result = await JobModel.updateMany(
+      {
+        status: "processing",
+        processedAt: { $lt: cutoff },
+        $expr: { $lt: ["$attempts", "$maxAttempts"] },
+      },
+      { $set: { status: "pending" }, $inc: { attempts: 1 } }
+    );
+
+    // Dead-letter jobs that exceeded maxAttempts while stuck
+    await JobModel.updateMany(
+      {
+        status: "processing",
+        processedAt: { $lt: cutoff },
+        $expr: { $gte: ["$attempts", "$maxAttempts"] },
+      },
+      { $set: { status: "dead" } }
+    );
+
+    return result.modifiedCount;
+  }
+
   async cleanup(olderThanMs = 7 * 24 * 60 * 60 * 1000): Promise<number> {
     const cutoff = new Date(Date.now() - olderThanMs);
     const result = await JobModel.deleteMany({
-      status: { $in: ["completed"] },
+      status: { $in: ["completed", "dead"] },
       updatedAt: { $lt: cutoff },
     });
     return result.deletedCount;

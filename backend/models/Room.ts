@@ -27,6 +27,7 @@ export interface RoomSettings {
 // ── Main interface ─────────────────────────────────────────────────────────────
 
 export interface IRoom extends Document {
+  id: string;
   name: string;
   description: string;
   iconColor: string;
@@ -111,8 +112,9 @@ const roomSchema = new Schema<IRoom>(
     timestamps: true,
     toJSON: {
       virtuals: true,
-      transform(_doc, ret) {
-        ret.id = ret._id.toString();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      transform(_doc: any, ret: any) {
+        ret.id = String(ret._id);
         // Convert memberRoles Map to plain object for JSON
         if (ret.memberRoles instanceof Map) {
           ret.memberRoles = Object.fromEntries(ret.memberRoles);

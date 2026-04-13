@@ -58,5 +58,6 @@ userSchema.index({ status: 1 });               // Online user lookups
 userSchema.index({ roomIds: 1 });               // "Which rooms is user in?"
 // friendCode already has unique:true in schema definition — no duplicate index needed
 userSchema.index({ "friendRequests.from": 1 }); // Pending friend request queries
+userSchema.index({ friendIds: 1 });               // Friend lookups
 
 export const User = mongoose.model<IUser>("User", userSchema);

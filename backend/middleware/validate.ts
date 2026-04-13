@@ -8,7 +8,7 @@ import { ZodSchema } from "zod";
  */
 export function validate(schema: ZodSchema) {
   return (req: Request, _res: Response, next: NextFunction) => {
-    const result = schema.safeParse(req.body);
+    const result = schema.safeParse(req.body ?? {});
     if (!result.success) {
       const issues = result.error.issues.map((e) => ({
         path: e.path.join("."),

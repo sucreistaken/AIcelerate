@@ -1,13 +1,13 @@
 import { logger } from "../utils/logger";
-import { safeGenerate, stripCodeFences, tryParseJSON, getTemperature } from "./aiService";
+import { safeGenerate, getTemperature, tryParseJSON, stripCodeFences } from "./aiService";
 import { LoLink, LoAlignedSegment, LoAlignment } from "../types";
 import { smartTruncate } from "../utils/smartTruncate";
 import { getLangDirective, type SupportedLang } from "../utils/langDirective";
-import { getLesson, upsertLesson } from "../controllers/lessonControllers";
-import { notFound, badRequest, AppError } from "../middleware/errorHandler";
+import { getLesson, upsertLesson } from "./lessonDataService";
+import { notFound, badRequest, unprocessable, AppError } from "../middleware/errorHandler";
 import { SCHEMAS } from "../prompts/schemas";
 
-export function buildCondensedContext(lesson: any): { lecContext: string; sldContext: string } {
+export function buildCondensedContext(lesson: { transcript?: string; slideText?: string; plan?: import("../types").LessonPlan }): { lecContext: string; sldContext: string } {
   const plan = lesson.plan;
   if (!plan) {
     return {
@@ -19,11 +19,11 @@ export function buildCondensedContext(lesson: any): { lecContext: string; sldCon
   if (plan.topic) parts.push(`Topic: ${plan.topic}`);
   if (plan.key_concepts?.length) parts.push(`Key concepts: ${plan.key_concepts.join(", ")}`);
   if (plan.modules?.length) {
-    const modSummary = plan.modules.slice(0, 6).map((m: any) => `- ${m.title || "Module"}: ${m.goal || ""}`).join("\n");
+    const modSummary = plan.modules.slice(0, 6).map((m) => `- ${m.title || "Module"}: ${m.goal || ""}`).join("\n");
     parts.push(`Modules:\n${modSummary}`);
   }
   if (plan.emphases?.length) {
-    const emphSummary = plan.emphases.slice(0, 8).map((e: any) => `- ${e.statement}${e.why ? ` (${e.why})` : ""}`).join("\n");
+    const emphSummary = plan.emphases.slice(0, 8).map((e) => `- ${e.statement}${e.why ? ` (${e.why})` : ""}`).join("\n");
     parts.push(`Professor emphases:\n${emphSummary}`);
   }
   const condensedPlan = parts.join("\n\n");
@@ -49,13 +49,13 @@ export function segmentTranscript(lectureText: string): { index: number; text: s
   return parts.map((text, index) => ({ index, text }));
 }
 
-export const hasAlignment = (plan: any) =>
+export const hasAlignment = (plan: { alignment?: { items?: unknown[]; average_duration_min?: number } } | undefined | null): boolean =>
   !!plan?.alignment?.items?.length &&
   Number.isFinite(plan?.alignment?.average_duration_min ?? NaN);
 
 export function buildLoModulesPrompt(input: {
   transcript: string; slideText: string; learningOutcomes: string[];
-  loAlignment?: LoAlignment; plan?: any; lang?: SupportedLang;
+  loAlignment?: LoAlignment; plan?: import("../types").LessonPlan; lang?: SupportedLang;
 }): string {
   const LEC = smartTruncate(input.transcript, 16000);
   const SLD = smartTruncate(input.slideText, 8000);
@@ -123,9 +123,9 @@ export async function generateLoAlignmentForLesson(
   lang?: SupportedLang
 ): Promise<LoAlignment> {
   const baseSegments = segmentTranscript(lectureText);
-  if (!baseSegments.length) throw new Error("Transcript is empty; cannot generate alignment.");
+  if (!baseSegments.length) throw unprocessable("Transcript is empty; cannot generate alignment");
   const LOs = (learningOutcomes || []).map((t) => String(t || "").trim()).filter(Boolean);
-  if (!LOs.length) throw new Error("Learning Outcomes list is empty.");
+  if (!LOs.length) throw unprocessable("Learning Outcomes list is empty");
   const LO_LIST = LOs.map((lo, i) => `LO${i + 1}: ${lo}`).join("\n");
   const SEGMENTS_JSON = smartTruncate(JSON.stringify(baseSegments.map((s) => ({ index: s.index, text: s.text }))), 12000);
   const SLD = smartTruncate(slidesText || "", 4000);
@@ -161,10 +161,12 @@ ${SLD || "—"}
 
   const result = await safeGenerate({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: 4000, temperature: getTemperature("structured"), responseMimeType: "application/json", responseSchema: SCHEMAS.LO_ALIGNMENT } as any,
+    generationConfig: { maxOutputTokens: 4000, temperature: getTemperature("structured"), responseMimeType: "application/json", responseSchema: SCHEMAS.LO_ALIGNMENT as import("@google/generative-ai").ResponseSchema },
   }, { label: "lo_alignment", timeoutMs: 60_000 });
-  const parsed = JSON.parse(result.response.text());
-  if (!parsed?.segments || !Array.isArray(parsed.segments)) throw new Error("LO alignment JSON parse/schema error");
+  const rawAlignText = result.response.text();
+  const parsed = tryParseJSON(rawAlignText) ?? tryParseJSON(stripCodeFences(rawAlignText));
+  if (!parsed) throw new AppError(500, "AI response parse error", "LLM_PARSE_ERROR");
+  if (!parsed?.segments || !Array.isArray(parsed.segments)) throw new AppError(500, "LO alignment JSON/schema error", "LLM_PARSE_ERROR");
 
   const linksByIndex = new Map<number, LoLink[]>();
   for (const item of parsed.segments) {
@@ -191,7 +193,7 @@ export async function generateLoModules(
   lessonId: string,
   forceRegen: boolean = false,
   lang?: SupportedLang
-): Promise<{ modules: any[]; cached: boolean }> {
+): Promise<{ modules: import("../types/lesson").LoStudyModule[]; cached: boolean }> {
   const lesson = getLesson(lessonId);
   if (!lesson) throw notFound("Lesson not found");
 
@@ -208,20 +210,22 @@ export async function generateLoModules(
   });
   const result = await safeGenerate({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: 6000, temperature: getTemperature("balanced"), responseMimeType: "application/json", responseSchema: SCHEMAS.LO_MODULES } as any,
+    generationConfig: { maxOutputTokens: 6000, temperature: getTemperature("balanced"), responseMimeType: "application/json", responseSchema: SCHEMAS.LO_MODULES as import("@google/generative-ai").ResponseSchema },
   }, { label: "lo_modules", timeoutMs: 60_000 });
-  const j = JSON.parse(result.response.text());
+  const rawModText = result.response.text();
+  const j = tryParseJSON(rawModText) ?? tryParseJSON(stripCodeFences(rawModText));
+  if (!j) throw new AppError(500, "AI response parse error", "LLM_PARSE_ERROR");
   if (!j?.modules || !Array.isArray(j.modules)) {
     throw new AppError(500, "LO modules JSON/schema error", "LLM_PARSE_ERROR");
   }
 
   const loModules = { lessonId, modules: j.modules };
-  upsertLesson({ id: lessonId, loModules });
+  await upsertLesson({ id: lessonId, loModules });
   logger.info(`[AI] LO_MODULES | lessonId=${lessonId}`);
   return { modules: loModules.modules, cached: false };
 }
 
-export async function generateAlignmentOnly(lectureText: string, slidesText: string, lang?: SupportedLang) {
+export async function generateAlignmentOnly(lectureText: string, slidesText: string, _lang?: SupportedLang) {
   const LEC = smartTruncate(lectureText, 18000);
   const SLD = smartTruncate(slidesText, 18000);
 
@@ -255,9 +259,10 @@ ${SLD}
 
   const result = await safeGenerate({
     contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: 4000, temperature: getTemperature("structured"), responseMimeType: "application/json", responseSchema: SCHEMAS.PLAN_ALIGNMENT } as any,
+    generationConfig: { maxOutputTokens: 4000, temperature: getTemperature("structured"), responseMimeType: "application/json", responseSchema: SCHEMAS.PLAN_ALIGNMENT as import("@google/generative-ai").ResponseSchema },
   }, { label: "alignment_only", timeoutMs: 60_000 });
-  const j = JSON.parse(result.response.text());
-  if (!j) throw new Error("Alignment JSON parse error");
+  const rawAlignOnlyText = result.response.text();
+  const j = tryParseJSON(rawAlignOnlyText) ?? tryParseJSON(stripCodeFences(rawAlignOnlyText));
+  if (!j) throw new AppError(500, "AI response parse error", "LLM_PARSE_ERROR");
   return j;
 }

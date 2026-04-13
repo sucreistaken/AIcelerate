@@ -14,7 +14,7 @@ export const authController = {
     // Set refresh token as HttpOnly cookie, remove from response body
     setRefreshTokenCookie(res, result.refreshToken);
     const { refreshToken: _rt, ...safeResult } = result;
-    res.status(201).json(safeResult);
+    res.status(201).json({ ok: true, ...safeResult });
   }),
 
   login: asyncHandler(async (req: AuthRequest, res: Response) => {
@@ -24,7 +24,7 @@ export const authController = {
 
     setRefreshTokenCookie(res, result.refreshToken);
     const { refreshToken: _rt, ...safeResult } = result;
-    res.json(safeResult);
+    res.json({ ok: true, ...safeResult });
   }),
 
   refresh: asyncHandler(async (req: AuthRequest, res: Response) => {
@@ -37,7 +37,7 @@ export const authController = {
     // Set new rotated refresh token cookie
     setRefreshTokenCookie(res, result.refreshToken);
     const { refreshToken: _rt, ...safeResult } = result;
-    res.json(safeResult);
+    res.json({ ok: true, ...safeResult });
   }),
 
   logout: asyncHandler(async (req: AuthRequest, res: Response) => {
@@ -57,21 +57,21 @@ export const authController = {
 
   me: asyncHandler(async (req: AuthRequest, res: Response) => {
     const user = await authService.getUser(req.user!.userId);
-    res.json({ user });
+    res.json({ ok: true, user });
   }),
 
   changePassword: asyncHandler(async (req: AuthRequest, res: Response) => {
     const { currentPassword, newPassword } = req.body;
     if (!currentPassword || !newPassword) throw badRequest("currentPassword and newPassword are required");
-    const result = await authService.changePassword(req.user!.userId, currentPassword, newPassword);
-    res.json(result);
+    await authService.changePassword(req.user!.userId, currentPassword, newPassword);
+    res.json({ ok: true });
   }),
 
   deleteAccount: asyncHandler(async (req: AuthRequest, res: Response) => {
     const { password } = req.body;
     if (!password) throw badRequest("password is required");
-    const result = await authService.deleteAccount(req.user!.userId, password);
+    await authService.deleteAccount(req.user!.userId, password);
     clearRefreshTokenCookie(res);
-    res.json(result);
+    res.json({ ok: true });
   }),
 };

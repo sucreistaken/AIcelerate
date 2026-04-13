@@ -14,7 +14,7 @@ export const exportService = {
       difficulty: q.difficulty || 'medium',
     }));
 
-    const scores = Object.entries(data.quiz.scores).map(([userId, s]) => ({
+    const scores = Object.entries(data.quiz.scores).map(([_userId, s]) => ({
       nickname: s.nickname,
       correct: s.correct,
       total: s.total,

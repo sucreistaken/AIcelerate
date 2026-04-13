@@ -1,17 +1,18 @@
 import { channelToolRepo, FlashcardItem } from "../repositories/channelToolRepo";
 import { channelService } from "./channelService";
-import { getLesson } from "../controllers/lessonControllers";
+import { getLesson } from "./lessonDataService";
 import { generateId } from "../utils/idGenerator";
+import { badRequest, notFound } from "../middleware/errorHandler";
 
 export async function extractFlashcardsFromLesson(channelId: string): Promise<{
   cards: FlashcardItem[];
   summary: { emphases: number; quickQuiz: number; miniQuiz: number; mustRemember: number; total: number };
 }> {
   const channel = await channelService.getByIdGlobal(channelId);
-  if (!channel.lessonId) throw new Error("No lesson linked");
+  if (!channel.lessonId) throw badRequest("No lesson linked");
 
   const lesson = getLesson(channel.lessonId);
-  if (!lesson) throw new Error("Lesson not found");
+  if (!lesson) throw notFound("Lesson not found");
 
   const data = await channelToolRepo.load(channelId);
   if (!data.flashcards) data.flashcards = { cards: [] };

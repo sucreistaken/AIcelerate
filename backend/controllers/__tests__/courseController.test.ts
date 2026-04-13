@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Course } from "../courseController";
 
+// Ensure env vars are set before any module loads
+vi.hoisted(() => {
+  process.env.GEMINI_API_KEY = process.env.GEMINI_API_KEY || "test-key";
+  process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret-key-32-chars-long!!";
+  process.env.MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/test";
+  process.env.NODE_ENV = "test";
+});
+
 // Mock the cache module — factory must be self-contained (no external refs)
 vi.mock("../../cache", () => {
   const _store = { courses: [] as any[] };
@@ -49,26 +57,18 @@ vi.mock("../../utils/file-Handler", () => ({
   ensureDataFiles: vi.fn(),
 }));
 
-vi.mock("../lessonControllers", () => ({
-  listLessons: vi.fn(() => []),
-  getLesson: vi.fn(() => null),
+vi.mock("../../services/weaknessService", () => ({
+  weaknessService: {
+    getWeaknessForLesson: vi.fn(() => null),
+    getGlobalWeaknessSummary: vi.fn(() => ({ weakTopics: [], strongTopics: [] })),
+  },
 }));
 
-vi.mock("../flashcardController", () => ({
-  getFlashcards: vi.fn(() => []),
-  getDueCards: vi.fn(() => []),
+vi.mock("../../utils/logger", () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), child: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })) },
 }));
 
-vi.mock("../connectionsController", () => ({
-  getConnections: vi.fn(() => []),
-}));
-
-vi.mock("../weaknessController", () => ({
-  getGlobalWeaknessSummary: vi.fn(() => ({ weakTopics: [], strongTopics: [] })),
-  getWeaknessForLesson: vi.fn(() => null),
-}));
-
-// Import after mocks
+// Import after mocks — re-exports come through from courseDataService
 import {
   createCourse,
   getCourse,

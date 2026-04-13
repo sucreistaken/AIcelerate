@@ -5,7 +5,7 @@ import { spawn } from "child_process";
 import readline from "readline";
 import { EventEmitter } from "events";
 import { env } from "../config/env";
-import { getLesson, upsertLesson } from "../controllers/lessonControllers";
+import { getLesson, upsertLesson } from "./lessonDataService";
 import { safeGenerate } from "./aiService";
 import { uid } from "../utils/idGenerator";
 import { AppError } from "../middleware/errorHandler";
@@ -61,7 +61,7 @@ export function startTranscriptionJob(file: Express.Multer.File, lessonId?: stri
     } catch { }
   });
 
-  proc.on("close", (code) => {
+  proc.on("close", async (code) => {
     clearTimeout(killTimer);
     const job = jobs.get(jobId);
     if (!job) return;
@@ -70,7 +70,7 @@ export function startTranscriptionJob(file: Express.Multer.File, lessonId?: stri
     try { fs.unlinkSync(file.path); } catch { }
     if (lessonId) {
       const existing = getLesson(lessonId);
-      if (existing) upsertLesson({ id: lessonId, transcript: job.transcript });
+      if (existing) await upsertLesson({ id: lessonId, transcript: job.transcript });
     }
     const _cleanup = setTimeout(() => jobs.delete(jobId), 5 * 60 * 1000);
     _cleanup.unref();
@@ -131,11 +131,12 @@ export async function processSlideUpload(file: Express.Multer.File, lessonId: st
         extractedText = await processImageMarkers(extractedText);
 
         const lesson = getLesson(lessonId);
-        if (lesson) upsertLesson({ id: lessonId, slideText: extractedText });
+        if (lesson) await upsertLesson({ id: lessonId, slideText: extractedText });
 
         resolve(extractedText);
-      } catch (err: any) {
-        reject(new AppError(500, `Internal processing error: ${err.message}`));
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        reject(new AppError(500, `Internal processing error: ${message}`));
       }
     });
   });
@@ -185,26 +186,27 @@ async function analyzeWithRetry(imgPath: string, fn: (p: string) => Promise<stri
   for (let attempt = 0; attempt < IMG_MAX_RETRIES; attempt++) {
     try {
       return await fn(imgPath);
-    } catch (err: any) {
-      const status = err?.status ?? err?.httpCode ?? 0;
+    } catch (err: unknown) {
+      const errObj = err as Record<string, unknown>;
+      const status = (typeof errObj?.status === "number" ? errObj.status : typeof errObj?.httpCode === "number" ? errObj.httpCode : 0) as number;
       const isRetryable = status === 429 || status >= 500;
       if (!isRetryable || attempt === IMG_MAX_RETRIES - 1) throw err;
 
       // Use API-suggested delay for 429, exponential backoff otherwise
-      const apiDelay = status === 429 ? parseRetryDelay(err) : 0;
+      const apiDelay = status === 429 ? parseRetryDelay(errObj) : 0;
       const delay = apiDelay || 2000 * Math.pow(2, attempt);
       logger.warn(`[AI Analysis] Retry ${attempt + 1}/${IMG_MAX_RETRIES} for ${path.basename(imgPath)} in ${delay}ms`);
       await new Promise(r => setTimeout(r, delay));
     }
   }
-  throw new Error("Unreachable");
+  throw new AppError(500, "Unreachable: retry loop exited unexpectedly", "INTERNAL_ERROR");
 }
 
-function parseRetryDelay(err: any): number {
+function parseRetryDelay(err: Record<string, unknown>): number {
   try {
-    const details = err?.errorDetails ?? [];
+    const details = (err?.errorDetails ?? []) as Array<Record<string, unknown>>;
     for (const d of details) {
-      if (d?.["@type"]?.includes("RetryInfo") && d.retryDelay) {
+      if (typeof d?.["@type"] === "string" && d["@type"].includes("RetryInfo") && d.retryDelay) {
         const seconds = parseInt(String(d.retryDelay).replace(/s$/, ""), 10);
         if (seconds > 0) return seconds * 1000;
       }

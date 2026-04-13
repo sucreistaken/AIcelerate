@@ -135,7 +135,7 @@ Grade ALL answers from CONTEXT only. Rubric: correct|partial|incorrect. Each: fe
 
 export function buildChatContext(
   lessonTitle: string, courseName: string | undefined, courseBlock: string | undefined,
-  modules: any[], emphases: any[], deviationSummary: string,
+  modules: { title?: string; name?: string; goal?: string }[], emphases: { statement?: string; why?: string }[], deviationSummary: string,
   loSummary: string, cheatSheetHighlights: string, cheatSheetFormulas: string,
   lessonContentBlock: string, crossLessonBlock: string | undefined,
   progressBlock: string | undefined
@@ -147,10 +147,10 @@ Title: ${lessonTitle}
 Course: ${courseName || 'N/A'}
 
 === KEY TOPICS (Modules) ===
-${modules.slice(0, 6).map((m: any, i: number) => `${i + 1}. ${m.title || m.name || 'Topic'}: ${m.goal || ''}`).join('\n') || 'Not available'}
+${modules.slice(0, 6).map((m, i) => `${i + 1}. ${m.title || m.name || 'Topic'}: ${m.goal || ''}`).join('\n') || 'Not available'}
 
 === PROFESSOR EMPHASES ===
-${emphases.slice(0, 6).map((e: any) => `• ${e.statement || e}${e.why ? ` → ${e.why}` : ''}`).join('\n') || 'None recorded'}
+${emphases.slice(0, 6).map((e) => `• ${e.statement || ''}${e.why ? ` → ${e.why}` : ''}`).join('\n') || 'None recorded'}
 
 ${deviationSummary ? `=== LECTURE DEVIATIONS ===\n${deviationSummary}\n` : ''}
 ${loSummary ? `=== LEARNING OUTCOMES COVERED ===\n${loSummary}\n` : ''}

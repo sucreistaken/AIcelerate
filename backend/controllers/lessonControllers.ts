@@ -1,320 +1,101 @@
 // controllers/lessonControllers.ts
-import path from "path";
-import { readJSON, writeJSON, ensureDataFiles } from "../utils/file-Handler";
-import { lessonCache, invalidateLessonCaches } from "../cache";
-// Lazy import to avoid circular dependency (contextAssembler → channelService → env)
-let _invalidateCache: ((lessonId: string) => void) | null = null;
-function getInvalidateCache() {
-  if (!_invalidateCache) {
-    try {
-      _invalidateCache = require("./contextAssembler").invalidateToolContextCache;
-    } catch {
-      _invalidateCache = () => {};
+// HTTP-only controller — parse req, call service, send res.
+// Business logic lives in services/lessonDataService.ts.
+
+import { Response } from "express";
+import { AuthRequest } from "../middleware/auth";
+import { asyncHandler } from "../utils/asyncHandler";
+import { notFound } from "../middleware/errorHandler";
+import {
+  getLesson, listLessonsForUser, listLessonsPaginatedForUser,
+  upsertLesson, updateProgress, deleteLesson, getMemory,
+} from "../services/lessonDataService";
+import {
+  getCourseForLesson, removeLessonFromCourse, rebuildKnowledgeIndex,
+} from "../services/courseDataService";
+import type { PlanModule } from "../types";
+
+// Re-export types so existing consumers don't break
+export type { Lesson, Emphasis, LoStudyModule, LessonLoModules, CheatSheet } from "../types/lesson";
+
+// Re-export service functions for backward compat (non-HTTP consumers)
+export {
+  listLessons, listLessonsPaginated, getLessons, getLesson, getMemory,
+  addLesson, upsertLesson, attachQuizPack, setQuizScore, updateProgress, deleteLesson,
+} from "../services/lessonDataService";
+
+// ── HTTP Handlers ───────────────────────────────────────────────────────────
+
+export const lessonController = {
+  list: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const cursor = req.query.cursor as string | undefined;
+    const limit = Math.min(Math.max(1, Number(req.query.limit) || 20), 100);
+    if (!cursor && !req.query.limit) {
+      return res.json({ ok: true, lessons: listLessonsForUser(userId) });
     }
-  }
-  return _invalidateCache!;
-}
-import type { LessonPlan, LoAlignment, DeviationResult, MindmapCache, MindmapModuleCacheEntry } from "../types";
-import type { CheatSheet } from "../types";
+    res.json({ ok: true, ...listLessonsPaginatedForUser(userId, cursor, limit) });
+  }),
 
-// ---- Tipler ----
-export type Emphasis = {
-  statement: string;
-  why: string;
-  in_slides?: boolean;
-  evidence?: string;
-  confidence?: number; // 0..1
-};
-
-type QuizQA = { question: string; answer?: string };
-// LO bazlı çalışma modülleri (backend versiyonu)
-export type LoStudyModule = {
-  loId: string;
-  loTitle: string;
-  oneLineGist: string;
-  coreIdeas: string[];
-  mustRemember: string[];
-  intuitiveExplanation: string;
-  examples: {
-    label: string;
-    description: string;
-  }[];
-  typicalQuestions: string[];
-  commonTraps: string[];
-  miniQuiz: {
-    question: string;
-    answer: string;
-    why: string;
-  }[];
-  recommended_study_time_min: number;
-};
-
-export type LessonLoModules = {
-  lessonId: string;
-  modules: LoStudyModule[];
-};
-export type { CheatSheet } from "../types";
-export type Lesson = {
-  id: string;
-  title: string;
-  date: string;                 // ISO string
-  transcript: string;
-  slideText: string;
-  plan?: LessonPlan;
-  summary?: string;
-  highlights?: string[];
-  professorEmphases?: Emphasis[];
-  // Eski şema ile uyumluluk için (opsiyonel):
-  quiz?: QuizQA[];
-  cheatSheet?: CheatSheet;
-  // Yeni quiz paket modeli:
-  quizPacks?: Array<{ packId: string; createdAt: string; lastScore?: number }>;
-
-  // Ders bazında ilerleme:
-  progress?: { lastMode?: string; percent?: number };
-
-  // Zaman damgaları:
-  createdAt?: string;      // ISO string
-  updatedAt?: string;
-  courseId?: string;             // linked course ID
-  courseCode?: string;          // "MATH 153" gibi
-  learningOutcomes?: string[];  // IEU'den çekilen resmi LO listesi
-
-  loAlignment?: LoAlignment;
-  loModules?: LessonLoModules;
-
-  mindmapCache?: MindmapCache;
-  mindmapModuleCache?: { [moduleIndex: string]: MindmapModuleCacheEntry };
-  deviation?: DeviationResult;
-
-  // Compact AI digest (generated after plan creation)
-  digest?: import("../services/lessonDigestService").LessonDigest;
-
-  // Confidence scores for AI-generated artifacts (OPT-15)
-  planConfidence?: import("../types").ConfidenceScore;
-  cheatSheetConfidence?: import("../types").ConfidenceScore;
-};
-
-type GlobalMemory = {
-  recurringConcepts: string[];
-  recentEmphases: Array<Pick<Emphasis, "statement" | "why" | "confidence">>;
-  lastUpdated: string; // ISO
-};
-
-// ---- Yollar ----
-const DATA_DIR = path.join(process.cwd(), "backend", "data");
-const MEMORY_PATH = path.join(DATA_DIR, "memory.json");
-
-// Başlangıç dosyalarını garanti altına al
-ensureDataFiles([
-  { path: MEMORY_PATH, initial: { recurringConcepts: [], recentEmphases: [], lastUpdated: new Date().toISOString() } }
-]);
-
-// ---- Yardımcılar (now backed by DataCache — O(1) reads, debounced writes) ----
-function loadLessons(): Lesson[] {
-  return lessonCache.getAll();
-}
-
-function saveLessons(list: Lesson[]) {
-  lessonCache.setAll(list);
-}
-
-function loadMemory(): GlobalMemory {
-  return (
-    readJSON<GlobalMemory>(MEMORY_PATH) || {
-      recurringConcepts: [],
-      recentEmphases: [],
-      lastUpdated: new Date().toISOString(),
+  getById: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const lesson = getLesson(req.params.id);
+    if (!lesson || (lesson.userId && lesson.userId !== req.user!.userId)) {
+      throw notFound("Lesson not found");
     }
-  );
-}
+    res.json({ ok: true, lesson });
+  }),
 
-function saveMemory(mem: GlobalMemory) {
-  mem.lastUpdated = new Date().toISOString();
-  writeJSON(MEMORY_PATH, mem);
-}
+  create: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const result = await upsertLesson({ ...req.body, userId: req.user!.userId });
+    res.status(201).json({ ok: true, lesson: result });
+  }),
 
-// Bir ders üzerinden global memory'yi güncelle
-function updateGlobalMemoryFromLesson(stamped: Lesson) {
-  const memory = loadMemory();
-
-  (stamped.highlights || []).forEach((h) => {
-    if (h && !memory.recurringConcepts.includes(h)) memory.recurringConcepts.push(h);
-  });
-
-  if (stamped.professorEmphases?.length) {
-    for (const e of stamped.professorEmphases) {
-      memory.recentEmphases.unshift({
-        statement: e.statement,
-        why: e.why,
-        confidence: e.confidence,
-      });
+  updateProgress: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const existing = getLesson(req.params.id);
+    if (!existing || (existing.userId && existing.userId !== req.user!.userId)) {
+      throw notFound("Lesson not found");
     }
-    // Kuyruk: en fazla 20 son vurgu
-    memory.recentEmphases = memory.recentEmphases.slice(0, 20);
-  }
+    const updated = updateProgress(req.params.id, req.body);
+    if (!updated) throw notFound("Lesson not found");
+    res.json({ ok: true, lesson: updated });
+  }),
 
-  saveMemory(memory);
-}
-
-// ---- Okuma Fonksiyonları ----
-export function listLessons(): Lesson[] {
-  return loadLessons();
-}
-
-export function listLessonsPaginated(cursor?: string, limit = 20): { items: Lesson[]; nextCursor: string | null; hasMore: boolean } {
-  const all = loadLessons();
-  let startIdx = 0;
-  if (cursor) {
-    const idx = all.findIndex((l) => l.id === cursor);
-    if (idx >= 0) startIdx = idx + 1;
-  }
-  const sliced = all.slice(startIdx, startIdx + limit + 1);
-  const hasMore = sliced.length > limit;
-  const items = hasMore ? sliced.slice(0, limit) : sliced;
-  const last = items[items.length - 1];
-  return { items, nextCursor: hasMore && last ? last.id : null, hasMore };
-}
-
-// Geriye dönük uyumluluk (eski isim):
-export const getLessons = (): Lesson[] => listLessons();
-
-export function getLesson(id: string): Lesson | null {
-  return lessonCache.get(id);
-}
-
-export const getMemory = (): GlobalMemory => loadMemory();
-
-// ---- Yazma/Update Fonksiyonları ----
-
-// Eski API ile uyumluluk: addLesson (oluşturur + memory günceller)
-export const addLesson = (lesson: Lesson) => {
-  const stamped: Lesson = {
-    ...lesson,
-    createdAt: lesson.createdAt ?? new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-  lessonCache.set(stamped); // O(1) + debounced flush
-
-  updateGlobalMemoryFromLesson(stamped);
-  return stamped;
-};
-
-// Yeni API: upsert (varsa günceller, yoksa oluşturur) + memory günceller
-export function upsertLesson(newL: Partial<Lesson> & { id?: string }): Lesson {
-  let l: Lesson;
-
-  if (newL.id) {
-    const existing = lessonCache.get(newL.id);
-    if (existing) {
-      // Güncelle
-      l = {
-        ...existing,
-        ...newL,
-        updatedAt: new Date().toISOString(),
-      } as Lesson;
-
-      // Varsayılan boş alanlar:
-      l.transcript = l.transcript ?? "";
-      l.slideText = l.slideText ?? "";
-      l.highlights = l.highlights ?? [];
-      l.professorEmphases = l.professorEmphases ?? [];
-      l.quizPacks = l.quizPacks ?? existing.quizPacks ?? [];
-      l.progress = { ...(existing.progress || {}), ...(newL.progress || {}) };
-    } else {
-      // Yoksa oluştur
-      l = {
-        id: newL.id,
-        title: newL.title || "Untitled Lecture",
-        date: newL.date || new Date().toISOString(),
-        transcript: newL.transcript || "",
-        slideText: newL.slideText || "",
-        plan: newL.plan,
-        summary: newL.summary,
-        highlights: newL.highlights || [],
-        professorEmphases: newL.professorEmphases || [],
-        quiz: newL.quiz || [],
-        quizPacks: newL.quizPacks || [],
-        progress: newL.progress || { lastMode: "alignment", percent: 0 },
-        createdAt: newL.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+  remove: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const lesson = getLesson(req.params.id);
+    if (!lesson || (lesson.userId && lesson.userId !== req.user!.userId)) {
+      throw notFound("Lesson not found");
     }
-  } else {
-    // Yeni kayıt oluştur
-    const id = "lec-" + Date.now();
-    l = {
-      id,
-      title: newL.title || "Untitled Lecture",
-      date: newL.date || new Date().toISOString(),
-      transcript: newL.transcript || "",
-      slideText: newL.slideText || "",
-      plan: newL.plan,
-      summary: newL.summary,
-      highlights: newL.highlights || [],
-      professorEmphases: newL.professorEmphases || [],
-      quiz: newL.quiz || [],
-      quizPacks: newL.quizPacks || [],
-      progress: newL.progress || { lastMode: "alignment", percent: 0 },
-      createdAt: newL.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+    const course = getCourseForLesson(req.params.id);
+    if (course) {
+      removeLessonFromCourse(course.id, req.params.id);
+      rebuildKnowledgeIndex(course.id);
+    }
+    if (!deleteLesson(req.params.id)) throw notFound("Lesson not found");
+    res.json({ ok: true, deleted: req.params.id });
+  }),
+
+  getMemory: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const mem = await getMemory(req.user!.userId);
+    res.json({ ok: true, memory: mem });
+  }),
+
+  getModules: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const lesson = getLesson(req.params.id);
+    if (!lesson?.plan || (lesson.userId && lesson.userId !== req.user!.userId)) {
+      throw notFound("Lesson not found");
+    }
+    const modules = (lesson.plan.modules || []).map((m: PlanModule, i: number) => ({
+      id: i,
+      title: m.title || m.name || `Module ${i + 1}`,
+      topics: (m.topics || m.content || []).slice(0, 5).map(
+        (t) => typeof t === "string" ? t : (t.title || t.name || "Topic")
+      ),
+    }));
+    const allModulesOption = {
+      id: -1,
+      title: "Tüm Modüller (Genel Bakış)",
+      topics: modules.slice(0, 4).map((m) => m.title),
     };
-  }
-
-  lessonCache.set(l); // O(1) memory write + debounced async disk flush
-  // Invalidate context & computed caches
-  getInvalidateCache()(l.id);
-  invalidateLessonCaches(l.id);
-  // Memory'yi ders içeriğine göre güncelle
-  updateGlobalMemoryFromLesson(l);
-  return l;
-}
-
-// Quiz paketi iliştirme
-export function attachQuizPack(lessonId: string, packId: string) {
-  const lesson = lessonCache.get(lessonId);
-  if (!lesson) return;
-
-  const lp = lesson.quizPacks || [];
-  lp.push({ packId, createdAt: new Date().toISOString() });
-  lessonCache.set({ ...lesson, quizPacks: lp, updatedAt: new Date().toISOString() });
-  invalidateLessonCaches(lessonId);
-}
-
-// Quiz skorunu güncelleme
-export function setQuizScore(lessonId: string, packId: string, score: number) {
-  const lesson = lessonCache.get(lessonId);
-  if (!lesson) return;
-
-  const lp = lesson.quizPacks || [];
-  const p = lp.find((x: any) => x.packId === packId);
-  if (p) p.lastScore = score;
-
-  lessonCache.set({ ...lesson, quizPacks: lp, updatedAt: new Date().toISOString() });
-  invalidateLessonCaches(lessonId);
-}
-
-// İlerleme güncelleme (ders bazında durum saklama)
-export function updateProgress(
-  lessonId: string,
-  progress: Partial<Lesson["progress"]>
-) {
-  const lesson = lessonCache.get(lessonId);
-  if (!lesson) return null;
-
-  const updated = {
-    ...lesson,
-    progress: { ...(lesson.progress || {}), ...progress },
-    updatedAt: new Date().toISOString(),
-  };
-  lessonCache.set(updated);
-  invalidateLessonCaches(lessonId);
-  return updated;
-}
-
-// Ders silme
-export function deleteLesson(lessonId: string): boolean {
-  const deleted = lessonCache.delete(lessonId);
-  if (deleted) invalidateLessonCaches(lessonId);
-  return deleted;
-}
+    res.json({ ok: true, lessonTitle: lesson.title || "Lesson", modules: [allModulesOption, ...modules] });
+  }),
+};

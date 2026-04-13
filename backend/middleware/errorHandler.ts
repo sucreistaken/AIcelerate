@@ -5,10 +5,41 @@ export class AppError extends Error {
   constructor(
     public statusCode: number,
     message: string,
-    public code?: string
+    public code?: string,
+    public isOperational = true,
+    options?: { cause?: unknown }
   ) {
-    super(message);
+    super(message, options);
     this.name = "AppError";
+  }
+}
+
+// AI-specific error subclasses — eliminates fragile string matching
+export class AiTimeoutError extends AppError {
+  constructor(message = "AI response timed out. Please try again.") {
+    super(504, message, "AI_TIMEOUT");
+    this.name = "AiTimeoutError";
+  }
+}
+
+export class AiCircuitOpenError extends AppError {
+  constructor(message = "AI service temporarily unavailable. Please try again later.") {
+    super(503, message, "AI_CIRCUIT_OPEN");
+    this.name = "AiCircuitOpenError";
+  }
+}
+
+export class AiRateLimitedError extends AppError {
+  constructor(message = "AI rate limit exceeded. Please wait a moment.") {
+    super(429, message, "AI_RATE_LIMITED");
+    this.name = "AiRateLimitedError";
+  }
+}
+
+export class AiContentFilteredError extends AppError {
+  constructor(message = "Content was blocked by AI safety filter.") {
+    super(422, message, "AI_CONTENT_FILTERED");
+    this.name = "AiContentFilteredError";
   }
 }
 
@@ -58,7 +89,7 @@ export function gatewayTimeout(msg = "Gateway timeout") {
 
 export function tooManyRequests(msg = "Too many requests", retryAfterSec?: number) {
   const err = new AppError(429, msg, "RATE_LIMITED");
-  if (retryAfterSec) (err as any).retryAfter = retryAfterSec;
+  if (retryAfterSec) Object.assign(err, { retryAfter: retryAfterSec });
   return err;
 }
 
@@ -69,14 +100,27 @@ export function serviceUnavailable(msg = "Service temporarily unavailable") {
 export function errorHandler(err: Error, req: Request, res: Response, _next: NextFunction) {
   if (res.headersSent) return;
 
-  // Attach requestId for traceability
-  const requestId = (req as any).requestId;
+  // Attach requestId for traceability (set by requestContext middleware)
+  const requestId = req.requestId;
 
   if (err instanceof AppError) {
     res.status(err.statusCode).json({
       ok: false,
       error: err.message,
       code: err.code,
+      ...(requestId && { requestId }),
+    });
+    return;
+  }
+
+  // Handle HTTP errors from Express/body-parser (SyntaxError, PayloadTooLargeError, etc.)
+  // These have statusCode + expose set by the middleware that created them.
+  const httpErr = err as unknown as Record<string, unknown>;
+  if (typeof httpErr.statusCode === "number" && httpErr.expose === true) {
+    res.status(httpErr.statusCode as number).json({
+      ok: false,
+      error: err.message,
+      code: httpErr.statusCode === 413 ? "PAYLOAD_TOO_LARGE" : "BAD_REQUEST",
       ...(requestId && { requestId }),
     });
     return;
@@ -94,62 +138,38 @@ export function errorHandler(err: Error, req: Request, res: Response, _next: Nex
     return;
   }
 
-  // Handle AI-specific errors
-  if (err.message === "AI_TIMEOUT") {
-    res.status(504).json({
+  // Handle AI-specific errors via class hierarchy (no fragile string matching)
+  if (
+    err instanceof AiTimeoutError ||
+    err instanceof AiCircuitOpenError ||
+    err instanceof AiRateLimitedError ||
+    err instanceof AiContentFilteredError
+  ) {
+    res.status(err.statusCode).json({
       ok: false,
-      error: "AI yanıt süresi aşıldı. Lütfen tekrar deneyin.",
-      code: "AI_TIMEOUT",
-      ...(requestId && { requestId }),
-    });
-    return;
-  }
-
-  if (err.message === "AI_CIRCUIT_OPEN") {
-    res.status(503).json({
-      ok: false,
-      error: "AI servisi geçici olarak devre dışı. Lütfen biraz sonra tekrar deneyin.",
-      code: "AI_CIRCUIT_OPEN",
-      ...(requestId && { requestId }),
-    });
-    return;
-  }
-
-  if (err.message === "AI_RATE_LIMITED") {
-    res.status(429).json({
-      ok: false,
-      error: "AI istek limiti aşıldı. Lütfen biraz bekleyin.",
-      code: "AI_RATE_LIMITED",
-      ...(requestId && { requestId }),
-    });
-    return;
-  }
-
-  if (err.message === "AI_CONTENT_FILTERED") {
-    res.status(422).json({
-      ok: false,
-      error: "AI içerik güvenlik filtresi tarafından engellendi.",
-      code: "AI_CONTENT_FILTERED",
+      error: err.message,
+      code: err.code,
       ...(requestId && { requestId }),
     });
     return;
   }
 
   // Handle Google Generative AI HTTP errors (429, 503, etc.)
-  if ((err as any).status === 429 || (err.message && err.message.includes("429"))) {
+  const errStatus = "status" in err ? (err as Record<string, unknown>).status : undefined;
+  if (errStatus === 429) {
     res.status(429).json({
       ok: false,
-      error: "AI istek limiti aşıldı. Lütfen biraz bekleyin.",
+      error: "AI rate limit exceeded. Please wait a moment.",
       code: "AI_RATE_LIMITED",
       ...(requestId && { requestId }),
     });
     return;
   }
 
-  if ((err as any).status === 503 || (err.message && err.message.includes("503"))) {
+  if (errStatus === 503) {
     res.status(503).json({
       ok: false,
-      error: "AI servisi geçici olarak meşgul. Lütfen tekrar deneyin.",
+      error: "AI service temporarily busy. Please try again.",
       code: "AI_SERVICE_UNAVAILABLE",
       ...(requestId && { requestId }),
     });
@@ -163,7 +183,7 @@ export function errorHandler(err: Error, req: Request, res: Response, _next: Nex
       ok: false,
       error: err.message,
       code: "LLM_PARSE_ERROR",
-      llmText: err.llmText,
+      ...(process.env.NODE_ENV !== "production" && { llmText: err.llmText }),
       ...(requestId && { requestId }),
     });
     return;

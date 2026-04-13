@@ -1,6 +1,8 @@
-import { Channel, IChannel } from "../models/Channel";
+import mongoose from "mongoose";
+import { Channel } from "../models/Channel";
 import { Room } from "../models/Room";
-import { badRequest, notFound, forbidden } from "../middleware/errorHandler";
+import { Message } from "../models/Message";
+import { notFound, forbidden } from "../middleware/errorHandler";
 import { leanArrayToId } from "../config/mongoose-plugins";
 
 export const channelService = {
@@ -35,12 +37,13 @@ export const channelService = {
     lessonId?: string,
     lessonTitle?: string
   ) {
-    const room = await Room.findById(roomId);
+    const room = await Room.findById(roomId).select("ownerId memberRoles roles categories").lean();
     if (!room) throw notFound("Room not found");
 
-    // Check permission
+    // Check permission (lean-safe)
     if (room.ownerId !== userId) {
-      const userRoleIds = room.memberRoles?.get(userId) || [];
+      const memberRoles = room.memberRoles as unknown as Record<string, string[]> | undefined;
+      const userRoleIds = memberRoles?.[userId] || [];
       const hasPermission = room.roles.some(
         (r) => userRoleIds.includes(r.id) && r.permissions.includes("manage_channels")
       );
@@ -48,50 +51,52 @@ export const channelService = {
     }
 
     // Validate category exists
-    const cat = room.categories.find((c) => c.id === categoryId);
+    const cat = room.categories.find((c: { id: string }) => c.id === categoryId);
     if (!cat) throw notFound("Category not found");
 
     const channel = await this.create(roomId, categoryId, name, type, toolType, lessonId, lessonTitle);
 
-    // Add channel to category
-    cat.channelIds.push(channel.id);
-    room.markModified("categories");
-    await room.save();
+    // Add channel to category atomically (no hydration needed)
+    await Room.findOneAndUpdate(
+      { _id: roomId, "categories.id": categoryId },
+      { $push: { "categories.$.channelIds": channel.id } }
+    );
 
     return channel;
   },
 
   async getByServer(roomId: string) {
     const channels = await Channel.find({ roomId }).sort({ order: 1 }).lean();
-    return leanArrayToId(channels).map((ch: any) => ({ ...ch, serverId: ch.roomId }));
+    return leanArrayToId(channels).map((ch) => ({ ...ch, serverId: ch.roomId }));
   },
 
   async getById(roomId: string, channelId: string) {
-    const channel = await Channel.findOne({ _id: channelId, roomId });
+    const channel = await Channel.findOne({ _id: channelId, roomId }).lean();
     if (!channel) throw notFound("Channel not found");
-    return channel.toJSON();
+    return { ...channel, id: String(channel._id), serverId: channel.roomId };
   },
 
   async getByIdGlobal(channelId: string) {
-    const channel = await Channel.findById(channelId);
+    const channel = await Channel.findById(channelId).lean();
     if (!channel) throw notFound("Channel not found");
-    return channel.toJSON();
+    return { ...channel, id: String(channel._id), serverId: channel.roomId };
   },
 
-  async update(roomId: string, channelId: string, userId: string, updates: Record<string, any>) {
-    const room = await Room.findById(roomId);
+  async update(roomId: string, channelId: string, userId: string, updates: Record<string, unknown>) {
+    const room = await Room.findById(roomId).select("ownerId memberRoles roles").lean();
     if (!room) throw notFound("Room not found");
 
     if (room.ownerId !== userId) {
-      const userRoleIds = room.memberRoles?.get(userId) || [];
+      const memberRoles = room.memberRoles as unknown as Record<string, string[]> | undefined;
+      const userRoleIds = memberRoles?.[userId] || [];
       const hasPermission = room.roles.some(
         (r) => userRoleIds.includes(r.id) && r.permissions.includes("manage_channels")
       );
       if (!hasPermission) throw forbidden("Missing permission: manage_channels");
     }
 
-    const safeUpdates: any = {};
-    if (updates.name) safeUpdates.name = updates.name.trim().toLowerCase().replace(/\s+/g, "-");
+    const safeUpdates: Record<string, unknown> = {};
+    if (typeof updates.name === "string") safeUpdates.name = updates.name.trim().toLowerCase().replace(/\s+/g, "-");
     if (updates.lessonId !== undefined) safeUpdates.lessonId = updates.lessonId;
     if (updates.lessonTitle !== undefined) safeUpdates.lessonTitle = updates.lessonTitle;
 
@@ -101,7 +106,7 @@ export const channelService = {
   },
 
   async delete(roomId: string, channelId: string, userId: string) {
-    const room = await Room.findById(roomId);
+    const room = await Room.findById(roomId).select("ownerId memberRoles roles categories");
     if (!room) throw notFound("Room not found");
 
     if (room.ownerId !== userId) {
@@ -117,25 +122,48 @@ export const channelService = {
       cat.channelIds = cat.channelIds.filter((id) => id !== channelId);
     }
     room.markModified("categories");
-    await room.save();
 
-    await Channel.findByIdAndDelete(channelId);
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      await room.save({ session });
+      await Channel.findByIdAndDelete(channelId, { session });
+      // Cascade: soft-delete all messages in the channel
+      await Message.updateMany(
+        { channelId, deleted: false },
+        { $set: { deleted: true, content: "[channel deleted]" } },
+        { session }
+      );
+      await session.commitTransaction();
+    } catch (err) {
+      await session.abortTransaction();
+      throw err;
+    } finally {
+      session.endSession();
+    }
   },
 
-  async touchLastMessage(roomId: string, channelId: string) {
+  async touchLastMessage(_roomId: string, channelId: string) {
     await Channel.findByIdAndUpdate(channelId, { $set: { lastMessageAt: new Date() } });
   },
 
-  async togglePin(roomId: string, channelId: string, messageId: string) {
-    const channel = await Channel.findById(channelId);
-    if (!channel) throw notFound("Channel not found");
+  async togglePin(_roomId: string, channelId: string, messageId: string) {
+    // Try to remove first (atomic — no read needed)
+    const removed = await Channel.findOneAndUpdate(
+      { _id: channelId, pinnedMessageIds: messageId },
+      { $pull: { pinnedMessageIds: messageId } },
+      { new: true }
+    ).lean();
 
-    const isPinned = channel.pinnedMessageIds.includes(messageId);
-    const update = isPinned
-      ? { $pull: { pinnedMessageIds: messageId } }
-      : { $addToSet: { pinnedMessageIds: messageId } };
+    if (removed) return { ...removed, id: String(removed._id), serverId: removed.roomId };
 
-    const updated = await Channel.findByIdAndUpdate(channelId, update, { new: true });
-    return updated!.toJSON();
+    // Not pinned — add it
+    const added = await Channel.findByIdAndUpdate(
+      channelId,
+      { $addToSet: { pinnedMessageIds: messageId } },
+      { new: true }
+    ).lean();
+    if (!added) throw notFound("Channel not found");
+    return { ...added, id: String(added._id), serverId: added.roomId };
   },
 };

@@ -103,7 +103,7 @@ export interface ChannelToolData {
   sprint?: SprintData;
   notes?: NotesData;
   locked?: boolean;
-  lockedBy?: string;
+  lockedBy?: string | null;
 }
 
 // ── MongoDB-backed Repository ──────────────────────────────────────────────────

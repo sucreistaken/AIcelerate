@@ -3,7 +3,7 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface IToolData extends Document {
   channelId: string;
   toolType: string;
-  data: any;
+  data: Record<string, unknown>;
   locked: boolean;
   lockedBy?: string;
   version: number;
@@ -13,7 +13,7 @@ export interface IToolData extends Document {
 
 const toolDataSchema = new Schema<IToolData>(
   {
-    channelId: { type: String, required: true, index: true },
+    channelId: { type: String, required: true },
     toolType: { type: String, required: true },
     data: { type: Schema.Types.Mixed, default: {} },
     locked: { type: Boolean, default: false },

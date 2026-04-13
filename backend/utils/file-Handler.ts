@@ -12,7 +12,7 @@ export const ensureDir = (dirPath: string) => {
 const JSON_CACHE_MAX = 200;
 const jsonCache = new Map<string, { data: unknown; mtime: number }>();
 
-export const readJSON = <T = any>(filePath: string): T | null => {
+export const readJSON = <T = unknown>(filePath: string): T | null => {
   try {
     if (!fs.existsSync(filePath)) return null;
 
@@ -25,12 +25,15 @@ export const readJSON = <T = any>(filePath: string): T | null => {
     const raw = fs.readFileSync(filePath, "utf-8");
     const data = JSON.parse(raw) as T;
 
+    // Re-check mtime after read to detect concurrent modification (TOCTOU safety)
+    const statAfter = fs.statSync(filePath);
+
     // Evict oldest entry if at capacity
     if (jsonCache.size >= JSON_CACHE_MAX && !jsonCache.has(filePath)) {
       const firstKey = jsonCache.keys().next().value;
       if (firstKey !== undefined) jsonCache.delete(firstKey);
     }
-    jsonCache.set(filePath, { data, mtime: stat.mtimeMs });
+    jsonCache.set(filePath, { data, mtime: statAfter.mtimeMs });
     return data;
   } catch (e) {
     logger.error("readJSON error:", e);
@@ -41,7 +44,11 @@ export const readJSON = <T = any>(filePath: string): T | null => {
 export const writeJSON = (filePath: string, data: unknown) => {
   try {
     ensureDir(path.dirname(filePath));
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+    // Atomic write: write to .tmp then rename (no partial writes on crash)
+    const tmpPath = filePath + ".tmp";
+    const indent = process.env.NODE_ENV === "production" ? undefined : 2;
+    fs.writeFileSync(tmpPath, JSON.stringify(data, null, indent), "utf-8");
+    fs.renameSync(tmpPath, filePath);
     // Update cache immediately
     try {
       const stat = fs.statSync(filePath);
@@ -54,7 +61,7 @@ export const writeJSON = (filePath: string, data: unknown) => {
   }
 };
 
-export const ensureDataFiles = (files: Array<{ path: string; initial: any }>) => {
+export const ensureDataFiles = (files: Array<{ path: string; initial: unknown }>) => {
   for (const f of files) {
     ensureDir(path.dirname(f.path));
     if (!fs.existsSync(f.path)) {

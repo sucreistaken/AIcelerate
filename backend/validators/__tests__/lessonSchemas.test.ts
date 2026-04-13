@@ -13,19 +13,19 @@ describe("planFromTextSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("rejects empty lectureText", () => {
+  it("accepts empty lectureText (defaults to empty string)", () => {
     const result = planFromTextSchema.safeParse({
       lectureText: "",
       slidesText: "slides",
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
-  it("rejects missing slidesText", () => {
+  it("accepts missing slidesText (defaults to empty string)", () => {
     const result = planFromTextSchema.safeParse({
       lectureText: "lecture",
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
   it("accepts optional fields", () => {

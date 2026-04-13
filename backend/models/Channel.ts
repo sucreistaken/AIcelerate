@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from "mongoose";
 
 export interface IChannel extends Document {
+  id: string;
   roomId: string;
   categoryId: string;
   name: string;
@@ -32,8 +33,9 @@ const channelSchema = new Schema<IChannel>(
     timestamps: true,
     toJSON: {
       virtuals: true,
-      transform(_doc, ret) {
-        ret.id = ret._id.toString();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      transform(_doc: any, ret: any) {
+        ret.id = String(ret._id);
         ret.serverId = ret.roomId; // Backward compat alias
         delete ret.__v;
         return ret;

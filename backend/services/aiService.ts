@@ -1,12 +1,11 @@
 import { GoogleGenerativeAI, GenerativeModel, GenerateContentRequest } from "@google/generative-ai";
 import { env } from "../config/env";
 import { withAiResilience } from "../utils/aiResilience";
-import { TTLCache } from "../utils/cache";
 import { logger } from "../utils/logger";
-import crypto from "crypto";
+import { AiCircuitOpenError } from "../middleware/errorHandler";
 
 // ── Model management with fallback ──────────────────────────────────────────
-const MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"] as const;
+const MODELS = (process.env.AI_MODELS || "gemini-2.5-flash,gemini-2.0-flash").split(",").map(s => s.trim());
 const modelInstances = new Map<string, GenerativeModel>();
 
 function getModelInstance(modelName: string): GenerativeModel {
@@ -50,26 +49,29 @@ export async function safeGenerate(
         logger.info({ model: modelName, label: options?.label }, "AI call succeeded on fallback model");
       }
 
+      // Extract token usage from Gemini response metadata
+      const usage = result.response?.usageMetadata;
       trackAiCall({
         endpoint: options?.label ?? "generateContent",
-        inputTokensEst: 0,
-        outputTokensEst: 0,
+        inputTokensEst: usage?.promptTokenCount ?? 0,
+        outputTokensEst: usage?.candidatesTokenCount ?? 0,
         latencyMs,
         success: true,
         model: modelName,
       });
 
       return result;
-    } catch (err: any) {
-      lastError = err;
+    } catch (err: unknown) {
+      lastError = err instanceof Error ? err : new Error(String(err));
 
       // Don't fallback on 429 (quota/billing) — another model won't help
-      const is429 = err.status === 429 || err.message?.includes("429");
+      const errRecord = err as Record<string, unknown>;
+      const is429 = errRecord.status === 429;
       // Don't fallback on circuit breaker open — all models share the breaker
-      const isCircuitOpen = err.message === "AI_CIRCUIT_OPEN";
+      const isCircuitOpen = err instanceof AiCircuitOpenError;
 
       if (modelName !== MODELS[MODELS.length - 1] && !is429 && !isCircuitOpen) {
-        logger.warn({ model: modelName, error: err.message, label: options?.label }, "AI model failed, trying fallback");
+        logger.warn({ model: modelName, error: lastError.message, label: options?.label }, "AI model failed, trying fallback");
         continue;
       }
     }
@@ -91,37 +93,13 @@ export async function safeGenerate(
   throw lastError!;
 }
 
-// ── AI Response Cache (deterministic endpoints) ─────────────────────────────
-const aiResponseCache = new TTLCache<string>({ ttlMs: 5 * 60_000, maxSize: 100 });
-
-function hashRequest(request: GenerateContentRequest): string {
-  const content = JSON.stringify(request);
-  return crypto.createHash("sha256").update(content).digest("hex").slice(0, 16);
-}
-
-/**
- * Cached AI generation — use for deterministic endpoints (cheat sheet, quiz, mindmap).
- * DO NOT use for chat (which should always be fresh).
- */
-export async function cachedGenerate(
-  request: GenerateContentRequest,
-  options?: { timeoutMs?: number; label?: string; cacheKey?: string }
-): Promise<string> {
-  const key = options?.cacheKey || hashRequest(request);
-
-  return aiResponseCache.getOrSet(key, async () => {
-    const result = await safeGenerate(request, options);
-    return result.response.text();
-  });
-}
-
 // ── Temperature profiles ──────────────────────────────────────────────────────
 export type ModelProfile = "structured" | "creative" | "balanced";
 
 const TEMPERATURE_MAP: Record<ModelProfile, number> = {
-  structured: 0.1, // Quiz eval, LO alignment, digest
-  creative:   0.7, // Chat, deep-dive, connection
-  balanced:   0.3, // Plan, quiz creation, cheat sheet
+  structured: Number(process.env.AI_TEMP_STRUCTURED || 0.1),
+  creative:   Number(process.env.AI_TEMP_CREATIVE || 0.7),
+  balanced:   Number(process.env.AI_TEMP_BALANCED || 0.3),
 };
 
 export function getTemperature(profile: ModelProfile): number {
@@ -159,7 +137,9 @@ export function getAiMetrics() {
     avgLatencyMs: cumulativeMetrics.totalCalls > 0
       ? Math.round(cumulativeMetrics.totalLatencyMs / cumulativeMetrics.totalCalls)
       : 0,
-    cacheSize: aiResponseCache.size,
+    cacheHitRate: cumulativeMetrics.totalCalls > 0
+      ? cumulativeMetrics.cacheHits / cumulativeMetrics.totalCalls
+      : 0,
     uptime: process.uptime(),
   };
 }

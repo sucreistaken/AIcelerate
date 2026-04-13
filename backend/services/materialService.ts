@@ -1,17 +1,6 @@
-import path from "path";
-import fs from "fs";
-import { badRequest, notFound } from "../middleware/errorHandler";
-import { readJSON, writeJSON, ensureDataFiles } from "../utils/file-Handler";
-
-const UPLOAD_DIR = path.join(process.cwd(), "backend", "data", "materials");
-
-// Ensure upload directory exists
-if (!fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-}
-
-import { generateId as _genId } from "../utils/idGenerator";
-const generateId = () => _genId("mat");
+import { Material } from "../models/Material";
+import { notFound } from "../middleware/errorHandler";
+import { leanToId } from "../config/mongoose-plugins";
 
 interface MaterialData {
   id: string;
@@ -24,49 +13,58 @@ interface MaterialData {
   createdAt: string;
 }
 
-const MATERIALS_FILE = path.join(process.cwd(), "backend", "data", "materials.json");
-
-ensureDataFiles([{ path: MATERIALS_FILE, initial: [] }]);
-
-function readMaterials(): MaterialData[] {
-  return readJSON<MaterialData[]>(MATERIALS_FILE) || [];
+/** Lean representation of a Material document (from .lean() or .toObject()). */
+interface MaterialLeanDoc {
+  _id?: unknown;
+  id?: string;
+  roomId: string;
+  uploadedBy: string;
+  pdfPath?: string;
+  audioPath?: string;
+  transcript?: string;
+  slideText?: string;
+  createdAt?: Date | string;
 }
 
-function writeMaterials(materials: MaterialData[]): void {
-  writeJSON(MATERIALS_FILE, materials);
+/** Convert a lean Mongo document to the MaterialData shape consumers expect. */
+function toMaterialData(doc: MaterialLeanDoc): MaterialData {
+  const normalized = leanToId(doc);
+  return {
+    id: normalized.id,
+    roomId: normalized.roomId,
+    uploadedBy: normalized.uploadedBy,
+    pdfPath: normalized.pdfPath,
+    audioPath: normalized.audioPath,
+    transcript: normalized.transcript,
+    slideText: normalized.slideText,
+    createdAt: normalized.createdAt instanceof Date
+      ? normalized.createdAt.toISOString()
+      : String(normalized.createdAt ?? ""),
+  };
 }
 
 export const materialService = {
   async create(roomId: string, uploadedBy: string): Promise<MaterialData> {
-    const material: MaterialData = {
-      id: generateId(),
-      roomId,
-      uploadedBy,
-      createdAt: new Date().toISOString(),
-    };
-    const materials = readMaterials();
-    materials.push(material);
-    writeMaterials(materials);
-    return material;
+    const doc = await Material.create({ roomId, uploadedBy });
+    return toMaterialData(doc.toObject());
   },
 
   async getByRoom(roomId: string): Promise<MaterialData | null> {
-    const materials = readMaterials();
-    return materials.find((m) => m.roomId === roomId) || null;
+    const doc = await Material.findOne({ roomId }).sort({ createdAt: -1 }).lean();
+    return doc ? toMaterialData(doc) : null;
   },
 
   async getById(id: string): Promise<MaterialData | null> {
-    const materials = readMaterials();
-    return materials.find((m) => m.id === id) || null;
+    const doc = await Material.findById(id).lean();
+    return doc ? toMaterialData(doc) : null;
   },
 
   async update(id: string, data: Partial<MaterialData>): Promise<MaterialData> {
-    const materials = readMaterials();
-    const idx = materials.findIndex((m) => m.id === id);
-    if (idx === -1) throw notFound("Material not found");
-    materials[idx] = { ...materials[idx], ...data };
-    writeMaterials(materials);
-    return materials[idx];
+    // Strip the id field so we don't try to overwrite _id
+    const { id: _ignored, ...updateData } = data;
+    const doc = await Material.findByIdAndUpdate(id, { $set: updateData }, { new: true }).lean();
+    if (!doc) throw notFound("Material not found");
+    return toMaterialData(doc);
   },
 
   async setPdf(id: string, pdfPath: string, slideText?: string): Promise<MaterialData> {
@@ -78,8 +76,6 @@ export const materialService = {
   },
 
   async deleteByRoom(roomId: string): Promise<void> {
-    const materials = readMaterials();
-    const filtered = materials.filter((m) => m.roomId !== roomId);
-    writeMaterials(filtered);
+    await Material.deleteMany({ roomId });
   },
 };

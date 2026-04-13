@@ -1,4 +1,5 @@
 import { logger } from "./logger";
+import { AiCircuitOpenError, AiTimeoutError } from "../middleware/errorHandler";
 
 /**
  * Circuit breaker for AI calls.
@@ -56,10 +57,7 @@ export async function withAiResilience<T>(
   const { timeoutMs = 30_000, maxRetries = 2, label = "AI call" } = options;
 
   if (breaker.isOpen) {
-    throw Object.assign(new Error("AI_CIRCUIT_OPEN"), {
-      statusCode: 503,
-      code: "AI_CIRCUIT_OPEN",
-    });
+    throw new AiCircuitOpenError();
   }
 
   let lastError: Error | null = null;
@@ -73,19 +71,21 @@ export async function withAiResilience<T>(
       clearTimeout(timer);
       breaker.recordSuccess();
       return result;
-    } catch (err: any) {
+    } catch (err: unknown) {
       clearTimeout(timer);
-      lastError = err;
+      lastError = err instanceof Error ? err : new Error(String(err));
 
       // Abort = timeout
-      if (err.name === "AbortError" || controller.signal.aborted) {
+      const errName = err instanceof Error ? err.name : "";
+      if (errName === "AbortError" || controller.signal.aborted) {
         logger.warn({ attempt, label, timeoutMs }, `${label} timed out after ${timeoutMs}ms`);
         breaker.recordFailure();
-        throw Object.assign(new Error("AI_TIMEOUT"), { statusCode: 504, code: "AI_TIMEOUT" });
+        throw new AiTimeoutError();
       }
 
       // Rate limit (429) or service unavailable (503): retry with backoff
-      const status = err.status || err.statusCode || err.httpCode;
+      const errRecord = err as Record<string, unknown>;
+      const status = errRecord.status || errRecord.statusCode || errRecord.httpCode;
       if ((status === 429 || status === 503) && attempt < maxRetries) {
         const backoffMs = Math.min(1000 * Math.pow(2, attempt), 8000);
         logger.warn(
