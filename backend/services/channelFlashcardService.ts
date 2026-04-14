@@ -3,13 +3,14 @@ import {
   channelToolRepo,
   FlashcardItem,
 } from "../repositories/channelToolRepo";
-import { safeGenerate, getTemperature } from "./aiService";
+import { safeGenerate, getTemperature, tryParseJSON, stripCodeFences, extractSafeText } from "./aiService";
 import { SCHEMAS } from "../prompts/schemas";
 import { generateId } from "../utils/idGenerator";
 import { buildToolContext } from "./contextAssemblerService";
 import { getLangDirective, type SupportedLang } from "../utils/langDirective";
 import { sanitizeForPrompt } from "../utils/sanitize";
-import { serviceUnavailable } from "../middleware/errorHandler";
+import { serviceUnavailable, AppError } from "../middleware/errorHandler";
+import { eventBus } from "../events/eventBus";
 export { extractFlashcardsFromLesson } from "./channelFlashcardExtractor";
 
 // ── Flashcards: add manually ────────────────────────────────────────────────
@@ -60,6 +61,7 @@ export async function generateFlashcards(
   }
 
   try {
+    eventBus.emit("ai:status", { channelId, tool: "flashcards", state: "thinking" });
     const toolCtx = await buildToolContext(channelId, "flashcards");
 
     const contextBlock = toolCtx
@@ -90,9 +92,13 @@ ${toolCtx ? `- Flashcards MUST be based on the provided lecture material
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: { maxOutputTokens: 2000, temperature: getTemperature("balanced"), responseMimeType: "application/json", responseSchema: SCHEMAS.CHANNEL_FLASHCARDS as import("@google/generative-ai").ResponseSchema },
     }, { label: "channel_flashcards", timeoutMs: 30_000 });
-    const text = result.response.text();
+    const text = extractSafeText(result.response);
     logger.info(`[AI] CHANNEL_FLASHCARDS | ~${Math.ceil(prompt.length / 4)} in, ~${Math.ceil(text.length / 4)} out | max=2000`);
-    const parsed = JSON.parse(text) as Array<{
+    const parsedRaw = tryParseJSON(text) ?? tryParseJSON(stripCodeFences(text));
+    if (!parsedRaw) {
+      throw new AppError(502, "Flashcards AI response parse error", "AI_PARSE_ERROR");
+    }
+    const parsed = parsedRaw as Array<{
       front: string;
       back: string;
       hint?: string;
@@ -115,9 +121,12 @@ ${toolCtx ? `- Flashcards MUST be based on the provided lecture material
     data.flashcards.cards.push(...newCards);
     await channelToolRepo.save(channelId, data);
 
+    eventBus.emit("ai:status", { channelId, tool: "flashcards", state: "complete" });
     return { cards: newCards, sourcesSummary: toolCtx?.meta.sourcesSummary || null };
   } catch (err) {
     logger.error("channelToolService.generateFlashcards error:", err);
+    eventBus.emit("ai:status", { channelId, tool: "flashcards", state: "error" });
+    if (err instanceof AppError) throw err;
     throw serviceUnavailable("Failed to generate flashcards");
   }
 }

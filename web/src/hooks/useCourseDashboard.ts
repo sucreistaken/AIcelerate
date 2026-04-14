@@ -5,6 +5,7 @@ import { useLessonStore } from "../stores/lessonStore";
 import { useUiStore } from "../stores/uiStore";
 import { useStudySelectionStore } from "../stores/studySelectionStore";
 import { courseApi } from "../services/api";
+import { logger } from "../utils/logger";
 import type { ModeId } from "../types";
 
 const CHAT_STORAGE_PREFIX = "lc.course-chat.";
@@ -39,6 +40,7 @@ export function useCourseDashboard() {
   const [chatLoading, setChatLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>("overview");
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  const chatStreamRef = useRef<AbortController | null>(null);
   const [confirmRebuild, setConfirmRebuild] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmDetach, setConfirmDetach] = useState<{ courseId: string; lessonId: string; title: string } | null>(null);
@@ -90,22 +92,92 @@ export function useCourseDashboard() {
     [setCurrentLessonId, setMode]
   );
 
-  const handleCourseChat = useCallback(async (customMsg?: string) => {
+  const handleCourseChat = useCallback((customMsg?: string) => {
     const msg = (customMsg || chatInput).trim();
     if (!msg || !course) return;
+
+    // Cancel any in-flight stream before starting a new one
+    chatStreamRef.current?.abort();
+
     setChatInput("");
-    setChatHistory((h) => [...h, { role: "user", content: msg }]);
+    // Capture history snapshot before adding the user message so the backend
+    // sees the same conversation context the user saw when sending.
+    const historySnapshot = chatHistory;
+    setChatHistory((h) => [
+      ...h,
+      { role: "user", content: msg },
+      // Optimistic placeholder: chunks stream into the last assistant message.
+      { role: "assistant", content: "" },
+    ]);
     setChatLoading(true);
-    try {
-      const result = await courseApi.courseChat(course.id, msg, chatHistory);
-      if (result.ok && result.text) {
-        setChatHistory((h) => [...h, { role: "assistant", content: result.text!, suggestions: result.suggestions }]);
-      }
-    } catch (err: any) {
-      toast.error("Sohbet hatas\ı: " + (err?.message || "Bilinmeyen hata"));
-    }
-    setChatLoading(false);
+
+    const courseId = course.id;
+    const appendChunk = (chunk: string) => {
+      setChatHistory((h) => {
+        const next = [...h];
+        const last = next[next.length - 1];
+        if (last && last.role === "assistant") {
+          next[next.length - 1] = { ...last, content: last.content + chunk };
+        }
+        return next;
+      });
+    };
+
+    chatStreamRef.current = courseApi.courseChatStream(
+      courseId,
+      msg,
+      historySnapshot.map((h) => ({ role: h.role, content: h.content })),
+      appendChunk,
+      (suggestions) => {
+        setChatHistory((h) => {
+          const next = [...h];
+          const last = next[next.length - 1];
+          if (last && last.role === "assistant") {
+            // Strip the trailing "**Suggested Questions:**" block from the text
+            // if suggestions were extracted — they render separately as chips.
+            let cleaned = last.content;
+            if (suggestions.length > 0) {
+              cleaned = cleaned.replace(/\*\*Suggested Questions:\*\*[\s\S]*$/, "").trimEnd();
+            }
+            next[next.length - 1] = {
+              ...last,
+              content: cleaned,
+              suggestions: suggestions.length > 0 ? suggestions : undefined,
+            };
+          }
+          return next;
+        });
+        setChatLoading(false);
+        chatStreamRef.current = null;
+      },
+      (error) => {
+        logger.warn("Course chat stream error:", error);
+        setChatHistory((h) => {
+          const next = [...h];
+          const last = next[next.length - 1];
+          if (last && last.role === "assistant") {
+            next[next.length - 1] = {
+              ...last,
+              content: last.content
+                ? last.content + "\n\n[Akış kesildi: " + error + "]"
+                : "Sohbet hatası: " + error,
+            };
+          }
+          return next;
+        });
+        toast.error("Sohbet hatası: " + error);
+        setChatLoading(false);
+        chatStreamRef.current = null;
+      },
+    );
   }, [chatInput, course, chatHistory]);
+
+  // Cleanup: cancel in-flight stream on unmount
+  useEffect(() => {
+    return () => {
+      chatStreamRef.current?.abort();
+    };
+  }, []);
 
   const clearChat = useCallback(() => {
     setChatHistory([]);

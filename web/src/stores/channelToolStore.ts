@@ -11,16 +11,30 @@ import type {
 import { channelToolApi } from "../services/channelToolApi";
 import { getCollabSocket } from "../services/socket";
 
+/** AI status event mirrored from the backend over Socket.IO. */
+export type ChannelAiTool = "quiz" | "flashcards" | "mind-map" | "deep-dive";
+export type ChannelAiState = "thinking" | "complete" | "error";
+export interface ChannelAiStatus {
+  tool: ChannelAiTool;
+  state: ChannelAiState;
+  actorId?: string;
+  /** Client-side receipt timestamp (Date.now()). */
+  timestamp: number;
+}
+
 interface ChannelToolState {
   dataByChannel: Record<string, ChannelToolData>;
   loading: Record<string, boolean>;
   /** Per-channel AI pending flag — lives in Zustand so it updates atomically with messages */
   aiPending: Record<string, boolean>;
+  /** Per-channel AI status mirror of backend eventBus "ai:status" events. Null when idle. */
+  aiStatusByChannel: Record<string, ChannelAiStatus | null>;
   error: string | null;
 
   loadToolData: (channelId: string) => Promise<void>;
   setToolData: (channelId: string, data: ChannelToolData) => void;
   setAiPending: (channelId: string, pending: boolean) => void;
+  setAiStatus: (channelId: string, status: ChannelAiStatus | null) => void;
 
   // Convenience updaters
   updateQuiz: (channelId: string, quiz: ChannelQuizData) => void;
@@ -28,6 +42,26 @@ interface ChannelToolState {
   addDeepDiveMessages: (channelId: string, messages: ChannelDeepDiveMessage[]) => void;
   /** Atomic: remove temp msg + add real msgs + clear aiPending in ONE set() */
   finishDeepDiveResponse: (channelId: string, tempId: string, messages: ChannelDeepDiveMessage[]) => void;
+  /** Atomic: add user-side optimistic message. Returns nothing. */
+  startDeepDiveRequest: (channelId: string, optimisticMsg: ChannelDeepDiveMessage) => void;
+  /**
+   * Streaming helpers for deep-dive chat.
+   * - addDeepDivePlaceholder: append an empty-text AI placeholder so chunks can stream into it.
+   * - appendDeepDiveChunk: append text to a placeholder's `text` field.
+   * - reconcileDeepDiveStream: rename placeholder IDs to backend IDs, clear aiPending. Atomic.
+   * - rollbackDeepDiveStream: remove optimistic + placeholder messages on error. Atomic.
+   */
+  addDeepDivePlaceholder: (channelId: string, placeholder: ChannelDeepDiveMessage) => void;
+  appendDeepDiveChunk: (channelId: string, placeholderId: string, chunk: string) => void;
+  reconcileDeepDiveStream: (
+    channelId: string,
+    tempUserId: string,
+    placeholderAiId: string,
+    realUserMessageId: string,
+    realAiMessageId: string,
+  ) => void;
+  rollbackDeepDiveStream: (channelId: string, tempUserId: string, placeholderAiId: string) => void;
+
   updateMindMap: (channelId: string, mindMap: ChannelMindMapData) => void;
   updateSprint: (channelId: string, sprint: ChannelSprintData) => void;
   addNoteToStore: (channelId: string, note: ChannelNoteItem) => void;
@@ -43,10 +77,15 @@ export const useChannelToolStore = create<ChannelToolState>((set, get) => ({
   dataByChannel: {},
   loading: {},
   aiPending: {},
+  aiStatusByChannel: {},
   error: null,
 
   setAiPending: (channelId, pending) => {
     set((s) => ({ aiPending: { ...s.aiPending, [channelId]: pending } }));
+  },
+
+  setAiStatus: (channelId, status) => {
+    set((s) => ({ aiStatusByChannel: { ...s.aiStatusByChannel, [channelId]: status } }));
   },
 
   /** Atomic: add messages + set aiPending in ONE render */
@@ -76,6 +115,7 @@ export const useChannelToolStore = create<ChannelToolState>((set, get) => ({
       dataByChannel: { ...s.dataByChannel, [channelId]: { channelId, toolType: "" } as any },
       loading: { ...s.loading, [channelId]: true },
       aiPending: { ...s.aiPending, [channelId]: false },
+      aiStatusByChannel: { ...s.aiStatusByChannel, [channelId]: null },
     }));
     try {
       const data = await channelToolApi.getToolData(channelId);
@@ -166,6 +206,98 @@ export const useChannelToolStore = create<ChannelToolState>((set, get) => ({
     });
   },
 
+  // Streaming: append an empty AI placeholder. Deduped by id — safe to retry.
+  addDeepDivePlaceholder: (channelId, placeholder) => {
+    set((s) => {
+      const existing = s.dataByChannel[channelId] || { ...EMPTY_TOOL_DATA, channelId };
+      const prev = existing.deepDive?.messages ?? [];
+      if (prev.some((m) => m.id === placeholder.id)) return s;
+      return {
+        dataByChannel: {
+          ...s.dataByChannel,
+          [channelId]: {
+            ...existing,
+            deepDive: { messages: [...prev, placeholder] },
+          },
+        },
+      };
+    });
+  },
+
+  // Streaming: append chunk text onto the placeholder message. Only updates
+  // the target channel/placeholder — other entries reference-equal.
+  appendDeepDiveChunk: (channelId, placeholderId, chunk) => {
+    if (!chunk) return;
+    set((s) => {
+      const existing = s.dataByChannel[channelId];
+      if (!existing?.deepDive) return s;
+      const msgs = existing.deepDive.messages;
+      const idx = msgs.findIndex((m) => m.id === placeholderId);
+      if (idx === -1) return s;
+      const target = msgs[idx];
+      const updated = { ...target, text: target.text + chunk };
+      const nextMsgs = msgs.slice();
+      nextMsgs[idx] = updated;
+      return {
+        dataByChannel: {
+          ...s.dataByChannel,
+          [channelId]: {
+            ...existing,
+            deepDive: { messages: nextMsgs },
+          },
+        },
+      };
+    });
+  },
+
+  // Streaming success: rename temp IDs to backend IDs + clear aiPending. Atomic.
+  reconcileDeepDiveStream: (channelId, tempUserId, placeholderAiId, realUserMessageId, realAiMessageId) => {
+    set((s) => {
+      const existing = s.dataByChannel[channelId];
+      if (!existing?.deepDive) return s;
+      const nextMsgs = existing.deepDive.messages.map((m) => {
+        if (m.id === tempUserId) return { ...m, id: realUserMessageId };
+        if (m.id === placeholderAiId) return { ...m, id: realAiMessageId };
+        return m;
+      });
+      return {
+        dataByChannel: {
+          ...s.dataByChannel,
+          [channelId]: {
+            ...existing,
+            deepDive: { messages: nextMsgs },
+          },
+        },
+        aiPending: { ...s.aiPending, [channelId]: false },
+      };
+    });
+  },
+
+  // Streaming error: drop both optimistic + placeholder messages, clear aiPending. Atomic.
+  rollbackDeepDiveStream: (channelId, tempUserId, placeholderAiId) => {
+    set((s) => {
+      const existing = s.dataByChannel[channelId];
+      if (!existing?.deepDive) {
+        return {
+          aiPending: { ...s.aiPending, [channelId]: false },
+        };
+      }
+      const nextMsgs = existing.deepDive.messages.filter(
+        (m) => m.id !== tempUserId && m.id !== placeholderAiId,
+      );
+      return {
+        dataByChannel: {
+          ...s.dataByChannel,
+          [channelId]: {
+            ...existing,
+            deepDive: { messages: nextMsgs },
+          },
+        },
+        aiPending: { ...s.aiPending, [channelId]: false },
+      };
+    });
+  },
+
   updateMindMap: (channelId, mindMap) => {
     set((s) => {
       const existing = s.dataByChannel[channelId] || { ...EMPTY_TOOL_DATA, channelId };
@@ -242,6 +374,7 @@ export const useChannelToolStore = create<ChannelToolState>((set, get) => ({
     socket.off("tool:notes:edited");
     socket.off("tool:notes:deleted");
     socket.off("tool:notes:pinned");
+    socket.off("tool:ai:status");
 
     socket.on("tool:data:update", (data: { channelId: string; toolData: ChannelToolData }) => {
       get().setToolData(data.channelId, data.toolData);
@@ -285,5 +418,28 @@ export const useChannelToolStore = create<ChannelToolState>((set, get) => ({
     socket.on("tool:notes:pinned", (data: { channelId: string; note: ChannelNoteItem }) => {
       get().updateNoteInStore(data.channelId, data.note);
     });
+
+    // Per-channel AI status: "thinking" stays until cleared, "complete"/"error"
+    // flash briefly then clear so the empty state can flip back to its idle look.
+    socket.on(
+      "tool:ai:status",
+      (data: { channelId: string; tool: ChannelAiTool; state: ChannelAiState; actorId?: string }) => {
+        const { channelId, tool, state, actorId } = data;
+        get().setAiStatus(channelId, { tool, state, actorId, timestamp: Date.now() });
+
+        if (state === "complete" || state === "error") {
+          // Brief pulse so the UI can show the resolved state, then clear.
+          // If a new event arrives before this fires, the timestamp check below
+          // keeps us from wiping a newer state.
+          const capturedTs = Date.now();
+          setTimeout(() => {
+            const current = get().aiStatusByChannel[channelId];
+            if (current && current.timestamp <= capturedTs) {
+              get().setAiStatus(channelId, null);
+            }
+          }, 1500);
+        }
+      },
+    );
   },
 }));

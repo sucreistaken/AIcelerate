@@ -2,6 +2,7 @@ import React, { type RefObject } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ChatMessage } from "../../hooks/useCourseDashboard";
 import { t } from "../../utils/i18n";
+import { TypingIndicator } from "../ui";
 
 function formatChatLine(text: string, keyPrefix: string): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
@@ -128,18 +129,19 @@ export function CourseChat({ chatHistory, chatInput, chatLoading, chatBottomRef,
             ))}
           </AnimatePresence>
 
-          {chatLoading && (
-            <div style={{ display: "flex", gap: 6, padding: 8 }}>
-              {[0, 1, 2].map((i) => (
-                <motion.div
-                  key={i}
-                  animate={{ scale: [1, 1.2, 1], opacity: [0.4, 1, 0.4] }}
-                  transition={{ repeat: Infinity, duration: 0.8, delay: i * 0.15 }}
-                  style={{ width: 6, height: 6, background: "var(--accent-2)", borderRadius: "50%" }}
-                />
-              ))}
-            </div>
-          )}
+          {chatLoading && (() => {
+            // Only show standalone indicator before the first chunk arrives.
+            // Once the assistant placeholder has content, the bubble itself
+            // visualises the stream — showing dots too would be noisy.
+            const last = chatHistory[chatHistory.length - 1];
+            const waitingForFirstChunk = last?.role === "assistant" && !last.content;
+            if (!waitingForFirstChunk) return null;
+            return (
+              <div style={{ padding: "8px 4px" }}>
+                <TypingIndicator color="var(--accent-2)" />
+              </div>
+            );
+          })()}
           <div ref={chatBottomRef} />
         </div>
 

@@ -18,6 +18,9 @@ interface ConnectionsState {
   selectedConcept: string | null;
   deepDiveResult: string | null;
   deepDiveLoading: boolean;
+  deepDiveError: string | null;
+  /** AbortController for the currently in-flight deep-dive SSE stream, if any. */
+  _deepDiveController: AbortController | null;
 
   fetchConnections: () => Promise<void>;
   buildConnections: () => Promise<void>;
@@ -28,7 +31,7 @@ interface ConnectionsState {
   setSortMode: (mode: SortMode) => void;
 
   setSelectedConcept: (concept: string | null) => void;
-  deepDiveConcept: (concept: string, lessonTitles: string[], relatedConcepts: string[]) => Promise<void>;
+  deepDiveConcept: (concept: string, lessonTitles: string[], relatedConcepts: string[]) => void;
   clearDeepDive: () => void;
 
   getFilteredConnections: () => ConceptConnection[];
@@ -47,6 +50,8 @@ export const useConnectionsStore = create<ConnectionsState>()((set, get) => ({
   selectedConcept: null,
   deepDiveResult: null,
   deepDiveLoading: false,
+  deepDiveError: null,
+  _deepDiveController: null,
 
   fetchConnections: async () => {
     set({ loading: true, error: null });
@@ -81,22 +86,63 @@ export const useConnectionsStore = create<ConnectionsState>()((set, get) => ({
   setLessonFilter: (lessonId) => set({ selectedLessonFilter: lessonId }),
   setSortMode: (mode) => set({ sortMode: mode }),
 
-  setSelectedConcept: (concept) => set({ selectedConcept: concept, deepDiveResult: null }),
-  clearDeepDive: () => set({ deepDiveResult: null }),
+  setSelectedConcept: (concept) => {
+    // Switching concept mid-stream: abort the old one so its chunks don't leak
+    // into the new concept's result.
+    get()._deepDiveController?.abort();
+    set({
+      selectedConcept: concept,
+      deepDiveResult: null,
+      deepDiveError: null,
+      deepDiveLoading: false,
+      _deepDiveController: null,
+    });
+  },
 
-  deepDiveConcept: async (concept, lessonTitles, relatedConcepts) => {
-    set({ deepDiveLoading: true, deepDiveResult: null });
-    try {
-      const res = await connectionsApi.deepDive(concept, lessonTitles, relatedConcepts);
-      if (res.ok && res.analysis) {
-        set({ deepDiveResult: res.analysis });
-      } else {
-        set({ deepDiveResult: 'Deep dive analysis could not be generated.' });
-      }
-    } catch {
-      set({ deepDiveResult: 'An error occurred during deep dive analysis.' });
-    }
-    set({ deepDiveLoading: false });
+  clearDeepDive: () => {
+    get()._deepDiveController?.abort();
+    set({
+      deepDiveResult: null,
+      deepDiveError: null,
+      deepDiveLoading: false,
+      _deepDiveController: null,
+    });
+  },
+
+  deepDiveConcept: (concept, lessonTitles, relatedConcepts) => {
+    // Cancel any in-flight stream before starting a new one
+    get()._deepDiveController?.abort();
+
+    // Seed the result with "" (not null) so the UI can distinguish
+    // "streaming, nothing yet" from "no dive requested".
+    set({
+      deepDiveLoading: true,
+      deepDiveResult: '',
+      deepDiveError: null,
+    });
+
+    const controller = connectionsApi.deepDiveStream(
+      concept,
+      lessonTitles,
+      relatedConcepts,
+      (chunk) => {
+        set((state) => ({ deepDiveResult: (state.deepDiveResult ?? '') + chunk }));
+      },
+      () => {
+        set({ deepDiveLoading: false, _deepDiveController: null });
+      },
+      (error) => {
+        set((state) => ({
+          deepDiveLoading: false,
+          deepDiveError: error,
+          // Keep any partial text so the user sees what arrived before the error.
+          deepDiveResult: state.deepDiveResult || null,
+          _deepDiveController: null,
+        }));
+      },
+    );
+
+    set({ _deepDiveController: controller });
   },
 
   getFilteredConnections: () => {

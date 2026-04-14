@@ -1,8 +1,12 @@
+import { TypingIndicator } from "../../../ui";
+
 interface FlashcardsEmptyProps {
   topic: string;
   hasLesson: boolean;
   generating: boolean;
   extracting: boolean;
+  /** True when any member in the channel is currently generating flashcards. */
+  aiThinking?: boolean;
   onGenerate: () => void;
   onExtract: () => void;
   onShowAddForm: () => void;
@@ -13,6 +17,7 @@ export default function FlashcardsEmpty({
   hasLesson,
   generating,
   extracting,
+  aiThinking = false,
   onGenerate,
   onExtract,
   onShowAddForm,
@@ -48,6 +53,11 @@ export default function FlashcardsEmpty({
           <p className="sh-tool__empty-desc" style={{ maxWidth: 360, margin: "var(--space-2) auto var(--space-5)" }}>
             AI ile <strong>"{topic}"</strong> konusunda kartlar olu{"\ş"}turun veya kendiniz ekleyin!
           </p>
+          {aiThinking && (
+            <div style={{ marginBottom: 12 }}>
+              <TypingIndicator label="AI kart \u00FCretiyor" />
+            </div>
+          )}
           <div className="sh-fc__empty-actions">
             <button className="sh-fc__cta-btn sh-fc__cta-btn--primary" onClick={onGenerate} disabled={generating}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

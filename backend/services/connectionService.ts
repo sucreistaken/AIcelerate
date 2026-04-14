@@ -3,7 +3,7 @@ import { connectionsCache } from "../cache";
 import { listLessons, getMemory } from "./lessonDataService";
 import { GlobalMemoryModel } from "../models/GlobalMemory";
 import { SCHEMAS } from "../prompts/schemas";
-import { safeGenerate } from "./aiService";
+import { safeGenerate, tryParseJSON, stripCodeFences, extractSafeText } from "./aiService";
 
 export type ConceptConnection = {
   concept: string;
@@ -171,9 +171,9 @@ ${JSON.stringify(batch, null, 2)}`;
           responseSchema: SCHEMAS.CONNECTION_INSIGHTS as import("@google/generative-ai").ResponseSchema,
         },
       }, { label: "connections_build", timeoutMs: 45_000 });
-      const raw = result.response.text();
+      const raw = extractSafeText(result.response);
       logger.info(`[AI] CONNECTION_INSIGHTS | ~${Math.ceil(prompt.length / 4)} in, ~${Math.ceil(raw.length / 4)} out | max=1500`);
-      const parsed = JSON.parse(raw);
+      const parsed = tryParseJSON(raw) ?? tryParseJSON(stripCodeFences(raw));
 
       if (Array.isArray(parsed)) {
         const insightMap = new Map<string, string>();

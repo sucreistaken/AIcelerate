@@ -27,6 +27,15 @@ export interface EventMap {
 
   // Lesson events
   "lesson:updated": { lessonId: string };
+
+  // AI tool progress events (broadcast to channel members for live "AI thinking" feedback)
+  "ai:status": {
+    channelId: string;
+    tool: "quiz" | "flashcards" | "mind-map" | "deep-dive";
+    state: "thinking" | "generating" | "complete" | "error";
+    actorId?: string;       // who triggered the AI call
+    message?: string;       // optional status text ("Generating quiz from lesson...")
+  };
 }
 
 export type EventName = keyof EventMap;

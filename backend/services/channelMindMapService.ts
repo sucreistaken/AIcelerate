@@ -6,7 +6,8 @@ import { getLesson } from "./lessonDataService";
 import { buildToolContext } from "./contextAssemblerService";
 import { getLangDirective, type SupportedLang } from "../utils/langDirective";
 import { sanitizeForPrompt } from "../utils/sanitize";
-import { serviceUnavailable } from "../middleware/errorHandler";
+import { serviceUnavailable, AppError } from "../middleware/errorHandler";
+import { eventBus } from "../events/eventBus";
 
 // ── Mind Map: generate ──────────────────────────────────────────────────────
 export async function generateMindMap(
@@ -18,6 +19,7 @@ export async function generateMindMap(
   const data = await channelToolRepo.load(channelId);
 
   try {
+    eventBus.emit("ai:status", { channelId, tool: "mind-map", state: "thinking" });
     const toolCtx = await buildToolContext(channelId, "mind-map");
 
     let contextBlock = '';
@@ -54,9 +56,12 @@ export async function generateMindMap(
 
     await channelToolRepo.save(channelId, data);
 
+    eventBus.emit("ai:status", { channelId, tool: "mind-map", state: "complete" });
     return { mindMap: data.mindMap, sourcesSummary: toolCtx?.meta.sourcesSummary || null };
   } catch (err) {
     logger.error("channelToolService.generateMindMap error:", err);
+    eventBus.emit("ai:status", { channelId, tool: "mind-map", state: "error" });
+    if (err instanceof AppError) throw err;
     throw serviceUnavailable("Failed to generate mind map");
   }
 }

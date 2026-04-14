@@ -1,10 +1,11 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import { ConceptConnection } from "../../types";
 import { useConnectionsStore } from "../../stores/connectionsStore";
 import { useLessonStore } from "../../stores/lessonStore";
 import { useUiStore } from "../../stores/uiStore";
 import { strengthClass } from "./helpers";
+import { TypingIndicator } from "../ui";
 
 interface ConnectionDetailPanelProps {
   connection: ConceptConnection;
@@ -12,7 +13,12 @@ interface ConnectionDetailPanelProps {
 }
 
 export default function ConnectionDetailPanel({ connection, onClose }: ConnectionDetailPanelProps) {
-  const { deepDiveResult, deepDiveLoading, deepDiveConcept, setSelectedConcept } = useConnectionsStore();
+  const deepDiveResult = useConnectionsStore((s) => s.deepDiveResult);
+  const deepDiveLoading = useConnectionsStore((s) => s.deepDiveLoading);
+  const deepDiveError = useConnectionsStore((s) => s.deepDiveError);
+  const deepDiveConcept = useConnectionsStore((s) => s.deepDiveConcept);
+  const setSelectedConcept = useConnectionsStore((s) => s.setSelectedConcept);
+  const clearDeepDive = useConnectionsStore((s) => s.clearDeepDive);
   const setCurrentLessonId = useLessonStore((s) => s.setCurrentLessonId);
   const setMode = useUiStore((s) => s.setMode);
   const allLessons = useLessonStore((s) => s.lessons);
@@ -28,6 +34,19 @@ export default function ConnectionDetailPanel({ connection, onClose }: Connectio
   const handleDeepDive = useCallback(() => {
     deepDiveConcept(connection.concept, connection.lessonTitles, connection.relatedConcepts);
   }, [deepDiveConcept, connection]);
+
+  // Abort streams when this panel unmounts (e.g. user closes it mid-stream).
+  // The store's clearDeepDive abort()s the AbortController for us.
+  useEffect(() => {
+    return () => {
+      clearDeepDive();
+    };
+  }, [clearDeepDive]);
+
+  // Derived UI states
+  const isStreamingWithContent = deepDiveLoading && !!deepDiveResult && deepDiveResult.length > 0;
+  const isAwaitingFirstChunk = deepDiveLoading && (!deepDiveResult || deepDiveResult.length === 0);
+  const isDone = !deepDiveLoading && !!deepDiveResult && !deepDiveError;
 
   return (
     <>
@@ -110,16 +129,72 @@ export default function ConnectionDetailPanel({ connection, onClose }: Connectio
             {deepDiveLoading ? "Analyzing..." : "Deep Dive"}
           </button>
 
-          {deepDiveLoading && (
-            <div style={{ marginTop: 12, color: "var(--muted)", fontSize: 13 }}>
-              Generating in-depth analysis...
+          {/* Phase 1: waiting for first chunk — show typing indicator with an Analyzing... label */}
+          {isAwaitingFirstChunk && (
+            <div style={{ marginTop: 12 }}>
+              <TypingIndicator label="Analyzing concept..." />
             </div>
           )}
 
-          {deepDiveResult && !deepDiveLoading && (
+          {/* Phase 2: streaming with partial content — show what's arrived so far + a blinking cursor */}
+          {isStreamingWithContent && (
+            <div className="conn-detail-panel__deepdive" aria-live="polite">
+              {deepDiveResult!.split("\n").map((p, i, arr) => {
+                if (!p.trim()) return null;
+                const isLast = i === arr.length - 1;
+                return (
+                  <p key={i}>
+                    {p}
+                    {isLast && (
+                      <motion.span
+                        animate={{ opacity: [0, 1, 0] }}
+                        transition={{ repeat: Infinity, duration: 0.9 }}
+                        style={{
+                          display: "inline-block",
+                          width: 2,
+                          height: "1em",
+                          background: "var(--accent-2)",
+                          marginLeft: 2,
+                          verticalAlign: "text-bottom",
+                        }}
+                        aria-hidden="true"
+                      />
+                    )}
+                  </p>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Phase 3: done — plain formatted output */}
+          {isDone && (
             <div className="conn-detail-panel__deepdive">
-              {deepDiveResult.split("\n").map((p, i) =>
+              {deepDiveResult!.split("\n").map((p, i) =>
                 p.trim() ? <p key={i}>{p}</p> : null
+              )}
+            </div>
+          )}
+
+          {/* Phase 4: error — show the message + any partial text we already got */}
+          {deepDiveError && (
+            <div
+              role="alert"
+              style={{
+                marginTop: 12,
+                padding: 10,
+                borderRadius: 8,
+                background: "var(--danger-bg, rgba(239, 68, 68, 0.08))",
+                color: "var(--danger, #ef4444)",
+                fontSize: 13,
+              }}
+            >
+              Deep dive failed: {deepDiveError}
+              {deepDiveResult && deepDiveResult.length > 0 && (
+                <div className="conn-detail-panel__deepdive" style={{ marginTop: 8 }}>
+                  {deepDiveResult.split("\n").map((p, i) =>
+                    p.trim() ? <p key={i}>{p}</p> : null
+                  )}
+                </div>
               )}
             </div>
           )}

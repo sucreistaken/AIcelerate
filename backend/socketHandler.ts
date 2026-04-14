@@ -5,6 +5,7 @@ import { roomService } from "./services/roomService";
 import { channelService } from "./services/channelService";
 import { checkSocketRateLimit } from "./middleware/rateLimiter";
 import { authService } from "./services/authService";
+import { eventBus } from "./events/eventBus";
 import { logger } from "./utils/logger";
 import { TTLCache } from "./utils/cache";
 import {
@@ -65,6 +66,12 @@ function clearTyping(channelId: string, userId: string, collab: Namespace) {
 
 export function setupCollabNamespace(io: Server) {
   const collab = io.of("/collab");
+
+  // Bridge AI status events from eventBus to channel rooms
+  // Frontend listens on `tool:ai:status` for "AI thinking..." indicators
+  eventBus.on("ai:status", (data) => {
+    collab.to(`channel:${data.channelId}`).emit("tool:ai:status", data);
+  });
 
   collab.on("connection", (socket: Socket) => {
     let userId: string | null = null;

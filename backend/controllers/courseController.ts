@@ -14,7 +14,7 @@ import {
   getCourse,
 } from "../services/courseDataService";
 import { upsertLesson } from "../services/lessonDataService";
-import { generateCourseChatResponse, generateStudySchedule } from "../services/courseAiService";
+import { generateCourseChatResponse, generateCourseChatResponseStream, generateStudySchedule } from "../services/courseAiService";
 
 
 // ── HTTP Handlers ───────────────────────────────────────────────────────────
@@ -88,6 +88,11 @@ export const courseController = {
     if (!getCourseForUser(req.params.id, req.user!.userId)) throw notFound("Course not found");
     const { text, suggestions } = await generateCourseChatResponse(req.params.id, req.body.message, req.body.history);
     res.json({ ok: true, text, suggestions });
+  }),
+
+  chatStream: asyncHandler(async (req: AuthRequest, res: Response) => {
+    if (!getCourseForUser(req.params.id, req.user!.userId)) throw notFound("Course not found");
+    await generateCourseChatResponseStream(req.params.id, req.body.message, req.body.history, res);
   }),
 
   getProgress: asyncHandler(async (req: AuthRequest, res: Response) => {

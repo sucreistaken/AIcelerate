@@ -4,6 +4,7 @@
 import { logger } from "../utils/logger";
 import { t } from "../utils/i18n";
 import { API_BASE } from './httpClient';
+import { consumeSseStream } from './sseClient';
 import { Course, CourseKnowledgeIndex, CourseProgress, WeeklySchedule, CourseExport, LoAlignment, LoStudyModule, KnowledgeGraph, AdaptiveQuizSessionState, AdaptiveQuizSummary, LODashboardData, LOProgress } from '../types';
 
 // ============ Course API ============
@@ -106,6 +107,46 @@ export const courseApi = {
         } catch (error) {
             return { ok: false, error: t('error.generic') };
         }
+    },
+
+    /**
+     * Streaming course chat — SSE. Pattern mirrors deepDiveApi.chatStream.
+     * Returns AbortController so the caller can cancel on unmount.
+     */
+    courseChatStream(
+        courseId: string,
+        message: string,
+        history: Array<{ role: string; content: string }>,
+        onChunk: (text: string) => void,
+        onDone: (suggestions: string[]) => void,
+        onError: (error: string) => void,
+        signal?: AbortSignal,
+    ): AbortController {
+        return consumeSseStream(
+            `${API_BASE}/api/courses/${courseId}/chat/stream`,
+            { method: 'POST', body: { message, history }, signal },
+            {
+                onEvent: (evt) => {
+                    if (evt.type === 'chunk' && typeof evt.text === 'string') {
+                        onChunk(evt.text);
+                    } else if (evt.type === 'done') {
+                        const suggestions = Array.isArray(evt.suggestions)
+                            ? (evt.suggestions as string[])
+                            : [];
+                        onDone(suggestions);
+                    } else if (evt.type === 'error') {
+                        const msg = typeof evt.message === 'string' ? evt.message
+                            : typeof evt.error === 'string' ? evt.error
+                            : 'Stream error';
+                        onError(msg);
+                    }
+                },
+                onError: (err) => {
+                    logger.warn('Course chat stream failed', err);
+                    onError(err);
+                },
+            },
+        );
     },
 
     async getProgress(courseId: string): Promise<{ ok: boolean; progress?: CourseProgress; error?: string }> {

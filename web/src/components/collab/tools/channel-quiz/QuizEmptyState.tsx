@@ -1,8 +1,12 @@
+import { TypingIndicator } from "../../../ui";
+
 const COUNT_OPTIONS = [5, 10, 15, 20];
 
 interface Props {
   topic: string;
   generating: boolean;
+  /** True when another session is running an AI generation on this channel. */
+  aiThinking?: boolean;
   quizCount: number;
   setQuizCount: (n: number) => void;
   difficulty: 'easy' | 'medium' | 'hard';
@@ -15,6 +19,7 @@ interface Props {
 export default function QuizEmptyState({
   topic,
   generating,
+  aiThinking = false,
   quizCount,
   setQuizCount,
   difficulty,
@@ -43,6 +48,12 @@ export default function QuizEmptyState({
           </div>
           <h3 className="sh-tool__empty-title">Create a Quiz</h3>
           <p className="sh-tool__empty-desc">Test your knowledge with AI-generated questions about "{topic}"</p>
+
+          {aiThinking && (
+            <div style={{ marginBottom: 12 }}>
+              <TypingIndicator label="AI quiz olu\u015Fturuyor" />
+            </div>
+          )}
 
           <div className="sh-quiz__config sh-quiz__config-card">
             <div className="sh-quiz__config-card-header">

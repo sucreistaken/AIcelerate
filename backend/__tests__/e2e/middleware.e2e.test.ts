@@ -81,14 +81,16 @@ vi.mock("../../services/notificationService", () => ({
 vi.mock("../../services/aiService", () => ({
   getAiMetrics: vi.fn(() => ({
     totalCalls: 0, successCount: 0, failureCount: 0, fallbackCount: 0,
-    totalLatencyMs: 0, avgLatencyMs: 0, cacheHits: 0, cacheSize: 0, uptime: 1,
+    totalLatencyMs: 0, avgLatencyMs: 0, uptime: 1,
   })),
   getModel: vi.fn(),
   safeGenerate: vi.fn(),
-  cachedGenerate: vi.fn(),
   getTemperature: vi.fn(() => 0.3),
   stripCodeFences: vi.fn((s: string) => s),
+  tryParseJSON: vi.fn((s: string) => { try { return JSON.parse(s); } catch { return null; } }),
   trackAiCall: vi.fn(),
+  trackStreamUsage: vi.fn(),
+  extractSafeText: vi.fn((r: { text: () => string }) => r?.text?.() ?? ""),
 }));
 
 import supertest from "supertest";

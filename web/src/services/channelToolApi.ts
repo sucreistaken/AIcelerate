@@ -14,10 +14,25 @@ import type {
 } from "../types";
 
 import { fetchWithAuth } from "./fetchWithAuth";
+import { consumeSseStream } from "./sseClient";
 
 const BASE = `${API_BASE}/api/collab/channels`;
 const COLLAB_BASE = `${API_BASE}/api/collab`;
 const request = fetchWithAuth;
+
+export interface DeepDiveStreamBody {
+  text: string;
+  nickname: string;
+  topic: string;
+  serverName: string;
+}
+
+export interface DeepDiveStreamCallbacks {
+  onChunk: (text: string) => void;
+  /** Fired when the server emits `done`. Carries the real IDs so the client can reconcile optimistic placeholders. */
+  onDone: (ids: { userMessageId: string; aiMessageId: string }) => void;
+  onError: (error: string) => void;
+}
 
 export const channelToolApi = {
   getToolData(channelId: string) {
@@ -70,6 +85,45 @@ export const channelToolApi = {
     return request<{ ok: boolean; userMessage: ChannelDeepDiveMessage; aiMessage: ChannelDeepDiveMessage }>(
       `${BASE}/${channelId}/tool/deep-dive/chat`,
       { method: "POST", body: JSON.stringify({ text, nickname, topic, serverName }) }
+    );
+  },
+
+  /**
+   * Streaming variant of deepDiveChat. Server emits:
+   *  - { type: "chunk", text }
+   *  - { type: "done", userMessageId, aiMessageId }
+   *  - { type: "error", message }
+   * Returns an AbortController — call .abort() to cancel the stream.
+   */
+  deepDiveChatStream(
+    channelId: string,
+    body: DeepDiveStreamBody,
+    callbacks: DeepDiveStreamCallbacks,
+    signal?: AbortSignal,
+  ): AbortController {
+    return consumeSseStream(
+      `${BASE}/${channelId}/tool/deep-dive/chat/stream`,
+      { method: "POST", body, signal },
+      {
+        onEvent: (evt) => {
+          if (evt.type === "chunk" && typeof evt.text === "string") {
+            callbacks.onChunk(evt.text);
+          } else if (
+            evt.type === "done" &&
+            typeof evt.userMessageId === "string" &&
+            typeof evt.aiMessageId === "string"
+          ) {
+            callbacks.onDone({ userMessageId: evt.userMessageId, aiMessageId: evt.aiMessageId });
+          } else if (evt.type === "error") {
+            const msg =
+              typeof evt.message === "string" ? evt.message
+              : typeof evt.error === "string" ? evt.error
+              : "Stream error";
+            callbacks.onError(msg);
+          }
+        },
+        onError: callbacks.onError,
+      },
     );
   },
 

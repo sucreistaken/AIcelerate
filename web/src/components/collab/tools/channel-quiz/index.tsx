@@ -1,5 +1,6 @@
 import type { LessonContextInfo } from "../../../../types";
 import { useChannelQuiz } from "./useChannelQuiz";
+import { useChannelToolStore } from "../../../../stores/channelToolStore";
 import QuizEmptyState from "./QuizEmptyState";
 import QuizResultsView from "./QuizResultsView";
 import QuizQuestionView from "./QuizQuestionView";
@@ -40,11 +41,21 @@ export default function ChannelQuiz({ channelId, topic, serverName, userId, nick
     resetToReview,
   } = useChannelQuiz(channelId, topic, serverName, userId, nickname);
 
+  // AI thinking indicator — true while ANOTHER member (or us) is generating a quiz.
+  // Socket.IO broadcasts "tool:ai:status" frames from the server's eventBus.
+  const aiThinking = useChannelToolStore(
+    (s) => {
+      const status = s.aiStatusByChannel[channelId];
+      return status?.tool === "quiz" && status.state === "thinking";
+    },
+  );
+
   if (questions.length === 0 && !showResults) {
     return (
       <QuizEmptyState
         topic={topic}
-        generating={generating}
+        generating={generating || aiThinking}
+        aiThinking={aiThinking}
         quizCount={quizCount}
         setQuizCount={setQuizCount}
         difficulty={difficulty}

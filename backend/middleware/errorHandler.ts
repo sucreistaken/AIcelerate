@@ -54,14 +54,6 @@ function isValidationError(err: Error): err is ValidationError {
   return "statusCode" in err && (err as Record<string, unknown>).code === "VALIDATION_ERROR";
 }
 
-/** Shape produced by lessonAiService when LLM JSON parsing fails. */
-interface LlmParseError extends Error {
-  llmText: string;
-}
-
-function isLlmParseError(err: Error): err is LlmParseError {
-  return "llmText" in err;
-}
 
 export function notFound(msg = "Not found") {
   return new AppError(404, msg, "NOT_FOUND");
@@ -171,19 +163,6 @@ export function errorHandler(err: Error, req: Request, res: Response, _next: Nex
       ok: false,
       error: "AI service temporarily busy. Please try again.",
       code: "AI_SERVICE_UNAVAILABLE",
-      ...(requestId && { requestId }),
-    });
-    return;
-  }
-
-  // Handle JSON parse errors from LLM
-  if (isLlmParseError(err)) {
-    logger.error("LLM parse error:", err.message);
-    res.status(500).json({
-      ok: false,
-      error: err.message,
-      code: "LLM_PARSE_ERROR",
-      ...(process.env.NODE_ENV !== "production" && { llmText: err.llmText }),
       ...(requestId && { requestId }),
     });
     return;

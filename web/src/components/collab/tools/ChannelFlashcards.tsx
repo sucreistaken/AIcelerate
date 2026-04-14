@@ -1,4 +1,5 @@
 import { useChannelFlashcards } from "../../../hooks/useChannelFlashcards";
+import { useChannelToolStore } from "../../../stores/channelToolStore";
 import type { LessonContextInfo } from "../../../types";
 import FlashcardsEmpty from "./flashcards/FlashcardsEmpty";
 import FlashcardsReview from "./flashcards/FlashcardsReview";
@@ -18,6 +19,12 @@ export default function ChannelFlashcards({ channelId, topic, serverName, userId
 
   const hook = useChannelFlashcards({ channelId, topic, serverName, userId, nickname, hasLesson });
 
+  // Broadcast-driven AI thinking flag (another member may be generating).
+  const aiThinking = useChannelToolStore((s) => {
+    const status = s.aiStatusByChannel[channelId];
+    return status?.tool === "flashcards" && status.state === "thinking";
+  });
+
   if (hook.cards.length === 0 && !hook.showAddForm) {
     return (
       <FlashcardsEmpty
@@ -25,6 +32,7 @@ export default function ChannelFlashcards({ channelId, topic, serverName, userId
         hasLesson={hasLesson}
         generating={hook.generating}
         extracting={hook.extracting}
+        aiThinking={aiThinking}
         onGenerate={hook.handleGenerate}
         onExtract={hook.handleExtract}
         onShowAddForm={() => hook.setShowAddForm(true)}

@@ -91,6 +91,7 @@ router.post("/channels/:channelId/tool/flashcards/generate", requireAuth, toolAi
 router.post("/channels/:channelId/tool/flashcards/extract", requireAuth, toolAiLimit, validate(toolFlashcardExtractSchema), channelToolController.extractFlashcards);
 router.post("/channels/:channelId/tool/flashcards/review", requireAuth, toolWriteLimit, validate(toolFlashcardReviewSchema), channelToolController.reviewFlashcard);
 router.post("/channels/:channelId/tool/deep-dive/chat", requireAuth, toolAiLimit, validate(toolDeepDiveChatSchema), channelToolController.deepDiveChat);
+router.post("/channels/:channelId/tool/deep-dive/chat/stream", requireAuth, toolAiLimit, validate(toolDeepDiveChatSchema), channelToolController.deepDiveChatStream);
 router.post("/channels/:channelId/tool/mind-map/generate", requireAuth, toolAiLimit, validate(toolMindMapGenerateSchema), channelToolController.generateMindMap);
 router.post("/channels/:channelId/tool/sprint/start", requireAuth, toolWriteLimit, validate(toolSprintStartSchema), channelToolController.startSprint);
 router.post("/channels/:channelId/tool/sprint/status", requireAuth, toolWriteLimit, validate(toolSprintStatusSchema), channelToolController.updateSprintStatus);

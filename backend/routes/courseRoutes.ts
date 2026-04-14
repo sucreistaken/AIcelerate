@@ -21,6 +21,7 @@ router.get("/courses/:id/lessons", requireAuth, courseController.getLessons);
 router.post("/courses/:id/rebuild-index", requireAuth, validate(emptyBodySchema), courseController.rebuildIndex);
 router.get("/courses/:id/knowledge-index", requireAuth, courseController.getKnowledgeIndex);
 router.post("/courses/:id/chat", requireAuth, rateLimiter("ai:course-chat", 15, 60_000), validate(courseChatSchema), courseController.chat);
+router.post("/courses/:id/chat/stream", requireAuth, rateLimiter("ai:course-chat", 15, 60_000), validate(courseChatSchema), courseController.chatStream);
 router.get("/courses/:id/progress", requireAuth, courseController.getProgress);
 router.post("/courses/:id/study-schedule", requireAuth, validate(studyScheduleSchema), courseController.studySchedule);
 router.get("/courses/:id/export", requireAuth, courseController.exportData);

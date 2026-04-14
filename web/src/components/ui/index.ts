@@ -36,3 +36,5 @@ export { ConfirmModal, useConfirmModal } from "./ConfirmModal";
 export type { ConfirmModalProps } from "./ConfirmModal";
 export { KeyboardShortcuts } from "./KeyboardShortcuts";
 export { OnboardingTour } from "./OnboardingTour";
+export { TypingIndicator } from "./TypingIndicator";
+export type { TypingIndicatorProps } from "./TypingIndicator";

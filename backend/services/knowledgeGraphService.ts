@@ -1,11 +1,11 @@
 // services/knowledgeGraphService.ts
 // Extracts concept relationships from course lessons to build a knowledge graph.
 
-import { safeGenerate, getTemperature } from "./aiService";
+import { safeGenerate, getTemperature, tryParseJSON, stripCodeFences, extractSafeText } from "./aiService";
 import { SCHEMAS } from "../prompts/schemas";
 import { smartTruncate } from "../utils/smartTruncate";
 import { logger } from "../utils/logger";
-import { notFound } from "../middleware/errorHandler";
+import { notFound, AppError } from "../middleware/errorHandler";
 import { getLesson } from "./lessonDataService";
 import type { Lesson } from "./lessonDataService";
 import { getCourse, updateCourse } from "./courseDataService";
@@ -78,8 +78,11 @@ export async function extractGraphFromLessons(courseId: string): Promise<Knowled
     },
   }, { label: "knowledge_graph", timeoutMs: 60_000 });
 
-  const rawText = result.response.text() || "";
-  const parsed = JSON.parse(rawText);
+  const rawText = extractSafeText(result.response) || "";
+  const parsed = tryParseJSON(rawText) ?? tryParseJSON(stripCodeFences(rawText));
+  if (!parsed) {
+    throw new AppError(502, "Knowledge graph AI response parse error", "AI_PARSE_ERROR");
+  }
 
   logger.info(`[KNOWLEDGE_GRAPH] courseId=${courseId} | nodes=${parsed.nodes?.length || 0} edges=${parsed.edges?.length || 0}`);
 

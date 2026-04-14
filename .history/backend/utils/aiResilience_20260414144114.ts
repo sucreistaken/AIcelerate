@@ -11,7 +11,6 @@ class CircuitBreaker {
   private openUntil = 0;
 
   constructor(
-    private readonly key: string,
     private readonly threshold: number = 3,
     private readonly cooldownMs: number = 60_000
   ) { }
@@ -36,44 +35,34 @@ class CircuitBreaker {
     if (this.failures >= this.threshold) {
       this.openUntil = Date.now() + this.cooldownMs;
       logger.warn(
-        { key: this.key, failures: this.failures, cooldownMs: this.cooldownMs },
-        `AI circuit breaker OPEN for "${this.key}" — ${this.threshold} consecutive failures, cooling down for ${this.cooldownMs / 1000}s`
+        { failures: this.failures, cooldownMs: this.cooldownMs },
+        `AI circuit breaker OPEN — ${this.threshold} consecutive failures, cooling down for ${this.cooldownMs / 1000}s`
       );
     }
   }
 }
 
-// Per-key circuit breakers — each model gets its own breaker so a failing
-// gemini-2.5-flash doesn't trip the breaker for gemini-2.0-flash fallback.
-const breakers = new Map<string, CircuitBreaker>();
+const breaker = new CircuitBreaker(3, 60_000);
 
-function getBreaker(key: string): CircuitBreaker {
-  if (!breakers.has(key)) {
-    breakers.set(key, new CircuitBreaker(key, 3, 60_000));
-  }
-  return breakers.get(key)!;
-}
-
-/** Test-only: reset all circuit breaker state. NOT for production use. */
+/** Test-only: reset the global circuit breaker state. NOT for production use. */
 export function _resetBreakerForTests(): void {
-  breakers.clear();
+  breaker.recordSuccess();
 }
 
 /**
  * Wraps an AI generateContent call with:
- * 1. Per-key circuit breaker protection (defaults to "default" — pass breakerKey: modelName for per-model)
+ * 1. Circuit breaker protection
  * 2. AbortController timeout (default 30s)
- * 3. Exponential backoff retry on 429/503 with jitter (avoids thundering herd)
+ * 3. Exponential backoff retry on 429/503
  */
 export async function withAiResilience<T>(
   fn: (signal: AbortSignal) => Promise<T>,
-  options: { timeoutMs?: number; maxRetries?: number; label?: string; breakerKey?: string } = {}
+  options: { timeoutMs?: number; maxRetries?: number; label?: string } = {}
 ): Promise<T> {
-  const { timeoutMs = 30_000, maxRetries = 2, label = "AI call", breakerKey = "default" } = options;
-  const breaker = getBreaker(breakerKey);
+  const { timeoutMs = 30_000, maxRetries = 2, label = "AI call" } = options;
 
   if (breaker.isOpen) {
-    throw new AiCircuitOpenError(`AI service "${breakerKey}" temporarily unavailable. Please try again later.`);
+    throw new AiCircuitOpenError();
   }
 
   let lastError: Error | null = null;
@@ -99,15 +88,11 @@ export async function withAiResilience<T>(
         throw new AiTimeoutError();
       }
 
-      // Rate limit (429) or service unavailable (503): retry with jittered backoff
+      // Rate limit (429) or service unavailable (503): retry with backoff
       const errRecord = err as Record<string, unknown>;
       const status = errRecord.status || errRecord.statusCode || errRecord.httpCode;
       if ((status === 429 || status === 503) && attempt < maxRetries) {
-        // Exponential backoff + random jitter (0-500ms) to avoid thundering herd
-        // when many concurrent callers all hit the same retry boundary.
-        const baseBackoffMs = Math.min(1000 * Math.pow(2, attempt), 8000);
-        const jitter = Math.floor(Math.random() * 500);
-        const backoffMs = baseBackoffMs + jitter;
+        const backoffMs = Math.min(1000 * Math.pow(2, attempt), 8000);
         logger.warn(
           { attempt, label, status, backoffMs },
           `${label} got ${status}, retrying in ${backoffMs}ms (attempt ${attempt + 1}/${maxRetries + 1})`

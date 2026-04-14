@@ -99,18 +99,6 @@ describe("errorHandler middleware", () => {
     );
   });
 
-  it("handles LLM parse errors", () => {
-    const res = createMockRes();
-    const err = Object.assign(new Error("parse failed"), { llmText: "raw output" });
-
-    errorHandler(err, mockReq, res, mockNext);
-
-    expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ code: "LLM_PARSE_ERROR", llmText: "raw output" })
-    );
-  });
-
   it("handles generic errors as 500", () => {
     const res = createMockRes();
     const err = new Error("unknown");

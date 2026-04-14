@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useChannelToolStore } from "../../../stores/channelToolStore";
 import { channelToolApi } from "../../../services/channelToolApi";
 import { getCollabSocket } from "../../../services/socket";
+import { TypingIndicator } from "../../ui";
 
 import type { LessonContextInfo } from "../../../types";
 
@@ -23,6 +24,13 @@ export default function ChannelMindMap({ channelId, topic, serverName, nickname,
     (s) => s.dataByChannel[channelId]?.mindMap?.topic ?? ""
   );
   const updateMindMap = useChannelToolStore((s) => s.updateMindMap);
+
+  // True when any member in this channel is generating a mind-map. Derived
+  // from the broadcast-driven aiStatusByChannel slice, refreshed by Socket.IO.
+  const aiThinking = useChannelToolStore((s) => {
+    const status = s.aiStatusByChannel[channelId];
+    return status?.tool === "mind-map" && status.state === "thinking";
+  });
 
   // Local state
   const [generating, setGenerating] = useState(false);
@@ -99,8 +107,10 @@ export default function ChannelMindMap({ channelId, topic, serverName, nickname,
     setScale(1);
   }, []);
 
-  // Empty state - no mind map generated yet
-  if (!mermaidCode && !generating) {
+  // Empty state - no mind map generated yet and nobody is generating one.
+  // If `aiThinking` is true we fall through to the "generating" skeleton so
+  // remote generations still show a progress indicator.
+  if (!mermaidCode && !generating && !aiThinking) {
     return (
       <div className="sh-tool">
         {/* Header */}
@@ -135,10 +145,15 @@ export default function ChannelMindMap({ channelId, topic, serverName, nickname,
               <p className="sh-mindmap__empty-desc">
                 AI ile konunun g\örsel haritas\ın\ı \ç\ıkar\ın. Kavramlar aras\ı ba\ğlant\ılar\ı ke\şfedin.
               </p>
+              {aiThinking && (
+                <div style={{ marginBottom: 12 }}>
+                  <TypingIndicator label="AI zihin haritas\u0131 olu\u015Fturuyor" />
+                </div>
+              )}
               <button
                 className="sh-mindmap__generate-hero-btn"
                 onClick={() => handleGenerate()}
-                disabled={generating}
+                disabled={generating || aiThinking}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
@@ -152,8 +167,9 @@ export default function ChannelMindMap({ channelId, topic, serverName, nickname,
     );
   }
 
-  // Generating state - skeleton animation
-  if (generating && !mermaidCode) {
+  // Generating state - skeleton animation.
+  // Triggered by local click (generating=true) OR a remote broadcast (aiThinking=true).
+  if ((generating || aiThinking) && !mermaidCode) {
     return (
       <div className="sh-tool">
         <div className="sh-tool__header">
@@ -186,7 +202,9 @@ export default function ChannelMindMap({ channelId, topic, serverName, nickname,
               <div className="sh-mindmap__skeleton-bar sh-mindmap__skeleton-bar--2" />
               <div className="sh-mindmap__skeleton-bar sh-mindmap__skeleton-bar--3" />
             </div>
-            <p className="sh-mindmap__skeleton-hint">AI konuyu analiz ediyor, l\ütfen bekleyin.</p>
+            <div style={{ marginTop: 8 }}>
+              <TypingIndicator label="AI konuyu analiz ediyor" />
+            </div>
           </div>
         </div>
       </div>

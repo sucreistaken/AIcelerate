@@ -4,7 +4,7 @@ import { validate } from "../middleware/validate";
 import { requireAuth, type AuthRequest } from "../middleware/auth";
 import { rateLimiter } from "../middleware/rateLimiter";
 import { buildConnections, getConnections } from "../services/connectionService";
-import { generateConnectionDeepDive } from "../services/connectionAiService";
+import { generateConnectionDeepDive, generateConnectionDeepDiveStream } from "../services/connectionAiService";
 import { connectionDeepDiveSchema } from "../validators/connectionSchemas";
 import { emptyBodySchema } from "../validators/routeSchemas";
 
@@ -24,6 +24,11 @@ router.post("/connections/deep-dive", requireAuth, validate(connectionDeepDiveSc
   const { concept, lessonTitles, relatedConcepts } = req.body;
   const analysis = await generateConnectionDeepDive(concept, lessonTitles, relatedConcepts);
   res.json({ ok: true, analysis });
+}));
+
+router.post("/connections/deep-dive/stream", requireAuth, validate(connectionDeepDiveSchema), asyncHandler(async (req, res) => {
+  const { concept, lessonTitles, relatedConcepts } = req.body;
+  await generateConnectionDeepDiveStream(concept, lessonTitles, relatedConcepts, res);
 }));
 
 export default router;

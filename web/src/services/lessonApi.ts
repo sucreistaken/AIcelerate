@@ -4,6 +4,7 @@
 import { logger } from "../utils/logger";
 import { t } from "../utils/i18n";
 import { API_BASE, LessonData, PlanResponse, TranscribeStartResponse } from './httpClient';
+import { consumeSseStream } from './sseClient';
 import { Plan, CheatSheet, ConceptConnection } from '../types';
 
 // ============ Lessons API ============
@@ -272,42 +273,33 @@ export const deepDiveApi = {
         onChunk: (text: string) => void,
         onDone: (suggestions: string[]) => void,
         onError: (error: string) => void,
+        signal?: AbortSignal,
     ): AbortController {
-        const controller = new AbortController();
-        fetch(`${API_BASE}/api/lessons/${lessonId}/chat?stream=true`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message, history }),
-            signal: controller.signal,
-        }).then(async (res) => {
-            if (!res.ok || !res.body) {
-                onError('Stream connection failed');
-                return;
-            }
-            const reader = res.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        try {
-                            const data = JSON.parse(line.slice(6));
-                            if (data.type === 'chunk') onChunk(data.text);
-                            else if (data.type === 'done') onDone(data.suggestions || []);
-                            else if (data.type === 'error') onError(data.error || 'Unknown error');
-                        } catch {}
+        return consumeSseStream(
+            `${API_BASE}/api/lessons/${lessonId}/chat?stream=true`,
+            { method: 'POST', body: { message, history }, signal },
+            {
+                onEvent: (evt) => {
+                    if (evt.type === 'chunk' && typeof evt.text === 'string') {
+                        onChunk(evt.text);
+                    } else if (evt.type === 'done') {
+                        const suggestions = Array.isArray(evt.suggestions)
+                            ? (evt.suggestions as string[])
+                            : [];
+                        onDone(suggestions);
+                    } else if (evt.type === 'error') {
+                        const msg = typeof evt.error === 'string' ? evt.error
+                            : typeof evt.message === 'string' ? evt.message
+                            : 'Unknown error';
+                        onError(msg);
                     }
-                }
-            }
-        }).catch((err) => {
-            if (err.name !== 'AbortError') onError(err.message);
-        });
-        return controller;
+                },
+                onError: (err) => {
+                    logger.warn('Deep dive chat stream failed', err);
+                    onError(err);
+                },
+            },
+        );
     },
 
     async generateMindMap(lessonId: string): Promise<{ ok: boolean; code?: string; error?: string }> {
@@ -397,5 +389,42 @@ export const connectionsApi = {
             body: JSON.stringify({ concept, lessonTitles, relatedConcepts }),
         });
         return await res.json();
+    },
+
+    /**
+     * Streaming concept deep-dive — consumes SSE from /connections/deep-dive/stream.
+     * Returns AbortController so callers can cancel on unmount.
+     */
+    deepDiveStream(
+        concept: string,
+        lessonTitles: string[],
+        relatedConcepts: string[],
+        onChunk: (text: string) => void,
+        onDone: () => void,
+        onError: (error: string) => void,
+        signal?: AbortSignal,
+    ): AbortController {
+        return consumeSseStream(
+            `${API_BASE}/api/connections/deep-dive/stream`,
+            { method: 'POST', body: { concept, lessonTitles, relatedConcepts }, signal },
+            {
+                onEvent: (evt) => {
+                    if (evt.type === 'chunk' && typeof evt.text === 'string') {
+                        onChunk(evt.text);
+                    } else if (evt.type === 'done') {
+                        onDone();
+                    } else if (evt.type === 'error') {
+                        const msg = typeof evt.message === 'string' ? evt.message
+                            : typeof evt.error === 'string' ? evt.error
+                            : 'Stream error';
+                        onError(msg);
+                    }
+                },
+                onError: (err) => {
+                    logger.warn('Concept deep dive stream failed', err);
+                    onError(err);
+                },
+            },
+        );
     },
 };

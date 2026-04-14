@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { authService } from "../services/authService";
 import { User } from "../models/User";
+import { runWithUser } from "../utils/userContext";
 
 export interface AuthRequest extends Request {
   user?: { userId: string; role: string };
@@ -47,7 +48,9 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
     const decoded = authService.verifyToken(token);
     const role = await getFreshRole(decoded.userId, decoded.role);
     req.user = { userId: decoded.userId, role };
-    next();
+    // Bind userId into AsyncLocalStorage so downstream code (aiService budget
+    // tracking, etc.) can read it without explicit threading.
+    runWithUser(decoded.userId, () => next());
   } catch (err: unknown) {
     const message = (err instanceof Error && err.message) ? err.message : "Invalid token";
     res.status(401).json({ ok: false, error: message, code: "UNAUTHORIZED" });

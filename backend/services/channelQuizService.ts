@@ -10,6 +10,7 @@ import { buildToolContext } from "./contextAssemblerService";
 import { getLangDirective, type SupportedLang } from "../utils/langDirective";
 import { sanitizeForPrompt } from "../utils/sanitize";
 import { AppError, notFound, serviceUnavailable } from "../middleware/errorHandler";
+import { eventBus } from "../events/eventBus";
 
 // ── Quiz: generate ──────────────────────────────────────────────────────────
 export async function generateQuiz(
@@ -25,6 +26,7 @@ export async function generateQuiz(
   const includeTF = options?.includeTrueFalse ?? true;
 
   try {
+    eventBus.emit("ai:status", { channelId, tool: "quiz", state: "thinking" });
     const toolCtx = await buildToolContext(channelId, "quiz");
 
     const difficultyGuide = {
@@ -94,9 +96,12 @@ ${toolCtx ? `- Questions MUST be based on the provided lecture material
     };
 
     await channelToolRepo.save(channelId, data);
+    eventBus.emit("ai:status", { channelId, tool: "quiz", state: "complete" });
     return { data, sourcesSummary: toolCtx?.meta.sourcesSummary || null };
   } catch (err) {
     logger.error("channelToolService.generateQuiz error:", err);
+    eventBus.emit("ai:status", { channelId, tool: "quiz", state: "error" });
+    if (err instanceof AppError) throw err;
     throw serviceUnavailable("Failed to generate quiz");
   }
 }

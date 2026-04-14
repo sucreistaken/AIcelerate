@@ -86,6 +86,22 @@ export const channelToolController = {
     res.json({ ok: true, userMessage, aiMessage });
   }),
 
+  deepDiveChatStream: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.user!.userId;
+    const channel = await channelService.getByIdGlobal(req.params.channelId);
+    await verifyMembership(userId, channel.roomId);
+    const { text, nickname, topic, serverName } = req.body;
+    await channelToolService.deepDiveChatStream(
+      req.params.channelId,
+      text,
+      userId,
+      nickname ?? "",
+      topic ?? "",
+      serverName ?? "",
+      res
+    );
+  }),
+
   generateMindMap: asyncHandler(async (req: AuthRequest, res: Response) => {
     const channel = await channelService.getByIdGlobal(req.params.channelId);
     await verifyMembership(req.user!.userId, channel.roomId);

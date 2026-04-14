@@ -3,7 +3,7 @@ import { requireAuth, type AuthRequest } from "../middleware/auth";
 import { asyncHandler } from "../utils/asyncHandler";
 import mongoose from "mongoose";
 import { rateLimiter } from "../middleware/rateLimiter";
-import { getAiMetrics } from "../services/aiService";
+import { getAiMetrics, getUserAiUsage } from "../services/aiService";
 import { listLessons, listLessonsPaginated } from "../services/lessonDataService";
 import type { Lesson } from "../services/lessonDataService";
 import { listCourses } from "../services/courseDataService";
@@ -43,6 +43,12 @@ router.get("/health", (_req, res) => {
 router.get("/health/ai-metrics", requireAuth, (_req, res) => {
   res.json({ ok: true, data: getAiMetrics() });
 });
+
+// Per-user daily AI token usage / budget
+router.get("/api/ai-usage", requireAuth, asyncHandler(async (req: AuthRequest, res) => {
+  const usage = await getUserAiUsage(req.user!.userId);
+  res.json({ ok: true, ...usage });
+}));
 
 // Dashboard batch endpoint — replaces 7 separate calls with 1
 // All data served from in-memory cache (0 disk I/O)

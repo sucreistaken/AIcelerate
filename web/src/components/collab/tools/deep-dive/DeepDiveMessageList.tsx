@@ -3,6 +3,7 @@ import type { ChannelDeepDiveMessage } from "../../../../types";
 import { formatTimestamp } from "../../../../utils/formatters";
 import { hashAuthorColor, renderFormattedText } from "./DeepDiveHelpers";
 import type { QuickAction } from "./useDeepDive";
+import { TypingIndicator } from "../../../ui";
 
 interface Props {
   topic: string;
@@ -121,13 +122,10 @@ export default function DeepDiveMessageList({
               <div className="sh-dive__avatar sh-dive__avatar--ai">
                 <span>{"AI"}</span>
               </div>
+              {/* Keep the bubble shape from study-hub.css; render the shared
+                  TypingIndicator inside so all AI dot animations stay in sync. */}
               <div className="sh-dive__typing-bubble">
-                <span className="sh-dive__typing-label">Study AI d{"\ü"}{"\ş"}{"\ü"}n{"\ü"}yor</span>
-                <span className="sh-dive__typing-dots">
-                  <span className="sh-dive__dot" />
-                  <span className="sh-dive__dot" />
-                  <span className="sh-dive__dot" />
-                </span>
+                <TypingIndicator label={`Study AI d\u00FC\u015F\u00FCn\u00FCyor`} />
               </div>
             </div>
           )}

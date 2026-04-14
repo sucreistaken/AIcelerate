@@ -3,7 +3,7 @@
 // Handles model calls, retry logic, response parsing.
 
 import { logger } from "../utils/logger";
-import { getModel, safeGenerate, getTemperature, tryParseJSON, stripCodeFences } from "./aiService";
+import { getModel, safeGenerate, getTemperature, tryParseJSON, stripCodeFences, trackStreamUsage } from "./aiService";
 import {
   buildModulesPrompt,
   buildEmphasesPrompt,
@@ -21,6 +21,7 @@ import type { Lesson } from "./lessonDataService";
 import { smartTruncate } from "../utils/smartTruncate";
 import { getLangDirective } from "../utils/langDirective";
 import { withAiResilience } from "../utils/aiResilience";
+import { setupSSE } from "../utils/sse";
 import type { LessonPlan, ChatMessage } from "../types";
 import type { SupportedLang } from "../utils/langDirective";
 import { AppError } from "../middleware/errorHandler";
@@ -131,14 +132,7 @@ export async function generatePlanStream(
     : "—";
   const langDir = getLangDirective(lang);
 
-  // Detect client disconnect to stop wasting AI tokens
-  let clientDisconnected = false;
-  res.on("close", () => { clientDisconnected = true; });
-
-  const sendEvent = (data: Record<string, unknown>) => {
-    if (clientDisconnected) return;
-    try { res.write(`data: ${JSON.stringify(data)}\n\n`); } catch { clientDisconnected = true; }
-  };
+  const { send: sendEvent } = setupSSE(res);
 
   sendEvent({ type: "phase", phase: "analyzing", message: "Analyzing lesson content..." });
 
@@ -266,6 +260,8 @@ export async function generateChatResponseStream(
   prompt: string, history: ChatMessage[], res: import("express").Response
 ) {
   const timeoutMs = 30000;
+  const startMs = Date.now();
+  const modelName = "gemini-2.5-flash";
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -276,18 +272,19 @@ export async function generateChatResponseStream(
   let streamResult;
   try {
     streamResult = await withAiResilience(
-      async (_signal) => getModel().generateContentStream({
+      async (signal) => getModel().generateContentStream({
         contents: [
           ...(compressed.map((h) => ({ role: h.role === 'user' ? 'user' as const : 'model' as const, parts: [{ text: h.content }] }))),
           { role: 'user', parts: [{ text: prompt }] },
         ],
         generationConfig: { maxOutputTokens: 2000, temperature: getTemperature("creative") },
-      }),
-      { timeoutMs, label: "lesson_chat_stream" }
+      }, { signal }),
+      { timeoutMs, label: "lesson_chat_stream", breakerKey: "gemini-2.5-flash" }
     );
   } catch (initErr: unknown) {
     const initErrMsg = initErr instanceof Error ? initErr.message : String(initErr);
     logger.error({ err: initErrMsg }, "AI stream init failed");
+    trackStreamUsage("lesson_chat_stream", modelName, startMs, undefined, false);
     res.write(`data: ${JSON.stringify({ type: 'error', message: 'AI bağlantısı başarısız oldu, lütfen tekrar deneyin.' })}\n\n`);
     res.end();
     return;
@@ -298,6 +295,7 @@ export async function generateChatResponseStream(
   res.on("close", () => { clientDisconnected = true; });
 
   let fullText = '';
+  let streamSucceeded = true;
   try {
     for await (const chunk of streamResult.stream) {
       if (clientDisconnected) break; // Stop consuming AI tokens
@@ -315,15 +313,25 @@ export async function generateChatResponseStream(
   } catch (streamErr: unknown) {
     // Gemini sometimes throws "Failed to parse stream" mid-response.
     // Send whatever we have so far rather than losing the entire response.
+    streamSucceeded = false;
     const streamErrMsg = streamErr instanceof Error ? streamErr.message : String(streamErr);
     logger.warn({ err: streamErrMsg }, "AI stream interrupted, sending partial response");
     if (!fullText) {
+      trackStreamUsage("lesson_chat_stream", modelName, startMs, undefined, false);
       if (!clientDisconnected) {
         res.write(`data: ${JSON.stringify({ type: 'error', message: 'AI yanıt üretemedi, lütfen tekrar deneyin.' })}\n\n`);
         res.end();
       }
       return;
     }
+  }
+
+  // Read final usageMetadata from streamResult.response (resolves after stream drains)
+  try {
+    const finalResponse = await streamResult.response;
+    trackStreamUsage("lesson_chat_stream", modelName, startMs, finalResponse, streamSucceeded);
+  } catch {
+    trackStreamUsage("lesson_chat_stream", modelName, startMs, undefined, streamSucceeded);
   }
 
   if (!clientDisconnected) {
@@ -336,19 +344,18 @@ export async function generateChatResponseStream(
 export async function generateChatResponseSync(
   prompt: string, history: ChatMessage[]
 ): Promise<{ text: string; suggestions: string[] }> {
-  const timeoutMs = 30000;
-
   const compressed = compressHistory(history);
-  const result = await withAiResilience(
-    async (_signal) => {
-      const chat = getModel().startChat({
-        history: compressed.map((h) => ({ role: h.role === 'user' ? 'user' as const : 'model' as const, parts: [{ text: h.content }] })),
-        generationConfig: { maxOutputTokens: 2000, temperature: getTemperature("creative") },
-      });
-      return chat.sendMessage(prompt);
-    },
-    { timeoutMs, label: "lesson_chat_sync" }
-  );
+  const result = await safeGenerate({
+    contents: [
+      ...compressed.map((h) => ({
+        role: (h.role === "user" ? "user" : "model") as "user" | "model",
+        parts: [{ text: h.content }],
+      })),
+      { role: "user" as const, parts: [{ text: prompt }] },
+    ],
+    generationConfig: { maxOutputTokens: 2000, temperature: getTemperature("creative") },
+  }, { label: "lesson_chat_sync", timeoutMs: 30_000 });
+
   const text = result.response.text();
   const suggestions = extractSuggestions(text);
   return { text, suggestions };

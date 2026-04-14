@@ -27,6 +27,8 @@ vi.mock("../aiService", () => ({
   tryParseJSON: vi.fn((text: string) => {
     try { return JSON.parse(text); } catch { return null; }
   }),
+  trackStreamUsage: vi.fn(),
+  extractSafeText: vi.fn((r: { text: () => string } | undefined) => r?.text?.() ?? ""),
 }));
 
 // Mock lessonPrompts - store refs so we can assert on them
@@ -243,12 +245,11 @@ describe("lessonAiService", () => {
 
   describe("generateChatResponseSync", () => {
     it("returns text and suggestions from AI", async () => {
-      const mockSendMessage = vi.fn().mockResolvedValue({
+      mockGenerateContent.mockResolvedValueOnce({
         response: {
           text: () => "Great question!\n\n\u{1F4A1} **Suggested Questions:**\n1. What is X?\n2. How does Y work?\n3. Why is Z important?",
         },
       });
-      mockStartChat.mockReturnValue({ sendMessage: mockSendMessage });
 
       const result = await generateChatResponseSync("prompt text", []);
       expect(result.text).toContain("Great question!");
@@ -257,21 +258,19 @@ describe("lessonAiService", () => {
     });
 
     it("returns empty suggestions when none found", async () => {
-      const mockSendMessage = vi.fn().mockResolvedValue({
+      mockGenerateContent.mockResolvedValueOnce({
         response: { text: () => "Just a plain answer with no suggestions." },
       });
-      mockStartChat.mockReturnValue({ sendMessage: mockSendMessage });
 
       const result = await generateChatResponseSync("prompt", []);
       expect(result.text).toBe("Just a plain answer with no suggestions.");
       expect(result.suggestions).toEqual([]);
     });
 
-    it("passes history to startChat", async () => {
-      const mockSendMessage = vi.fn().mockResolvedValue({
+    it("passes history as contents to safeGenerate", async () => {
+      mockGenerateContent.mockResolvedValueOnce({
         response: { text: () => "response" },
       });
-      mockStartChat.mockReturnValue({ sendMessage: mockSendMessage });
 
       const history = [
         { role: "user" as const, content: "Hello" },
@@ -279,11 +278,13 @@ describe("lessonAiService", () => {
       ];
       await generateChatResponseSync("new question", history);
 
-      expect(mockStartChat).toHaveBeenCalledWith(
+      // safeGenerate (=mockGenerateContent) is called with a request whose
+      // contents include the history mapped to {role, parts:[{text}]}
+      expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
-          history: expect.arrayContaining([
-            expect.objectContaining({ role: "user" }),
-            expect.objectContaining({ role: "model" }),
+          contents: expect.arrayContaining([
+            expect.objectContaining({ role: "user", parts: [{ text: "Hello" }] }),
+            expect.objectContaining({ role: "model", parts: [{ text: "Hi there" }] }),
           ]),
         })
       );

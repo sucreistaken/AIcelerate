@@ -132,16 +132,16 @@ vi.mock("../../services/aiService", () => ({
     fallbackCount: 1,
     totalLatencyMs: 12000,
     avgLatencyMs: 286,
-    cacheHits: 5,
-    cacheSize: 3,
     uptime: 600,
   })),
   getModel: vi.fn(),
   safeGenerate: vi.fn(),
-  cachedGenerate: vi.fn(),
   getTemperature: vi.fn(() => 0.3),
   stripCodeFences: vi.fn((s: string) => s),
+  tryParseJSON: vi.fn((s: string) => { try { return JSON.parse(s); } catch { return null; } }),
   trackAiCall: vi.fn(),
+  trackStreamUsage: vi.fn(),
+  extractSafeText: vi.fn((r: { text: () => string }) => r?.text?.() ?? ""),
 }));
 
 import supertest from "supertest";

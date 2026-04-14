@@ -41,6 +41,8 @@ vi.mock("../aiService", () => ({
     try { return JSON.parse(text); } catch { return null; }
   }),
   stripCodeFences: vi.fn((text: string) => text.replace(/^```[\s\S]*?\n|```$/g, "").trim()),
+  trackStreamUsage: vi.fn(),
+  extractSafeText: vi.fn((r: { text: () => string } | undefined) => r?.text?.() ?? ""),
 }));
 
 // Mock schemas

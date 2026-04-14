@@ -6,7 +6,7 @@ import {
 import { buildToolContext, LessonContextMeta } from "./contextAssemblerService";
 import { generateQuiz, answerQuiz } from "./channelQuizService";
 import { addFlashcard, generateFlashcards, extractFlashcardsFromLesson, reviewFlashcard } from "./channelFlashcardService";
-import { deepDiveChat } from "./channelDeepDiveService";
+import { deepDiveChat, deepDiveChatStream } from "./channelDeepDiveService";
 import { generateMindMap } from "./channelMindMapService";
 import { generateId } from "../utils/idGenerator";
 
@@ -26,6 +26,7 @@ export const channelToolService = {
   extractFlashcardsFromLesson,
   reviewFlashcard,
   deepDiveChat,
+  deepDiveChatStream,
   generateMindMap,
 
   // ── Get lesson context meta (for frontend badges) ─────────────────────────

@@ -33,7 +33,10 @@ export function useDeepDive(
   const loading = useChannelToolStore((s) => !!s.aiPending[channelId]);
   const startRequest = useChannelToolStore((s) => s.startDeepDiveRequest);
   const setAiPending = useChannelToolStore((s) => s.setAiPending);
-  const finishResponse = useChannelToolStore((s) => s.finishDeepDiveResponse);
+  const addPlaceholder = useChannelToolStore((s) => s.addDeepDivePlaceholder);
+  const appendChunk = useChannelToolStore((s) => s.appendDeepDiveChunk);
+  const reconcile = useChannelToolStore((s) => s.reconcileDeepDiveStream);
+  const rollback = useChannelToolStore((s) => s.rollbackDeepDiveStream);
   const addNoteToStore = useChannelToolStore((s) => s.addNoteToStore);
 
   const [input, setInput] = useState("");
@@ -57,21 +60,32 @@ export function useDeepDive(
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // AbortController for the in-flight stream — cancelled on unmount or new send
+  const streamControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  async function handleSend(text?: string) {
+  // Cancel in-flight stream on unmount or channel switch
+  useEffect(() => {
+    return () => {
+      streamControllerRef.current?.abort();
+      streamControllerRef.current = null;
+    };
+  }, [channelId]);
+
+  function handleSend(text?: string) {
     const messageText = text ?? input.trim();
     if (!messageText || loading) return;
 
     setInput("");
 
     // ATOMIC: add user message + enable typing bubble in ONE set() — zero intermediate renders
-    const tempId = `temp-${Date.now()}`;
+    const tempUserId = `temp-user-${Date.now()}`;
+    const placeholderAiId = `temp-ai-${Date.now()}`;
     startRequest(channelId, {
-      id: tempId,
+      id: tempUserId,
       role: "user",
       text: messageText,
       authorId: "me",
@@ -79,17 +93,85 @@ export function useDeepDive(
       timestamp: new Date().toISOString(),
     });
 
-    try {
-      const { userMessage, aiMessage } = await channelToolApi.deepDiveChat(
-        channelId, messageText, nickname, topic, serverName
-      );
-      // ATOMIC: remove temp + add real msgs + clear aiPending — ONE Zustand set()
-      finishResponse(channelId, tempId, [userMessage, aiMessage]);
-      getCollabSocket().emit("tool:deepdive:msg", { channelId, userMessage, aiMessage });
-    } catch (err) {
-      logger.error("Deep dive chat failed:", err);
-      setAiPending(channelId, false); // typing bubble OFF on error
-    }
+    // Cancel any prior stream before starting a new one (shouldn't happen due
+    // to the `loading` guard above, but belt-and-braces).
+    streamControllerRef.current?.abort();
+
+    let receivedChunk = false;
+    let fullAiText = "";
+
+    const controller = channelToolApi.deepDiveChatStream(
+      channelId,
+      { text: messageText, nickname, topic, serverName },
+      {
+        onChunk: (chunk) => {
+          if (!receivedChunk) {
+            receivedChunk = true;
+            // First chunk: add the placeholder so text starts filling in.
+            // Keeping the typing bubble visible until this point gives the
+            // "AI thinking..." → "AI typing..." handoff the user expects.
+            addPlaceholder(channelId, {
+              id: placeholderAiId,
+              role: "assistant",
+              text: "",
+              authorId: "ai",
+              authorNickname: "Study AI",
+              timestamp: new Date().toISOString(),
+            });
+            // Hide the typing bubble now that the bubble itself is rendering.
+            setAiPending(channelId, false);
+          }
+          fullAiText += chunk;
+          appendChunk(channelId, placeholderAiId, chunk);
+        },
+        onDone: ({ userMessageId, aiMessageId }) => {
+          // Edge case: stream completed without any chunks (empty response).
+          // Add the placeholder now so reconciliation has a target to rename.
+          if (!receivedChunk) {
+            addPlaceholder(channelId, {
+              id: placeholderAiId,
+              role: "assistant",
+              text: "",
+              authorId: "ai",
+              authorNickname: "Study AI",
+              timestamp: new Date().toISOString(),
+            });
+          }
+          reconcile(channelId, tempUserId, placeholderAiId, userMessageId, aiMessageId);
+
+          // Broadcast the completed pair to other members so they see the AI message.
+          // We carry the real IDs + final AI text. The sender won't receive their
+          // own echo (socket.to() skips the origin).
+          getCollabSocket().emit("tool:deepdive:msg", {
+            channelId,
+            userMessage: {
+              id: userMessageId,
+              role: "user",
+              text: messageText,
+              authorId: "me",
+              authorNickname: nickname,
+              timestamp: new Date().toISOString(),
+            },
+            aiMessage: {
+              id: aiMessageId,
+              role: "assistant",
+              text: fullAiText,
+              authorId: "ai",
+              authorNickname: "Study AI",
+              timestamp: new Date().toISOString(),
+            },
+          });
+
+          streamControllerRef.current = null;
+        },
+        onError: (err) => {
+          logger.error("Deep dive chat stream failed:", err);
+          rollback(channelId, tempUserId, placeholderAiId);
+          streamControllerRef.current = null;
+        },
+      },
+    );
+    streamControllerRef.current = controller;
   }
 
   function handleQuickAction(prompt: string) {
