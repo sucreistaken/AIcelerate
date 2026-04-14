@@ -165,8 +165,8 @@ ${SLD || "—"}
   }, { label: "lo_alignment", timeoutMs: 60_000 });
   const rawAlignText = result.response.text();
   const parsed = tryParseJSON(rawAlignText) ?? tryParseJSON(stripCodeFences(rawAlignText));
-  if (!parsed) throw new AppError(500, "AI response parse error", "LLM_PARSE_ERROR");
-  if (!parsed?.segments || !Array.isArray(parsed.segments)) throw new AppError(500, "LO alignment JSON/schema error", "LLM_PARSE_ERROR");
+  if (!parsed) throw new AppError(502, "AI response parse error", "AI_PARSE_ERROR");
+  if (!parsed?.segments || !Array.isArray(parsed.segments)) throw new AppError(502, "LO alignment JSON/schema error", "AI_PARSE_ERROR");
 
   const linksByIndex = new Map<number, LoLink[]>();
   for (const item of parsed.segments) {
@@ -214,9 +214,9 @@ export async function generateLoModules(
   }, { label: "lo_modules", timeoutMs: 60_000 });
   const rawModText = result.response.text();
   const j = tryParseJSON(rawModText) ?? tryParseJSON(stripCodeFences(rawModText));
-  if (!j) throw new AppError(500, "AI response parse error", "LLM_PARSE_ERROR");
+  if (!j) throw new AppError(502, "AI response parse error", "AI_PARSE_ERROR");
   if (!j?.modules || !Array.isArray(j.modules)) {
-    throw new AppError(500, "LO modules JSON/schema error", "LLM_PARSE_ERROR");
+    throw new AppError(502, "LO modules JSON/schema error", "AI_PARSE_ERROR");
   }
 
   const loModules = { lessonId, modules: j.modules };
@@ -263,6 +263,6 @@ ${SLD}
   }, { label: "alignment_only", timeoutMs: 60_000 });
   const rawAlignOnlyText = result.response.text();
   const j = tryParseJSON(rawAlignOnlyText) ?? tryParseJSON(stripCodeFences(rawAlignOnlyText));
-  if (!j) throw new AppError(500, "AI response parse error", "LLM_PARSE_ERROR");
+  if (!j) throw new AppError(502, "AI response parse error", "AI_PARSE_ERROR");
   return j;
 }

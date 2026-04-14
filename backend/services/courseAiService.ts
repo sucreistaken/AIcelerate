@@ -205,7 +205,7 @@ Return JSON: { "days": [{ "day": "Monday", "slots": [{ "time": "Morning", "activ
   const text = result.response.text();
   logger.info(`[AI] STUDY_SCHEDULE | courseId=${courseId} | ~${Math.ceil(prompt.length / 4)} in, ~${Math.ceil(text.length / 4)} out`);
   const parsed = tryParseJSON(text) ?? tryParseJSON(stripCodeFences(text));
-  if (!parsed) throw new AppError(500, "AI response parse error", "LLM_PARSE_ERROR");
+  if (!parsed) throw new AppError(502, "AI response parse error", "AI_PARSE_ERROR");
 
   return {
     courseId,

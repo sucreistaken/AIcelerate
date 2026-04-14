@@ -1,5 +1,6 @@
 import { smartTruncate } from "./smartTruncate";
 import { getModel } from "../services/aiService";
+import { withAiResilience } from "./aiResilience";
 import { logger } from "./logger";
 
 /**
@@ -18,12 +19,16 @@ export function estimateTokens(text: string): number {
  */
 export async function countTokensAccurate(text: string): Promise<number> {
   try {
-    const model = getModel();
-    const result = await model.countTokens(text);
+    const result = await withAiResilience(
+      async (signal) => getModel().countTokens({
+        contents: [{ role: "user", parts: [{ text }] }],
+      }, { signal }),
+      { timeoutMs: 5_000, maxRetries: 1, label: "countTokens", breakerKey: "gemini-2.5-flash" }
+    );
     return result.totalTokens;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    logger.warn({ error: message }, "Accurate token count failed, using estimation");
+    logger.warn({ err: message }, "Accurate token count failed, using estimation");
     return estimateTokens(text);
   }
 }

@@ -68,9 +68,9 @@ export async function generateCheatSheet(
   }, { label: "cheat_sheet", timeoutMs: 45_000 });
   const rawText = result.response.text();
   const j = tryParseJSON(rawText) ?? tryParseJSON(stripCodeFences(rawText));
-  if (!j) throw new AppError(500, "AI response parse error", "LLM_PARSE_ERROR");
+  if (!j) throw new AppError(502, "AI response parse error", "AI_PARSE_ERROR");
   if (!j?.sections || !Array.isArray(j.sections)) {
-    throw new AppError(500, "Cheat sheet JSON/schema error", "LLM_PARSE_ERROR");
+    throw new AppError(502, "Cheat sheet JSON/schema error", "AI_PARSE_ERROR");
   }
 
   const cheatSheet = {
