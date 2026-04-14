@@ -3,7 +3,7 @@ import { channelToolRepo } from "../repositories/channelToolRepo";
 import { safeGenerate, stripCodeFences, getTemperature } from "./aiService";
 import { channelService } from "./channelService";
 import { getLesson } from "./lessonDataService";
-import { buildToolContext } from "./channelContextBuilder";
+import { buildToolContext } from "./contextAssemblerService";
 import { getLangDirective, type SupportedLang } from "../utils/langDirective";
 import { sanitizeForPrompt } from "../utils/sanitize";
 import { serviceUnavailable } from "../middleware/errorHandler";

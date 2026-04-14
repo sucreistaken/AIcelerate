@@ -31,7 +31,7 @@ export const profileController = {
   sendFriendRequest: asyncHandler(async (req: AuthRequest, res: Response) => {
     const userId = req.user!.userId;
     const result = await profileService.sendFriendRequest(userId, req.body.friendCode);
-    res.json({ ok: true, ...result });
+    res.json(result);
   }),
 
   acceptFriendRequest: asyncHandler(async (req: AuthRequest, res: Response) => {

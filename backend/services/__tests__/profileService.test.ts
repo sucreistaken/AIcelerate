@@ -278,7 +278,7 @@ describe("profileService", () => {
 
       const result = await profileService.sendFriendRequest("sender-1", "Target#1234");
 
-      expect(result.success).toBe(true);
+      expect(result.ok).toBe(true);
 
       // Verify two updates within transaction
       expect(mockUserFindByIdAndUpdate).toHaveBeenCalledTimes(2);

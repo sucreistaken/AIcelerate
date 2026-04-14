@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { asyncHandler } from "../utils/asyncHandler";
 import { computeLOProgress } from "../services/loProgressService";
 import { notFound } from "../middleware/errorHandler";
 import { requireAuth } from "../middleware/auth";
@@ -8,14 +9,14 @@ import { emptyBodySchema } from "../validators/routeSchemas";
 const router = Router();
 
 // Get LO progress dashboard for a course
-router.get("/courses/:id/lo-progress", requireAuth, (req, res) => {
+router.get("/courses/:id/lo-progress", requireAuth, asyncHandler(async (req, res) => {
   const data = computeLOProgress(req.params.id);
   if (!data) throw notFound("Course not found");
   res.json({ ok: true, ...data });
-});
+}));
 
 // Get single LO detail
-router.get("/courses/:id/lo-progress/:loId", requireAuth, (req, res) => {
+router.get("/courses/:id/lo-progress/:loId", requireAuth, asyncHandler(async (req, res) => {
   const data = computeLOProgress(req.params.id);
   if (!data) throw notFound("Course not found");
 
@@ -23,13 +24,13 @@ router.get("/courses/:id/lo-progress/:loId", requireAuth, (req, res) => {
   if (!lo) throw notFound("Learning Outcome not found");
 
   res.json({ ok: true, ...lo, courseName: data.courseName });
-});
+}));
 
 // Force recompute (same as GET but explicit)
-router.post("/courses/:id/lo-progress/refresh", requireAuth, validate(emptyBodySchema), (req, res) => {
+router.post("/courses/:id/lo-progress/refresh", requireAuth, validate(emptyBodySchema), asyncHandler(async (req, res) => {
   const data = computeLOProgress(req.params.id);
   if (!data) throw notFound("Course not found");
   res.json({ ok: true, ...data });
-});
+}));
 
 export default router;

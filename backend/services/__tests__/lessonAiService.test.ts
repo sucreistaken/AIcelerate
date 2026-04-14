@@ -65,7 +65,7 @@ vi.mock("../lessonDigestService", () => ({
 }));
 
 // Mock contextAssembler
-vi.mock("../../controllers/contextAssembler", () => ({
+vi.mock("../../services/contextAssemblerService", () => ({
   assembleCourseContext: vi.fn(() => ({
     courseName: "Test Course",
     courseBlock: "Course block",

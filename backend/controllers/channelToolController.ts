@@ -1,9 +1,8 @@
 import { Request, Response } from "express";
 import { channelToolService } from "../services/channelToolService";
-import { listLessons, getLesson } from "./lessonControllers";
+import { listLessons, getLesson } from "../services/lessonDataService";
 import { channelService } from "../services/channelService";
 import { roomService } from "../services/roomService";
-import { Channel } from "../models/Channel";
 import { AuthRequest } from "../middleware/auth";
 import { asyncHandler } from "../utils/asyncHandler";
 import { badRequest, notFound, forbidden } from "../middleware/errorHandler";
@@ -140,7 +139,7 @@ export const channelToolController = {
     const channel = await channelService.getByIdGlobal(req.params.channelId);
     await verifyMembership(userId, channel.roomId);
     await channelToolService.deleteNote(req.params.channelId, req.params.noteId);
-    res.json({ ok: true });
+    res.status(204).end();
   }),
 
   pinNote: asyncHandler(async (req: AuthRequest, res: Response) => {
@@ -184,9 +183,8 @@ export const channelToolController = {
     const { serverId, lessonId, lessonTitle } = req.body;
     if (!serverId || !lessonId || !lessonTitle) throw badRequest("Missing serverId, lessonId, or lessonTitle");
     await verifyMembership(userId, serverId);
-    const updated = await Channel.findByIdAndUpdate(channelId, { $set: { lessonId, lessonTitle } }, { new: true });
-    if (!updated) throw notFound("Channel not found");
-    res.json({ ok: true, channel: { ...updated.toJSON(), id: updated._id.toString() } });
+    const channel = await channelService.linkLesson(channelId, lessonId, lessonTitle);
+    res.json({ ok: true, channel });
   }),
 
   unlinkLesson: asyncHandler(async (req: AuthRequest, res: Response) => {
@@ -195,9 +193,8 @@ export const channelToolController = {
     const { serverId } = req.body;
     if (!serverId) throw badRequest("Missing serverId");
     await verifyMembership(userId, serverId);
-    const updated = await Channel.findByIdAndUpdate(channelId, { $unset: { lessonId: "", lessonTitle: "" } }, { new: true });
-    if (!updated) throw notFound("Channel not found");
-    res.json({ ok: true, channel: { ...updated.toJSON(), id: updated._id.toString() } });
+    const channel = await channelService.unlinkLesson(channelId);
+    res.json({ ok: true, channel });
   }),
 
   getLessonDetail: asyncHandler(async (req: Request, res: Response) => {

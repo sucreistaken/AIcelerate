@@ -94,7 +94,7 @@ vi.mock("../../services/courseAiService", () => ({
   generateStudySchedule: vi.fn(),
 }));
 
-vi.mock("../../controllers/schedulerController", () => ({
+vi.mock("../../services/schedulerService", () => ({
   getNextSession: vi.fn(() => ({ task: null, totalPending: 0 })),
   getDailyPlan: vi.fn(() => ({
     id: "dp-1",
@@ -107,7 +107,7 @@ vi.mock("../../controllers/schedulerController", () => ({
   getStreak: vi.fn(() => ({ currentStreak: 3, longestStreak: 7, lastStudyDate: "2026-04-10" })),
 }));
 
-vi.mock("../../controllers/flashcardController", () => ({
+vi.mock("../../services/flashcardService", () => ({
   getFlashcardStats: vi.fn(() => ({
     total: 10,
     new: 2,
@@ -119,7 +119,7 @@ vi.mock("../../controllers/flashcardController", () => ({
   getDueCards: vi.fn(() => []),
 }));
 
-vi.mock("../../controllers/notificationController", () => ({
+vi.mock("../../services/notificationService", () => ({
   checkAndGenerateNotifications: vi.fn(() => Promise.resolve([])),
   getUnreadCount: vi.fn(() => 3),
 }));

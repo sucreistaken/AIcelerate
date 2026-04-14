@@ -15,7 +15,7 @@ import type { Lesson } from "../types/lesson";
 import type { Course, CourseKnowledgeIndex, CourseProgress } from "../types/course";
 import type { Flashcard } from "../services/flashcardService";
 import type { WeaknessAnalysis, WeaknessSummary } from "../services/weaknessService";
-import type { ConceptConnection } from "../controllers/connectionsController";
+import type { ConceptConnection } from "../services/connectionService";
 import { LessonModel } from "../models/Lesson";
 import { FlashcardModel } from "../models/Flashcard";
 import { CourseModel } from "../models/Course";

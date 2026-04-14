@@ -4,6 +4,7 @@
 import { weaknessService } from "./weaknessService";
 import { flashcardService } from "./flashcardService";
 import { getCourse } from "./courseDataService";
+import { sprintService } from "./sprintService";
 import { generateId } from "../utils/idGenerator";
 import { ScheduleModel } from "../models/Schedule";
 
@@ -511,3 +512,29 @@ export const schedulerPersistence = {
     return recalcStreak(store.streak, today);
   },
 };
+
+// ── Standalone function aliases for backward-compatible imports ──
+
+export function getNextSession(courseId?: string): { task: StudyTask | null; totalPending: number } {
+  return schedulerPersistence.getNextSession(courseId);
+}
+
+export async function getDailyPlan(courseId?: string): Promise<DailyPlan> {
+  const settings = await sprintService.getSettings();
+  const budgetMinutes = settings.studyDurationMin * 3;
+  return schedulerPersistence.getDailyPlan(courseId, budgetMinutes);
+}
+
+export async function getWeeklyOverview(courseId?: string): Promise<WeeklyOverview> {
+  const settings = await sprintService.getSettings();
+  const dailyBudget = settings.studyDurationMin * 3;
+  return schedulerPersistence.getWeeklyOverview(courseId, dailyBudget);
+}
+
+export function completeTask(taskId: string): Promise<{ ok: boolean; streak: StreakData }> {
+  return schedulerPersistence.completeTask(taskId);
+}
+
+export function getStreak(): Promise<StreakData> {
+  return schedulerPersistence.getStreak();
+}

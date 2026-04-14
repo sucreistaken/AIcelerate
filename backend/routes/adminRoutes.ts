@@ -15,7 +15,7 @@ import {
   auditLogQuerySchema,
 } from "../validators/adminSchemas";
 import { emptyBodySchema } from "../validators/routeSchemas";
-import * as admin from "../controllers/adminController";
+import * as admin from "../services/adminPanelService";
 
 const router = Router();
 
@@ -79,8 +79,8 @@ router.delete(
   validate(emptyBodySchema),
   auditLog("user.delete"),
   asyncHandler(async (req, res) => {
-    const result = await admin.deleteUser(req.params.id);
-    res.json({ ok: true, ...result });
+    await admin.deleteUser(req.params.id);
+    res.status(204).end();
   })
 );
 
@@ -101,8 +101,8 @@ router.delete(
   validate(emptyBodySchema),
   auditLog("course.delete"),
   asyncHandler(async (req, res) => {
-    const result = await admin.deleteCourse(req.params.id);
-    res.json({ ok: true, ...result });
+    await admin.deleteCourse(req.params.id);
+    res.status(204).end();
   })
 );
 
@@ -123,8 +123,8 @@ router.delete(
   validate(emptyBodySchema),
   auditLog("lesson.delete"),
   asyncHandler(async (req, res) => {
-    const result = await admin.deleteLesson(req.params.id);
-    res.json({ ok: true, ...result });
+    await admin.deleteLesson(req.params.id);
+    res.status(204).end();
   })
 );
 
@@ -166,8 +166,8 @@ router.delete(
   validate(emptyBodySchema),
   auditLog("role.delete"),
   asyncHandler(async (req, res) => {
-    const result = await admin.deleteRole(req.params.id);
-    res.json({ ok: true, ...result });
+    await admin.deleteRole(req.params.id);
+    res.status(204).end();
   })
 );
 

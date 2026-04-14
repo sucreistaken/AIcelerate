@@ -6,7 +6,7 @@ import {
 import { safeGenerate, getTemperature, tryParseJSON, stripCodeFences } from "./aiService";
 import { SCHEMAS } from "../prompts/schemas";
 import { generateId } from "../utils/idGenerator";
-import { buildToolContext } from "./channelContextBuilder";
+import { buildToolContext } from "./contextAssemblerService";
 import { getLangDirective, type SupportedLang } from "../utils/langDirective";
 import { sanitizeForPrompt } from "../utils/sanitize";
 import { AppError, notFound, serviceUnavailable } from "../middleware/errorHandler";

@@ -163,3 +163,16 @@ export const quizPackService = {
     };
   },
 };
+
+// ── Standalone function aliases for backward-compatible imports ──
+
+export const generateQuizFromEmphases = (count = 5, lessonIds?: string[]) =>
+  quizPackService.generateFromEmphases(count, lessonIds);
+
+export const getQuizPack = (packId: string) =>
+  quizPackService.getPack(packId);
+
+export const scoreQuizPack = (
+  packId: string,
+  answers: Array<{ id: string; answer: string | boolean }>
+) => quizPackService.scorePack(packId, answers);

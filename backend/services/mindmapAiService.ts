@@ -6,7 +6,7 @@ import {
   buildMindmapModulePrompt,
   buildMindmapNodeDetailPrompt,
 } from "../prompts/lessonPrompts";
-import { assembleCourseContext } from "../controllers/contextAssembler";
+import { assembleCourseContext } from "./contextAssemblerService";
 import type { Lesson } from "./lessonDataService";
 import type { NodeDetailResult, PlanModule, PlanEmphasis } from "../types";
 import type { SupportedLang } from "../utils/langDirective";

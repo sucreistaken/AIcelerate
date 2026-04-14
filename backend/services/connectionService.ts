@@ -1,10 +1,9 @@
 import { logger } from "../utils/logger";
-// controllers/connectionsController.ts
 import { connectionsCache } from "../cache";
-import { listLessons, getMemory } from "./lessonControllers";
+import { listLessons, getMemory } from "./lessonDataService";
 import { GlobalMemoryModel } from "../models/GlobalMemory";
 import { SCHEMAS } from "../prompts/schemas";
-import { safeGenerate } from "../services/aiService";
+import { safeGenerate } from "./aiService";
 
 export type ConceptConnection = {
   concept: string;
@@ -15,9 +14,27 @@ export type ConceptConnection = {
   aiInsight?: string;
 };
 
-// Build connections by scanning all lessons (cached 120s when no AI enrichment)
-export async function buildConnections(userId: string, enrich: boolean = false): Promise<ConceptConnection[]> {
-  // Use cached result if available and no AI enrichment requested
+/** Find co-occurring concepts via inverted index (O(k) lookup, max 5) */
+function findRelatedConcepts(
+  concept: string,
+  lessonIds: Iterable<string>,
+  lessonToConcepts: Map<string, Set<string>>,
+): string[] {
+  const related = new Set<string>();
+  for (const lessonId of lessonIds) {
+    const coOccurring = lessonToConcepts.get(lessonId);
+    if (coOccurring) {
+      for (const other of coOccurring) {
+        if (other !== concept) related.add(other);
+        if (related.size >= 5) break;
+      }
+    }
+    if (related.size >= 5) break;
+  }
+  return [...related].slice(0, 5);
+}
+
+export async function buildConnections(userId: string, enrich = false): Promise<ConceptConnection[]> {
   if (!enrich) {
     const cached = connectionsCache.get(`connections:${userId}`);
     if (cached) return cached;
@@ -34,38 +51,32 @@ export async function buildConnections(userId: string, enrich: boolean = false):
 
     const terms = new Set<string>();
 
-    // From key_concepts
     if (lesson.plan.key_concepts) {
       for (const c of lesson.plan.key_concepts) {
         if (c) terms.add(c.toLowerCase().trim());
       }
     }
 
-    // From highlights
     if (lesson.highlights) {
       for (const h of lesson.highlights) {
         if (h) terms.add(h.toLowerCase().trim());
       }
     }
 
-    // From emphases statements
     const emphases = lesson.plan.emphases || lesson.professorEmphases || [];
     for (const e of emphases) {
       if (e.statement) {
-        // Extract key phrases (simplified NLP: take first 4-5 words)
         const words = e.statement.toLowerCase().split(/\s+/).slice(0, 5).join(" ");
         if (words.length > 5) terms.add(words);
       }
     }
 
-    // From module titles
     if (lesson.plan.modules) {
       for (const mod of lesson.plan.modules) {
         if (mod.title) terms.add(mod.title.toLowerCase().trim());
       }
     }
 
-    // Register each term
     for (const term of terms) {
       if (!conceptMap.has(term)) {
         conceptMap.set(term, { lessonIds: new Set(), lessonTitles: new Set() });
@@ -76,12 +87,11 @@ export async function buildConnections(userId: string, enrich: boolean = false):
     }
   }
 
-  // Cross-reference with recurring concepts from memory
   const recurringSet = new Set(
     (memory.recurringConcepts || []).map((c: string) => c.toLowerCase().trim())
   );
 
-  // Build inverted index: lessonId -> Set<concept> for O(1) co-occurrence lookup
+  // Build inverted index: lessonId -> Set<concept>
   const lessonToConcepts = new Map<string, Set<string>>();
   for (const [concept, data] of conceptMap) {
     for (const lessonId of data.lessonIds) {
@@ -90,26 +100,13 @@ export async function buildConnections(userId: string, enrich: boolean = false):
     }
   }
 
-  // Build connections for concepts appearing in 2+ lessons
+  // Multi-lesson connections (concepts appearing in 2+ lessons)
   const multiLessonConnections: ConceptConnection[] = [];
 
   for (const [concept, data] of conceptMap) {
     if (data.lessonIds.size < 2) continue;
 
-    // Find related concepts via inverted index (O(k) instead of O(n^2))
-    const relatedSet = new Set<string>();
-    for (const lessonId of data.lessonIds) {
-      const coOccurring = lessonToConcepts.get(lessonId);
-      if (coOccurring) {
-        for (const other of coOccurring) {
-          if (other !== concept) relatedSet.add(other);
-          if (relatedSet.size >= 5) break;
-        }
-      }
-      if (relatedSet.size >= 5) break;
-    }
-    const relatedConcepts = [...relatedSet].slice(0, 5);
-
+    const relatedConcepts = findRelatedConcepts(concept, data.lessonIds, lessonToConcepts);
     const baseFraction = data.lessonIds.size / Math.max(1, lessons.length);
     const boost = recurringSet.has(concept) ? 0.2 : 0;
     const strength = Math.min(1, Math.round((baseFraction + boost) * 100) / 100);
@@ -123,8 +120,7 @@ export async function buildConnections(userId: string, enrich: boolean = false):
     });
   }
 
-  // If no cross-lesson connections, include single-lesson key concepts
-  // so the feature always shows useful data
+  // Fallback: single-lesson key concepts if no cross-lesson connections
   let connections: ConceptConnection[];
 
   if (multiLessonConnections.length > 0) {
@@ -132,20 +128,7 @@ export async function buildConnections(userId: string, enrich: boolean = false):
   } else {
     connections = [];
     for (const [concept, data] of conceptMap) {
-      // Find related concepts via inverted index (O(k) instead of O(n^2))
-      const relatedSet = new Set<string>();
-      for (const lessonId of data.lessonIds) {
-        const coOccurring = lessonToConcepts.get(lessonId);
-        if (coOccurring) {
-          for (const other of coOccurring) {
-            if (other !== concept) relatedSet.add(other);
-            if (relatedSet.size >= 5) break;
-          }
-        }
-        if (relatedSet.size >= 5) break;
-      }
-      const relatedConcepts = [...relatedSet].slice(0, 5);
-
+      const relatedConcepts = findRelatedConcepts(concept, data.lessonIds, lessonToConcepts);
       const isRecurring = recurringSet.has(concept);
       const strength = Math.min(
         1,
@@ -162,13 +145,11 @@ export async function buildConnections(userId: string, enrich: boolean = false):
     }
   }
 
-  // Sort by strength descending
   connections.sort((a, b) => b.strength - a.strength);
 
-  // Generate AI insights for top 20 connections
+  // AI enrichment for top 20 connections
   if (enrich && connections.length > 0) {
-    const top = connections.slice(0, 20);
-    const batch = top.map((c) => ({
+    const batch = connections.slice(0, 20).map((c) => ({
       concept: c.concept,
       lessons: c.lessonTitles,
       related: c.relatedConcepts.slice(0, 3),
@@ -211,7 +192,6 @@ ${JSON.stringify(batch, null, 2)}`;
     }
   }
 
-  // Save connections to MongoDB scoped to user
   try {
     await GlobalMemoryModel.findOneAndUpdate(
       { userId },
@@ -222,13 +202,10 @@ ${JSON.stringify(batch, null, 2)}`;
     logger.error("Failed to save connections to MongoDB", err);
   }
 
-  // Cache the computed result (scoped by userId)
   connectionsCache.set(`connections:${userId}`, connections);
-
   return connections;
 }
 
-// Get existing connections for a user
 export async function getConnections(userId: string): Promise<ConceptConnection[]> {
   try {
     const doc = await GlobalMemoryModel.findOne({ userId }).lean();

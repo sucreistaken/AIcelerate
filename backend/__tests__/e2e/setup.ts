@@ -41,7 +41,7 @@ vi.mock("mongoose", async () => {
 // ---------------------------------------------------------------------------
 // Mock file I/O — prevents reading/writing to the data directory
 // ---------------------------------------------------------------------------
-vi.mock("../../utils/file-Handler", () => ({
+vi.mock("../../utils/fileHandler", () => ({
   readJSON: vi.fn().mockReturnValue(null),
   writeJSON: vi.fn(),
   ensureDir: vi.fn(),

@@ -15,14 +15,6 @@ import {
 } from "../services/courseDataService";
 import type { PlanModule } from "../types";
 
-// Re-export types so existing consumers don't break
-export type { Lesson, Emphasis, LoStudyModule, LessonLoModules, CheatSheet } from "../types/lesson";
-
-// Re-export service functions for backward compat (non-HTTP consumers)
-export {
-  listLessons, listLessonsPaginated, getLessons, getLesson, getMemory,
-  addLesson, upsertLesson, attachQuizPack, setQuizScore, updateProgress, deleteLesson,
-} from "../services/lessonDataService";
 
 // ── HTTP Handlers ───────────────────────────────────────────────────────────
 
@@ -71,7 +63,7 @@ export const lessonController = {
       rebuildKnowledgeIndex(course.id);
     }
     if (!deleteLesson(req.params.id)) throw notFound("Lesson not found");
-    res.json({ ok: true, deleted: req.params.id });
+    res.status(204).end();
   }),
 
   getMemory: asyncHandler(async (req: AuthRequest, res: Response) => {

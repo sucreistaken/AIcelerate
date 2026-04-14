@@ -48,7 +48,6 @@ export const roomController = {
     res.json({ ok: true, rooms });
   }),
 
-  /** @deprecated Alias for getUserRooms — used by legacy serverController routes */
   getUserServers: asyncHandler(async (req: AuthRequest, res: Response) => {
     const userId = req.user!.userId;
     const rooms = await roomService.getUserServers(userId);

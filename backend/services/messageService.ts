@@ -44,7 +44,7 @@ export const messageService = {
     await channelService.touchLastMessage(serverId, channelId);
 
     const result = message.toJSON();
-    eventBus.emit("message:sent", { channelId, serverId, message: result });
+    eventBus.emit("message:sent", { channelId, serverId, message: result as unknown as Record<string, unknown> });
 
     return result;
   },

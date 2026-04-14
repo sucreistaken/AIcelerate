@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { profileController } from "../controllers/profileController";
-import { roomController as serverController } from "../controllers/roomController";
+import { roomController } from "../controllers/roomController";
 import { channelController } from "../controllers/channelController";
-import { messageController as msgController } from "../controllers/messageController";
+import { messageController } from "../controllers/messageController";
 import { channelToolController } from "../controllers/channelToolController";
 import { exportController } from "../controllers/exportController";
 import { rateLimiter } from "../middleware/rateLimiter";
@@ -33,22 +33,22 @@ router.delete("/profiles/:id/friends/:friendId", requireAuth, validate(emptyBody
 router.get("/profiles/:id/friends", requireAuth, profileController.getFriends);
 
 // --- Servers ---
-router.post("/servers", requireAuth, validate(createServerSchema), serverController.create);
-router.get("/servers/discover", requireAuth, serverController.discover);
-router.get("/servers/templates", requireAuth, serverController.getTemplates);
-router.get("/servers/invite/:code", requireAuth, serverController.getByInviteCode);
-router.get("/servers/user/:userId", requireAuth, serverController.getUserServers);
-router.post("/servers/join-invite", requireAuth, validate(serverJoinInviteSchema), serverController.joinByInvite);
+router.post("/servers", requireAuth, validate(createServerSchema), roomController.create);
+router.get("/servers/discover", requireAuth, roomController.discover);
+router.get("/servers/templates", requireAuth, roomController.getTemplates);
+router.get("/servers/invite/:code", requireAuth, roomController.getByInviteCode);
+router.get("/servers/user/:userId", requireAuth, roomController.getUserServers);
+router.post("/servers/join-invite", requireAuth, validate(serverJoinInviteSchema), roomController.joinByInvite);
 
-router.get("/servers/:id", requireAuth, serverController.get);
-router.patch("/servers/:id", requireAuth, validate(updateServerSchema), serverController.update);
-router.post("/servers/:id/join", requireAuth, validate(emptyBodySchema), serverController.join);
-router.post("/servers/:id/leave", requireAuth, validate(emptyBodySchema), serverController.leave);
-router.post("/servers/:id/kick", requireAuth, validate(serverKickSchema), serverController.kick);
-router.delete("/servers/:id", requireAuth, validate(emptyBodySchema), serverController.delete);
-router.post("/servers/:id/categories", requireAuth, validate(serverAddCatSchema), serverController.addCategory);
-router.post("/servers/:id/regenerate-invite", requireAuth, validate(emptyBodySchema), serverController.regenerateInvite);
-router.get("/servers/:id/members", requireAuth, serverController.getMembers);
+router.get("/servers/:id", requireAuth, roomController.get);
+router.patch("/servers/:id", requireAuth, validate(updateServerSchema), roomController.update);
+router.post("/servers/:id/join", requireAuth, validate(emptyBodySchema), roomController.join);
+router.post("/servers/:id/leave", requireAuth, validate(emptyBodySchema), roomController.leave);
+router.post("/servers/:id/kick", requireAuth, validate(serverKickSchema), roomController.kick);
+router.delete("/servers/:id", requireAuth, validate(emptyBodySchema), roomController.delete);
+router.post("/servers/:id/categories", requireAuth, validate(serverAddCatSchema), roomController.addCategory);
+router.post("/servers/:id/regenerate-invite", requireAuth, validate(emptyBodySchema), roomController.regenerateInvite);
+router.get("/servers/:id/members", requireAuth, roomController.getMembers);
 
 // --- Channels ---
 router.post("/servers/:serverId/channels", requireAuth, validate(createChannelSchema), channelController.create);
@@ -58,17 +58,17 @@ router.patch("/servers/:serverId/channels/:channelId", requireAuth, validate(upd
 router.delete("/servers/:serverId/channels/:channelId", requireAuth, validate(emptyBodySchema), channelController.delete);
 
 // --- Lobby ---
-router.get("/lobby/messages", requireAuth, msgController.getLobbyMessages);
-router.post("/lobby/messages", requireAuth, rateLimiter("lobby", 20, 60000), validate(sendLobbyMessageSchema), msgController.sendLobbyMessage);
+router.get("/lobby/messages", requireAuth, messageController.getLobbyMessages);
+router.post("/lobby/messages", requireAuth, rateLimiter("lobby", 20, 60000), validate(sendLobbyMessageSchema), messageController.sendLobbyMessage);
 
 // --- Messages ---
-router.post("/channels/:channelId/messages", requireAuth, rateLimiter("messages", 30, 60000), validate(sendMessageSchema), msgController.send);
-router.get("/channels/:channelId/messages", requireAuth, msgController.getMessages);
-router.get("/channels/:channelId/threads/:threadId", requireAuth, msgController.getThread);
-router.patch("/channels/:channelId/messages/:messageId", requireAuth, validate(editMessageSchema), msgController.edit);
-router.delete("/channels/:channelId/messages/:messageId", requireAuth, validate(emptyBodySchema), msgController.delete);
-router.post("/channels/:channelId/messages/:messageId/react", requireAuth, validate(reactMessageSchema), msgController.react);
-router.post("/channels/:channelId/messages/:messageId/pin", requireAuth, validate(pinMessageSchema), msgController.pin);
+router.post("/channels/:channelId/messages", requireAuth, rateLimiter("messages", 30, 60000), validate(sendMessageSchema), messageController.send);
+router.get("/channels/:channelId/messages", requireAuth, messageController.getMessages);
+router.get("/channels/:channelId/threads/:threadId", requireAuth, messageController.getThread);
+router.patch("/channels/:channelId/messages/:messageId", requireAuth, validate(editMessageSchema), messageController.edit);
+router.delete("/channels/:channelId/messages/:messageId", requireAuth, validate(emptyBodySchema), messageController.delete);
+router.post("/channels/:channelId/messages/:messageId/react", requireAuth, validate(reactMessageSchema), messageController.react);
+router.post("/channels/:channelId/messages/:messageId/pin", requireAuth, validate(pinMessageSchema), messageController.pin);
 
 // --- Lessons (for material linking) ---
 router.get("/lessons", requireAuth, channelToolController.getLessons);

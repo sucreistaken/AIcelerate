@@ -3,14 +3,14 @@ import {
   ChannelToolData,
   NoteItem,
 } from "../repositories/channelToolRepo";
-import { buildToolContext, LessonContextMeta } from "./channelContextBuilder";
+import { buildToolContext, LessonContextMeta } from "./contextAssemblerService";
 import { generateQuiz, answerQuiz } from "./channelQuizService";
 import { addFlashcard, generateFlashcards, extractFlashcardsFromLesson, reviewFlashcard } from "./channelFlashcardService";
 import { deepDiveChat } from "./channelDeepDiveService";
 import { generateMindMap } from "./channelMindMapService";
 import { generateId } from "../utils/idGenerator";
 
-export { LessonContextMeta } from "./channelContextBuilder";
+export { LessonContextMeta } from "./contextAssemblerService";
 
 export const channelToolService = {
   // ── Get data ────────────────────────────────────────────────────────────────

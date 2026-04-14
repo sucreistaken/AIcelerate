@@ -2,16 +2,14 @@ import { Request, Response } from "express";
 import { messageService } from "../services/messageService";
 import { AuthRequest } from "../middleware/auth";
 import { asyncHandler } from "../utils/asyncHandler";
-import { Room } from "../models/Room";
-import { Channel } from "../models/Channel";
-import { forbidden, notFound } from "../middleware/errorHandler";
+import { channelService } from "../services/channelService";
+import { roomService } from "../services/roomService";
+import { forbidden } from "../middleware/errorHandler";
 
 async function verifyMembership(userId: string, channelId: string): Promise<void> {
-  const channel = await Channel.findById(channelId);
-  if (!channel) throw notFound("Channel not found");
+  const channel = await channelService.getByIdGlobal(channelId);
   if (channel.roomId === "global-lobby") return; // Lobby is open
-  const room = await Room.findById(channel.roomId);
-  if (!room) throw notFound("Room not found");
+  const room = await roomService.getById(channel.roomId);
   if (!room.memberIds.includes(userId)) {
     throw forbidden("Not a member of this server");
   }
@@ -60,7 +58,7 @@ export const messageController = {
     await messageService.delete(
       req.params.channelId, req.params.messageId, userId, isAdmin
     );
-    res.json({ ok: true });
+    res.status(204).end();
   }),
 
   react: asyncHandler(async (req: AuthRequest, res: Response) => {

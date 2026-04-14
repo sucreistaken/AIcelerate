@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { Lesson } from "../lessonControllers";
+import type { Lesson } from "../../services/lessonDataService";
 
 // In-memory store for lessons and memory
 let lessonsStore: Lesson[] = [];
@@ -62,7 +62,7 @@ vi.mock("../../cache", () => {
   };
 });
 
-// Import after mocks are set up
+// Import directly from service (canonical location)
 import {
   listLessons,
   getLesson,
@@ -72,7 +72,7 @@ import {
   addLesson,
   attachQuizPack,
   setQuizScore,
-} from "../lessonControllers";
+} from "../../services/lessonDataService";
 
 import { lessonCache } from "../../cache";
 

@@ -1,7 +1,7 @@
 import { logger } from "../utils/logger";
 import { safeGenerate, getTemperature, tryParseJSON, stripCodeFences } from "./aiService";
 import { getLesson, upsertLesson } from "./lessonDataService";
-import { assembleCourseContext } from "../controllers/contextAssembler";
+import { assembleCourseContext } from "./contextAssemblerService";
 import { buildCondensedContext } from "./loModuleService";
 import { smartTruncate } from "../utils/smartTruncate";
 import { getLangDirective } from "../utils/langDirective";

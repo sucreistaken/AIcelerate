@@ -16,17 +16,6 @@ import {
 import { upsertLesson } from "../services/lessonDataService";
 import { generateCourseChatResponse, generateStudySchedule } from "../services/courseAiService";
 
-// Re-export types so existing consumers don't break
-export type { Course, CourseKnowledgeIndex, FlashcardStats, LessonStatus, CourseProgress } from "../types/course";
-
-// Re-export service functions for backward compat (non-HTTP consumers)
-export {
-  listCourses, getCourse, listCoursesForUser, getCourseForUser,
-  createCourse, updateCourse, deleteCourse,
-  addLessonToCourse, removeLessonFromCourse, getCourseLessons,
-  getCourseForLesson, migrateOrphanLessons,
-  rebuildKnowledgeIndex, getCourseProgress, exportCourseData,
-} from "../services/courseDataService";
 
 // ── HTTP Handlers ───────────────────────────────────────────────────────────
 
@@ -56,7 +45,7 @@ export const courseController = {
   remove: asyncHandler(async (req: AuthRequest, res: Response) => {
     if (!getCourseForUser(req.params.id, req.user!.userId)) throw notFound("Course not found");
     if (!deleteCourse(req.params.id)) throw notFound("Course not found");
-    res.json({ ok: true });
+    res.status(204).end();
   }),
 
   addLesson: asyncHandler(async (req: AuthRequest, res: Response) => {

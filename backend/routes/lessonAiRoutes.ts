@@ -6,7 +6,7 @@ import { rateLimiter } from "../middleware/rateLimiter";
 import {
   getLesson, upsertLesson,
 } from "../services/lessonDataService";
-import { getCourseForLesson, rebuildKnowledgeIndex } from "../controllers/courseController";
+import { getCourseForLesson, rebuildKnowledgeIndex } from "../services/courseDataService";
 import { hasAlignment, generateAlignmentOnly, generateLoAlignmentForLesson, generateLoModules } from "../services/loModuleService";
 import { generateCheatSheet } from "../services/cheatSheetService";
 import { generateDigest } from "../services/lessonDigestService";

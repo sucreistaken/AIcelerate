@@ -3,7 +3,7 @@ import { asyncHandler } from "../utils/asyncHandler";
 import { validate } from "../middleware/validate";
 import { requireAuth, type AuthRequest } from "../middleware/auth";
 import { rateLimiter } from "../middleware/rateLimiter";
-import { buildConnections, getConnections } from "../controllers/connectionsController";
+import { buildConnections, getConnections } from "../services/connectionService";
 import { generateConnectionDeepDive } from "../services/connectionAiService";
 import { connectionDeepDiveSchema } from "../validators/connectionSchemas";
 import { emptyBodySchema } from "../validators/routeSchemas";

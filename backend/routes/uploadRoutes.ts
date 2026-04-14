@@ -100,7 +100,7 @@ router.post("/slides/upload", requireAuth, rateLimiter("slides-upload", 5, 60_00
 }));
 
 // GET /api/transcribe/stream/:jobId (SSE)
-router.get("/transcribe/stream/:jobId", requireAuth, (req, res) => {
+router.get("/transcribe/stream/:jobId", requireAuth, asyncHandler(async (req, res) => {
   const job = getJob(req.params.jobId);
   if (!job) throw notFound("Job not found");
 
@@ -118,6 +118,6 @@ router.get("/transcribe/stream/:jobId", requireAuth, (req, res) => {
   const onMsg = (msg: unknown) => send(msg);
   job.emitter.on("msg", onMsg);
   req.on("close", () => { clearInterval(heartbeat); job.emitter.off("msg", onMsg); res.end(); });
-});
+}));
 
 export default router;

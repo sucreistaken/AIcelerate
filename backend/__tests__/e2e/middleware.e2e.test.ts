@@ -65,16 +65,16 @@ vi.mock("../../services/courseAiService", () => ({
   generateCourseChatResponse: vi.fn(),
   generateStudySchedule: vi.fn(),
 }));
-vi.mock("../../controllers/schedulerController", () => ({
+vi.mock("../../services/schedulerService", () => ({
   getNextSession: vi.fn(() => ({ task: null, totalPending: 0 })),
   getDailyPlan: vi.fn(() => ({ id: "dp-1", date: "2026-04-11", generatedAt: "", tasks: [], totalEstimatedMinutes: 0, summary: "" })),
   getStreak: vi.fn(() => ({ currentStreak: 0, longestStreak: 0, lastStudyDate: null })),
 }));
-vi.mock("../../controllers/flashcardController", () => ({
+vi.mock("../../services/flashcardService", () => ({
   getFlashcardStats: vi.fn(() => ({ total: 0, new: 0, learning: 0, review: 0, graduated: 0, dueToday: 0 })),
   getDueCards: vi.fn(() => []),
 }));
-vi.mock("../../controllers/notificationController", () => ({
+vi.mock("../../services/notificationService", () => ({
   checkAndGenerateNotifications: vi.fn(() => []),
   getUnreadCount: vi.fn(() => 0),
 }));

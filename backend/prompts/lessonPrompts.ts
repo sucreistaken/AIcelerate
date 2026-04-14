@@ -4,57 +4,6 @@
 import { smartTruncate } from "../utils/smartTruncate";
 import { getLangDirective, type SupportedLang } from "../utils/langDirective";
 
-/** @deprecated Use buildModulesPrompt + buildEmphasesPrompt + buildAlignmentPrompt instead */
-export function buildPlanFromTextPrompt(
-  LEC: string, SLD: string, courseCode: string | undefined,
-  LO_BLOCK: string, lang?: SupportedLang
-): string {
-  return `
-You are an instructional designer. Analyze the following teacher speech transcript (LEC) and slide text (SLIDE) together.
-
-${getLangDirective(lang)}
-
-PRIORITY:
-- First, build a clear, practical learning plan (modules + lessons) that a student can follow.
-- Then, extract teacher emphases from the lecture, and compare lecture vs slides (alignment).
-
-IF OFFICIAL "LEARNING OUTCOMES" ARE PROVIDED:
-- Align your plan with these learning outcomes.
-
-[COURSE CODE]
-${courseCode || "—"}
-
-[OFFICIAL LEARNING OUTCOMES]
-${LO_BLOCK}
-
-GOALS:
-1) LEARNING PLAN ("modules"): 2–6 modules, each with 1–6 lessons.
-2) TEACHER EMPHASES ("emphases"): From transcript repetition, explanations, examples.
-3) ALIGNMENT ("alignment"): Topics in both LEC and SLIDE.
-
-OUTPUT: ONLY VALID JSON.
-SCHEMA:
-{
-  "topic": "string", "key_concepts": string[], "duration_weeks": number,
-  "modules": [{ "title": "string", "goal": "string", "lessons": [{ "title": "string", "objective": "string", "study_time_min": number, "activities": [{ "type": "read|watch|practice|quiz|project", "prompt": "string", "expected_outcome": "string" }], "mini_quiz": string[] }] }],
-  "resources": string[],
-  "emphases": [{ "statement": "string", "why": "string", "in_slides": boolean, "evidence": "string", "source": "lecture"|"slides"|"both", "from_transcript_quote": "string", "from_slide_quote": "string|null", "related_lo_ids": string[] }],
-  "seed_quiz": string[],
-  "alignment": { "summary_chatty": "string", "average_duration_min": number, "items": [{ "topic": "string", "concepts": string[], "in_both": boolean, "emphasis_level": "high"|"medium"|"low", "lecture_quotes": string[], "slide_refs": string[], "duration_min": number, "confidence": number }] }
-}
-
-RULES:
-- At least 5 emphases and 5 alignment items.
-- Output ONLY JSON.
-
-[LEC]
-${LEC}
-
-[SLIDE]
-${SLD}
-`.trim();
-}
-
 // ── Split plan prompts (OPT-1) ───────────────────────────────────────────────
 
 export function buildModulesPrompt(

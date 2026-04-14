@@ -180,3 +180,20 @@ export const shareService = {
     };
   },
 };
+
+// ── Standalone function aliases for backward-compatible imports ──
+
+export const createShare = (lessonId: string, createdBy?: string) =>
+  shareService.createShare(lessonId, createdBy);
+
+export const getShare = (shareId: string) =>
+  shareService.getShare(shareId);
+
+export const addComment = (shareId: string, author: string, text: string) =>
+  shareService.addComment(shareId, author, text);
+
+export const listShares = (userId: string) =>
+  shareService.listShares(userId);
+
+export const deleteShare = (shareId: string, userId: string) =>
+  shareService.deleteShare(shareId, userId);

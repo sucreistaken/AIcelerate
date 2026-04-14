@@ -55,19 +55,19 @@ vi.mock("../../utils/asyncHandler", () => ({
   asyncHandler: (fn: Function) => fn,
 }));
 
-// Mock Room model
-const mockRoomFindById = vi.fn();
-vi.mock("../../models/Room", () => ({
-  Room: {
-    findById: (...args: any[]) => mockRoomFindById(...args),
+// Mock channelService
+const mockChannelGetByIdGlobal = vi.fn();
+vi.mock("../../services/channelService", () => ({
+  channelService: {
+    getByIdGlobal: (...args: any[]) => mockChannelGetByIdGlobal(...args),
   },
 }));
 
-// Mock Channel model
-const mockChannelFindById = vi.fn();
-vi.mock("../../models/Channel", () => ({
-  Channel: {
-    findById: (...args: any[]) => mockChannelFindById(...args),
+// Mock roomService
+const mockRoomGetById = vi.fn();
+vi.mock("../../services/roomService", () => ({
+  roomService: {
+    getById: (...args: any[]) => mockRoomGetById(...args),
   },
 }));
 
@@ -89,12 +89,17 @@ function makeRes() {
   const res: any = {
     statusCode: 200,
     _jsonData: null,
+    _ended: false,
     status(code: number) {
       res.statusCode = code;
       return res;
     },
     json(data: any) {
       res._jsonData = data;
+      return res;
+    },
+    end() {
+      res._ended = true;
       return res;
     },
   };
@@ -129,8 +134,8 @@ describe("messageController", () => {
 
   describe("verifyMembership", () => {
     it("passes for room members", async () => {
-      mockChannelFindById.mockResolvedValue(makeChannel());
-      mockRoomFindById.mockResolvedValue(makeRoom({ memberIds: ["user-1", "user-2"] }));
+      mockChannelGetByIdGlobal.mockResolvedValue(makeChannel());
+      mockRoomGetById.mockResolvedValue(makeRoom({ memberIds: ["user-1", "user-2"] }));
       mockGetMessages.mockResolvedValue([]);
 
       const req = makeAuthReq({
@@ -146,8 +151,8 @@ describe("messageController", () => {
     });
 
     it("throws forbidden for non-members", async () => {
-      mockChannelFindById.mockResolvedValue(makeChannel());
-      mockRoomFindById.mockResolvedValue(makeRoom({ memberIds: ["user-2", "user-3"] })); // user-1 is NOT a member
+      mockChannelGetByIdGlobal.mockResolvedValue(makeChannel());
+      mockRoomGetById.mockResolvedValue(makeRoom({ memberIds: ["user-2", "user-3"] })); // user-1 is NOT a member
 
       const req = makeAuthReq({
         params: { channelId: "ch-1" },
@@ -161,7 +166,7 @@ describe("messageController", () => {
     });
 
     it("skips check for global-lobby", async () => {
-      mockChannelFindById.mockResolvedValue(makeChannel({ roomId: "global-lobby" }));
+      mockChannelGetByIdGlobal.mockResolvedValue(makeChannel({ roomId: "global-lobby" }));
       mockGetMessages.mockResolvedValue([]);
 
       const req = makeAuthReq({
@@ -170,15 +175,18 @@ describe("messageController", () => {
       });
       const res = makeRes();
 
-      // Should not throw and should NOT call Room.findById
+      // Should not throw and should NOT call roomService.getById
       await messageController.getMessages(req, res);
 
-      expect(mockRoomFindById).not.toHaveBeenCalled();
+      expect(mockRoomGetById).not.toHaveBeenCalled();
       expect(res._jsonData).toBeDefined();
     });
 
     it("throws notFound when channel doesn't exist", async () => {
-      mockChannelFindById.mockResolvedValue(null);
+      const err = new Error("Channel not found");
+      (err as any).statusCode = 404;
+      (err as any).code = "NOT_FOUND";
+      mockChannelGetByIdGlobal.mockRejectedValue(err);
 
       const req = makeAuthReq({
         params: { channelId: "nonexistent" },
@@ -192,8 +200,11 @@ describe("messageController", () => {
     });
 
     it("throws notFound when room doesn't exist", async () => {
-      mockChannelFindById.mockResolvedValue(makeChannel({ roomId: "room-999" }));
-      mockRoomFindById.mockResolvedValue(null);
+      mockChannelGetByIdGlobal.mockResolvedValue(makeChannel({ roomId: "room-999" }));
+      const err = new Error("Room not found");
+      (err as any).statusCode = 404;
+      (err as any).code = "NOT_FOUND";
+      mockRoomGetById.mockRejectedValue(err);
 
       const req = makeAuthReq({
         params: { channelId: "ch-1" },
@@ -211,8 +222,8 @@ describe("messageController", () => {
 
   describe("send()", () => {
     it("calls verifyMembership then messageService.send", async () => {
-      mockChannelFindById.mockResolvedValue(makeChannel());
-      mockRoomFindById.mockResolvedValue(makeRoom({ memberIds: ["user-1"] }));
+      mockChannelGetByIdGlobal.mockResolvedValue(makeChannel());
+      mockRoomGetById.mockResolvedValue(makeRoom({ memberIds: ["user-1"] }));
       const sentMsg = { id: "msg-1", content: "Hello" };
       mockSend.mockResolvedValue(sentMsg);
 
@@ -224,15 +235,15 @@ describe("messageController", () => {
 
       await messageController.send(req, res);
 
-      expect(mockChannelFindById).toHaveBeenCalledWith("ch-1");
+      expect(mockChannelGetByIdGlobal).toHaveBeenCalled();
       expect(mockSend).toHaveBeenCalledWith("ch-1", "room-1", "user-1", "Hello", "text", [], undefined);
       expect(res.statusCode).toBe(201);
       expect(res._jsonData).toEqual({ ok: true, message: sentMsg });
     });
 
     it("uses serverId from body if not in params", async () => {
-      mockChannelFindById.mockResolvedValue(makeChannel());
-      mockRoomFindById.mockResolvedValue(makeRoom({ memberIds: ["user-1"] }));
+      mockChannelGetByIdGlobal.mockResolvedValue(makeChannel());
+      mockRoomGetById.mockResolvedValue(makeRoom({ memberIds: ["user-1"] }));
       mockSend.mockResolvedValue({ id: "msg-1" });
 
       const req = makeAuthReq({
@@ -259,8 +270,8 @@ describe("messageController", () => {
 
   describe("edit()", () => {
     it("calls verifyMembership then messageService.edit", async () => {
-      mockChannelFindById.mockResolvedValue(makeChannel());
-      mockRoomFindById.mockResolvedValue(makeRoom({ memberIds: ["user-1"] }));
+      mockChannelGetByIdGlobal.mockResolvedValue(makeChannel());
+      mockRoomGetById.mockResolvedValue(makeRoom({ memberIds: ["user-1"] }));
       const editedMsg = { id: "msg-1", content: "Edited", edited: true };
       mockEdit.mockResolvedValue(editedMsg);
 
@@ -280,9 +291,9 @@ describe("messageController", () => {
   // ── delete() ────────────────────────────────────────────────────────
 
   describe("delete()", () => {
-    it("calls verifyMembership then messageService.delete", async () => {
-      mockChannelFindById.mockResolvedValue(makeChannel());
-      mockRoomFindById.mockResolvedValue(makeRoom({ memberIds: ["user-1"] }));
+    it("calls verifyMembership then messageService.delete and returns 204", async () => {
+      mockChannelGetByIdGlobal.mockResolvedValue(makeChannel());
+      mockRoomGetById.mockResolvedValue(makeRoom({ memberIds: ["user-1"] }));
       mockDelete.mockResolvedValue(undefined);
 
       const req = makeAuthReq({
@@ -294,12 +305,13 @@ describe("messageController", () => {
       await messageController.delete(req, res);
 
       expect(mockDelete).toHaveBeenCalledWith("ch-1", "msg-1", "user-1", false);
-      expect(res._jsonData).toEqual({ ok: true });
+      expect(res.statusCode).toBe(204);
+      expect(res._ended).toBe(true);
     });
 
     it("passes isAdmin true when user role is admin", async () => {
-      mockChannelFindById.mockResolvedValue(makeChannel());
-      mockRoomFindById.mockResolvedValue(makeRoom({ memberIds: ["user-1"] }));
+      mockChannelGetByIdGlobal.mockResolvedValue(makeChannel());
+      mockRoomGetById.mockResolvedValue(makeRoom({ memberIds: ["user-1"] }));
       mockDelete.mockResolvedValue(undefined);
 
       const req = makeAuthReq({
@@ -318,8 +330,8 @@ describe("messageController", () => {
 
   describe("getMessages()", () => {
     it("calls verifyMembership then returns messages", async () => {
-      mockChannelFindById.mockResolvedValue(makeChannel());
-      mockRoomFindById.mockResolvedValue(makeRoom({ memberIds: ["user-1"] }));
+      mockChannelGetByIdGlobal.mockResolvedValue(makeChannel());
+      mockRoomGetById.mockResolvedValue(makeRoom({ memberIds: ["user-1"] }));
       const messages = [{ id: "m1", content: "Hello" }, { id: "m2", content: "World" }];
       mockGetMessages.mockResolvedValue(messages);
 
@@ -336,8 +348,8 @@ describe("messageController", () => {
     });
 
     it("uses default limit of 50 when not provided", async () => {
-      mockChannelFindById.mockResolvedValue(makeChannel());
-      mockRoomFindById.mockResolvedValue(makeRoom({ memberIds: ["user-1"] }));
+      mockChannelGetByIdGlobal.mockResolvedValue(makeChannel());
+      mockRoomGetById.mockResolvedValue(makeRoom({ memberIds: ["user-1"] }));
       mockGetMessages.mockResolvedValue([]);
 
       const req = makeAuthReq({
@@ -356,8 +368,8 @@ describe("messageController", () => {
 
   describe("react()", () => {
     it("calls verifyMembership then messageService.react", async () => {
-      mockChannelFindById.mockResolvedValue(makeChannel());
-      mockRoomFindById.mockResolvedValue(makeRoom({ memberIds: ["user-1"] }));
+      mockChannelGetByIdGlobal.mockResolvedValue(makeChannel());
+      mockRoomGetById.mockResolvedValue(makeRoom({ memberIds: ["user-1"] }));
       const updatedMsg = { id: "msg-1", reactions: [{ emoji: "thumbsup", userIds: ["user-1"] }] };
       mockReact.mockResolvedValue(updatedMsg);
 
@@ -378,8 +390,8 @@ describe("messageController", () => {
 
   describe("pin()", () => {
     it("calls verifyMembership then messageService.pin", async () => {
-      mockChannelFindById.mockResolvedValue(makeChannel());
-      mockRoomFindById.mockResolvedValue(makeRoom({ memberIds: ["user-1"] }));
+      mockChannelGetByIdGlobal.mockResolvedValue(makeChannel());
+      mockRoomGetById.mockResolvedValue(makeRoom({ memberIds: ["user-1"] }));
       const pinnedMsg = { id: "msg-1", pinned: true };
       mockPin.mockResolvedValue(pinnedMsg);
 

@@ -5,7 +5,7 @@ import {
   getWeeklyOverview,
   completeTask as completeSchedulerTask,
   getStreak,
-} from "../controllers/schedulerController";
+} from "../services/schedulerService";
 import { requireAuth } from "../middleware/auth";
 import { asyncHandler } from "../utils/asyncHandler";
 import { validate } from "../middleware/validate";

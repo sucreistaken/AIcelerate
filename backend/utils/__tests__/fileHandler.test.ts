@@ -9,7 +9,7 @@ vi.mock("../../utils/logger", () => ({
 }));
 
 // Import after mocks
-import { readJSON, writeJSON, ensureDir, ensureDataFiles } from "../file-Handler";
+import { readJSON, writeJSON, ensureDir, ensureDataFiles } from "../fileHandler";
 
 describe("fileHandler", () => {
   let tmpDir: string;

@@ -174,8 +174,7 @@ describe("Courses E2E", () => {
         .delete("/api/courses/course-del")
         .set("Authorization", getAuthHeader(USER_A));
 
-      expect(res.status).toBe(200);
-      expect(res.body.ok).toBe(true);
+      expect(res.status).toBe(204);
     });
 
     it("returns 404 when deleting other user's course", async () => {

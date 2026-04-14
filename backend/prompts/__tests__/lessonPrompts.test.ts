@@ -1,39 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
-  buildPlanFromTextPrompt,
   buildQuizFromPlanPrompt,
   buildQuizEvalPrompt,
   buildChatContext,
   buildChatPrompt,
   buildMindmapPrompt,
 } from "../lessonPrompts";
-
-describe("buildPlanFromTextPrompt", () => {
-  it("includes lecture and slide text", () => {
-    const prompt = buildPlanFromTextPrompt("Lecture content", "Slide content", undefined, "—");
-    expect(prompt).toContain("Lecture content");
-    expect(prompt).toContain("Slide content");
-  });
-
-  it("includes course code when provided", () => {
-    const prompt = buildPlanFromTextPrompt("lec", "sld", "CS101", "—");
-    expect(prompt).toContain("CS101");
-  });
-
-  it("includes learning outcomes block", () => {
-    const loBlock = "1. Understand X\n2. Apply Y";
-    const prompt = buildPlanFromTextPrompt("lec", "sld", undefined, loBlock);
-    expect(prompt).toContain("Understand X");
-    expect(prompt).toContain("Apply Y");
-  });
-
-  it("contains JSON schema instructions", () => {
-    const prompt = buildPlanFromTextPrompt("lec", "sld", undefined, "—");
-    expect(prompt).toContain("ONLY VALID JSON");
-    expect(prompt).toContain("modules");
-    expect(prompt).toContain("emphases");
-  });
-});
 
 describe("buildQuizFromPlanPrompt", () => {
   it("includes plan JSON", () => {

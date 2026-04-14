@@ -6,7 +6,7 @@ import {
   generateQuizFromEmphases,
   getQuizPack,
   scoreQuizPack,
-} from "../controllers/quizController";
+} from "../services/quizPackService";
 import { attachQuizPack, setQuizScore } from "../services/lessonDataService";
 import { isQuizPack } from "../types";
 import { quizGenerateSchema, quizSubmitSchema } from "../validators/routeSchemas";

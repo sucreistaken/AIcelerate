@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { Course } from "../courseController";
+import type { Course } from "../../services/courseDataService";
 
 // Ensure env vars are set before any module loads
 vi.hoisted(() => {
@@ -51,7 +51,7 @@ vi.mock("../../cache", () => {
   };
 });
 
-vi.mock("../../utils/file-Handler", () => ({
+vi.mock("../../utils/fileHandler", () => ({
   readJSON: vi.fn(),
   writeJSON: vi.fn(),
   ensureDataFiles: vi.fn(),
@@ -68,7 +68,7 @@ vi.mock("../../utils/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), child: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })) },
 }));
 
-// Import after mocks — re-exports come through from courseDataService
+// Import directly from service (canonical location)
 import {
   createCourse,
   getCourse,
@@ -78,7 +78,7 @@ import {
   addLessonToCourse,
   removeLessonFromCourse,
   getCourseForLesson,
-} from "../courseController";
+} from "../../services/courseDataService";
 
 import { courseCache } from "../../cache";
 

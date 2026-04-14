@@ -1,14 +1,15 @@
 import { Router } from "express";
 import { requireAuth, type AuthRequest } from "../middleware/auth";
+import { asyncHandler } from "../utils/asyncHandler";
 import mongoose from "mongoose";
 import { rateLimiter } from "../middleware/rateLimiter";
 import { getAiMetrics } from "../services/aiService";
 import { listLessons, listLessonsPaginated } from "../services/lessonDataService";
 import type { Lesson } from "../services/lessonDataService";
-import { listCourses } from "../controllers/courseController";
-import { getNextSession, getDailyPlan, getStreak } from "../controllers/schedulerController";
-import { getFlashcardStats } from "../controllers/flashcardController";
-import { checkAndGenerateNotifications, getUnreadCount } from "../controllers/notificationController";
+import { listCourses } from "../services/courseDataService";
+import { getNextSession, getDailyPlan, getStreak } from "../services/schedulerService";
+import { getFlashcardStats } from "../services/flashcardService";
+import { checkAndGenerateNotifications, getUnreadCount } from "../services/notificationService";
 
 import lessonRoutes from "./lessonRoutes";
 import lessonAiRoutes from "./lessonAiRoutes";
@@ -46,7 +47,7 @@ router.get("/health/ai-metrics", requireAuth, (_req, res) => {
 // Dashboard batch endpoint — replaces 7 separate calls with 1
 // All data served from in-memory cache (0 disk I/O)
 // ?lite=true strips transcript/slideText (~50-100KB saved per response)
-router.get("/api/dashboard/init", requireAuth, async (req: AuthRequest, res) => {
+router.get("/api/dashboard/init", requireAuth, asyncHandler(async (req: AuthRequest, res) => {
   const userId = req.user?.userId;
   const courseId = req.query.courseId as string | undefined;
   const lite = req.query.lite === "true";
@@ -97,7 +98,7 @@ router.get("/api/dashboard/init", requireAuth, async (req: AuthRequest, res) => 
     const message = err instanceof Error ? err.message : String(err);
     res.status(500).json({ ok: false, error: message });
   }
-});
+}));
 
 // Auth
 router.use("/api", authRoutes);

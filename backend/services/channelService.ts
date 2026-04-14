@@ -143,6 +143,26 @@ export const channelService = {
     }
   },
 
+  async linkLesson(channelId: string, lessonId: string, lessonTitle: string) {
+    const updated = await Channel.findByIdAndUpdate(
+      channelId,
+      { $set: { lessonId, lessonTitle } },
+      { new: true }
+    );
+    if (!updated) throw notFound("Channel not found");
+    return { ...updated.toJSON(), id: updated._id.toString() };
+  },
+
+  async unlinkLesson(channelId: string) {
+    const updated = await Channel.findByIdAndUpdate(
+      channelId,
+      { $unset: { lessonId: "", lessonTitle: "" } },
+      { new: true }
+    );
+    if (!updated) throw notFound("Channel not found");
+    return { ...updated.toJSON(), id: updated._id.toString() };
+  },
+
   async touchLastMessage(_roomId: string, channelId: string) {
     await Channel.findByIdAndUpdate(channelId, { $set: { lastMessageAt: new Date() } });
   },

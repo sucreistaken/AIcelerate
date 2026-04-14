@@ -183,7 +183,7 @@ export const profileService = {
       await session.endSession();
     }
 
-    return { success: true, message: `Friend request sent to ${target.profile.nickname}` };
+    return { ok: true, message: `Friend request sent to ${target.profile.nickname}` };
   },
 
   async acceptFriendRequest(userId: string, fromId: string) {

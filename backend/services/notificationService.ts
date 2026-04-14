@@ -252,3 +252,23 @@ export const notificationService = {
     return newNotifications;
   },
 };
+
+// ── Standalone function aliases for backward-compatible imports ──
+
+export const listNotifications = (userId: string, unreadOnly?: boolean) =>
+  notificationService.listNotifications(userId, unreadOnly);
+
+export const dismissNotification = (userId: string, notifId: string) =>
+  notificationService.dismissNotification(userId, notifId);
+
+export const dismissAllNotifications = (userId: string) =>
+  notificationService.dismissAllNotifications(userId);
+
+export const getUnreadCount = (userId: string) =>
+  notificationService.getUnreadCount(userId);
+
+export const createNotification = (userId: string, params: Parameters<typeof notificationService.createNotification>[1]) =>
+  notificationService.createNotification(userId, params);
+
+export const checkAndGenerateNotifications = (userId: string) =>
+  notificationService.checkAndGenerateNotifications(userId);

@@ -277,3 +277,31 @@ export const flashcardService = {
     return deleted;
   },
 };
+
+// ── Standalone function aliases for backward-compatible imports ──
+
+export const loadFlashcards = () => flashcardService.loadAll();
+
+export const saveFlashcards = (cards: Flashcard[]) => flashcardService.saveAll(cards);
+
+export const createCard = (
+  lessonId: string,
+  topicName: string,
+  front: string,
+  back: string,
+  source: Flashcard["source"]
+) => flashcardService.create(lessonId, topicName, front, back, source);
+
+export const generateFlashcardsForLesson = (lessonId: string) =>
+  flashcardService.generateForLesson(lessonId);
+
+export const reviewCard = (cardId: string, quality: number) =>
+  flashcardService.review(cardId, quality);
+
+export const getDueCards = () => flashcardService.getDueCards();
+
+export const getFlashcards = (lessonId?: string) => flashcardService.getAll(lessonId);
+
+export const getFlashcardStats = () => flashcardService.getStats();
+
+export const deleteFlashcard = (cardId: string) => flashcardService.delete(cardId);

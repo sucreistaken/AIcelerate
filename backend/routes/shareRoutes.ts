@@ -5,7 +5,7 @@ import {
   addComment,
   listShares,
   deleteShare,
-} from "../controllers/shareController";
+} from "../services/shareService";
 import { upsertLesson } from "../services/lessonDataService";
 import { requireAuth, AuthRequest } from "../middleware/auth";
 import { asyncHandler } from "../utils/asyncHandler";
@@ -44,9 +44,9 @@ router.get("/shares", requireAuth, asyncHandler(async (req: AuthRequest, res) =>
 
 router.delete("/shares/:shareId", requireAuth, validate(emptyBodySchema), asyncHandler(async (req: AuthRequest, res) => {
   const userId = req.user!.userId;
-  const ok = await deleteShare(req.params.shareId, userId);
-  if (!ok) return res.status(404).json({ ok: false, error: "Share not found" });
-  res.json({ ok: true });
+  const deleted = await deleteShare(req.params.shareId, userId);
+  if (!deleted) return res.status(404).json({ ok: false, error: "Share not found" });
+  res.status(204).end();
 }));
 
 router.post("/shares/:shareId/import", requireAuth, validate(emptyBodySchema), asyncHandler(async (req, res) => {

@@ -119,10 +119,10 @@ vi.mock("../../repositories/lessonRepo", () => ({
   },
 }));
 
-// ── Mock notificationController (dynamic import) ──
+// ── Mock notificationService (dynamic import) ──
 const mockCreateNotification = vi.fn();
 
-vi.mock("../notificationController", () => ({
+vi.mock("../../services/notificationService", () => ({
   createNotification: (...args: unknown[]) => mockCreateNotification(...args),
 }));
 
@@ -146,7 +146,7 @@ import {
   getSettings,
   updateSettings,
   sendNotification,
-} from "../adminController";
+} from "../../services/adminPanelService";
 
 // ── Helpers ──
 

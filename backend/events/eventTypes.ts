@@ -1,7 +1,6 @@
 export interface EventMap {
   // Message events
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Mongoose toJSON() returns complex type
-  "message:sent": { channelId: string; serverId: string; message: any };
+  "message:sent": { channelId: string; serverId: string; message: Record<string, unknown> };
   "message:deleted": { channelId: string; messageId: string };
   "message:reacted": { channelId: string; messageId: string; emoji: string; userId: string };
 

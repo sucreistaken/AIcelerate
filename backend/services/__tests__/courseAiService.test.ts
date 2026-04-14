@@ -14,7 +14,7 @@ vi.mock("../../services/courseDataService", () => ({
 }));
 
 // Mock contextAssembler — called by generateCourseChatResponse
-vi.mock("../../controllers/contextAssembler", () => ({
+vi.mock("../../services/contextAssemblerService", () => ({
   assembleCourseWideContext: vi.fn(() => ({
     fullContext: "Mocked course context",
   })),

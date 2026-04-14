@@ -1,14 +1,14 @@
-// controllers/adminController.ts
+// services/adminPanelService.ts — Admin panel business logic (CRUD, stats, roles, settings)
 import { User } from "../models/User";
 import { roleRepo } from "../repositories/roleRepo";
 import { auditRepo } from "../repositories/auditRepo";
 import { settingsRepo } from "../repositories/settingsRepo";
 import { generateId } from "../utils/idGenerator";
-import { cascadeDeleteUser } from "../services/adminService";
+import { cascadeDeleteUser } from "./adminService";
 import { notFound, badRequest, forbidden, conflict } from "../middleware/errorHandler";
 import { logger } from "../utils/logger";
 import type { PaginationParams, Permission } from "../types/admin";
-import type { NotificationType, NotificationSeverity } from "./notificationController";
+import type { NotificationType, NotificationSeverity } from "./notificationService";
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -307,7 +307,7 @@ export async function sendNotification(data: {
 }) {
   try {
     // Dynamic import — graceful if notification controller is unavailable
-    const { createNotification } = await import("./notificationController");
+    const { createNotification } = await import("./notificationService");
 
     // Send to each target user (or skip if no targets)
     const targetIds = data.targetUserIds || [];

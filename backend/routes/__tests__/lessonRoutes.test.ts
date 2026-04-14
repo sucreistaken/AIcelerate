@@ -44,7 +44,7 @@ vi.mock("../../services/courseDataService", () => ({
   rebuildKnowledgeIndex: (...args: any[]) => mockRebuildKnowledgeIndex(...args),
 }));
 
-vi.mock("../../controllers/contextAssembler", () => ({
+vi.mock("../../services/contextAssemblerService", () => ({
   assembleCourseContext: vi.fn(),
 }));
 
@@ -144,6 +144,7 @@ function mockRes() {
   const res: any = {
     json: vi.fn().mockReturnThis(),
     status: vi.fn().mockReturnThis(),
+    end: vi.fn().mockReturnThis(),
   };
   return res;
 }
@@ -275,7 +276,8 @@ describe("lessonRoutes", () => {
       expect(mockRemoveLessonFromCourse).toHaveBeenCalledWith("course-1", "lec-del");
       expect(mockRebuildKnowledgeIndex).toHaveBeenCalledWith("course-1");
       expect(mockDeleteLesson).toHaveBeenCalledWith("lec-del");
-      expect(res.json).toHaveBeenCalledWith({ ok: true, deleted: "lec-del" });
+      expect(res.status).toHaveBeenCalledWith(204);
+      expect(res.end).toHaveBeenCalled();
     });
 
     it("deletes a lesson not assigned to any course", async () => {
@@ -290,7 +292,8 @@ describe("lessonRoutes", () => {
 
       expect(mockRemoveLessonFromCourse).not.toHaveBeenCalled();
       expect(mockRebuildKnowledgeIndex).not.toHaveBeenCalled();
-      expect(res.json).toHaveBeenCalledWith({ ok: true, deleted: "lec-orphan" });
+      expect(res.status).toHaveBeenCalledWith(204);
+      expect(res.end).toHaveBeenCalled();
     });
 
     it("throws 404 when lesson to delete is not found", async () => {

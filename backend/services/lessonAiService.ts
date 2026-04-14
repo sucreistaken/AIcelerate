@@ -16,7 +16,7 @@ import { SCHEMAS } from "../prompts/schemas";
 export { generateMindmap, generateMindmapModule, generateMindmapNodeDetail } from "./mindmapAiService";
 export { generateQuizFromPlan, generateQuizAnswers, evaluateQuizAnswer, evaluateQuizBatch } from "./quizAiService";
 import { getDigestOrFallback } from "./lessonDigestService";
-import { assembleCourseContext } from "../controllers/contextAssembler";
+import { assembleCourseContext } from "./contextAssemblerService";
 import type { Lesson } from "./lessonDataService";
 import { smartTruncate } from "../utils/smartTruncate";
 import { getLangDirective } from "../utils/langDirective";

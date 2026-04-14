@@ -7,7 +7,7 @@ import { safeGenerate, getTemperature } from "./aiService";
 import { channelService } from "./channelService";
 import { getLesson } from "./lessonDataService";
 import { generateId } from "../utils/idGenerator";
-import { buildToolContext } from "./channelContextBuilder";
+import { buildToolContext } from "./contextAssemblerService";
 import { getLangDirective, type SupportedLang } from "../utils/langDirective";
 import { sanitizeForPrompt, sanitizeNickname } from "../utils/sanitize";
 import { serviceUnavailable } from "../middleware/errorHandler";

@@ -10,7 +10,7 @@ import {
 import type { SupportedLang } from "../utils/langDirective";
 import type { QuizAnswer, QuizEvalResult, QuizEvalBatchResult } from "../types";
 import { getDigestOrFallback } from "./lessonDigestService";
-import { assembleCourseContext } from "../controllers/contextAssembler";
+import { assembleCourseContext } from "./contextAssemblerService";
 import { AppError, badRequest } from "../middleware/errorHandler";
 
 function logAI(label: string, inputLen: number, outputLen: number, maxTokens: number) {

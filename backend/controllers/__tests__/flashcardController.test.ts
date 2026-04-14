@@ -72,9 +72,9 @@ import {
   reviewCard,
   getDueCards,
   getFlashcardStats,
-} from "../flashcardController";
+} from "../../services/flashcardService";
 
-describe("flashcardController", () => {
+describe("flashcardService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     _flashcardStore.length = 0;

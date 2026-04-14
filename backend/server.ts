@@ -22,7 +22,7 @@ import { startJobProcessor, stopJobProcessor } from "./queues/jobProcessor";
 import { connectDB } from "./config/database";
 import { connectRedis, disconnectRedis, redisPub, redisSub, isRedisReady } from "./config/redis";
 import { createAdapter } from "@socket.io/redis-adapter";
-import { migrateOrphanLessons } from "./controllers/courseController";
+import { migrateOrphanLessons } from "./services/courseDataService";
 import { roleRepo } from "./repositories/roleRepo";
 import { flushAllCaches, initAllCaches } from "./cache";
 import { logger } from "./utils/logger";

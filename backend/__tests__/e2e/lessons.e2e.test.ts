@@ -204,9 +204,7 @@ describe("Lessons E2E", () => {
         .delete("/api/lessons/lec-del")
         .set("Authorization", getAuthHeader(USER_A));
 
-      expect(res.status).toBe(200);
-      expect(res.body.ok).toBe(true);
-      expect(res.body.deleted).toBe("lec-del");
+      expect(res.status).toBe(204);
     });
 
     it("returns 404 when deleting other user's lesson", async () => {

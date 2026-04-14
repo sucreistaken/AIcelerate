@@ -3,17 +3,104 @@
 
 import { WorkspaceModel, IWorkspace } from "../models/Workspace";
 import { generateId as genId } from "../utils/idGenerator";
-import type {
-  RoomWorkspace,
-  SharedChatMessage,
-  SharedInsight,
-  SharedFlashcard,
-  SharedNote,
-  MindMapAnnotation,
-  AnnotationReply,
-  MessageReaction,
-  FlashcardVote,
-} from "../controllers/workspaceController";
+
+// ====== Types (canonical location) ======
+
+export interface MessageReaction {
+  userId: string;
+  type: "helpful";
+}
+
+export interface SharedChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  authorId: string;
+  authorNickname: string;
+  authorAvatar: string;
+  timestamp: string;
+  reactions: MessageReaction[];
+  savedAsInsight: boolean;
+}
+
+export interface SharedInsight {
+  id: string;
+  text: string;
+  sourceMessageId: string;
+  savedBy: string;
+  savedByNickname: string;
+  tags: string[];
+  timestamp: string;
+}
+
+export interface SharedDeepDiveState {
+  messages: SharedChatMessage[];
+  savedInsights: SharedInsight[];
+}
+
+export interface FlashcardVote {
+  userId: string;
+  vote: "up" | "down";
+}
+
+export interface SharedFlashcard {
+  id: string;
+  front: string;
+  back: string;
+  topicName: string;
+  createdBy: string;
+  createdByNickname: string;
+  createdAt: string;
+  editedBy?: string;
+  editedByNickname?: string;
+  editedAt?: string;
+  votes: FlashcardVote[];
+  source: "manual" | "ai-generated";
+}
+
+export interface AnnotationReply {
+  id: string;
+  text: string;
+  authorId: string;
+  authorNickname: string;
+  timestamp: string;
+}
+
+export interface MindMapAnnotation {
+  id: string;
+  nodeLabel: string;
+  type: "note" | "question" | "example" | "understood";
+  text: string;
+  authorId: string;
+  authorNickname: string;
+  authorAvatar: string;
+  timestamp: string;
+  replies: AnnotationReply[];
+}
+
+export interface SharedNote {
+  id: string;
+  title: string;
+  content: string;
+  category: "concept" | "formula" | "example" | "tip" | "warning" | "summary";
+  authorId: string;
+  authorNickname: string;
+  authorAvatar: string;
+  createdAt: string;
+  editedAt?: string;
+  editedBy?: string;
+  editedByNickname?: string;
+  source?: "manual" | "deep-dive" | "mind-map";
+  sourceId?: string;
+  pinned: boolean;
+}
+
+export interface RoomWorkspace {
+  deepDive: SharedDeepDiveState;
+  flashcards: SharedFlashcard[];
+  mindMapAnnotations: MindMapAnnotation[];
+  notes: SharedNote[];
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

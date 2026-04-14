@@ -1,7 +1,7 @@
 import { logger } from "../utils/logger";
 import { getModel, safeGenerate, getTemperature, tryParseJSON, stripCodeFences } from "./aiService";
 import { getCourse, getCourseProgress } from "./courseDataService";
-import { assembleCourseWideContext } from "../controllers/contextAssembler";
+import { assembleCourseWideContext } from "./contextAssemblerService";
 import { SCHEMAS } from "../prompts/schemas";
 import { notFound, AppError } from "../middleware/errorHandler";
 import { getLangDirective, type SupportedLang } from "../utils/langDirective";

@@ -5,7 +5,7 @@ import {
   dismissAllNotifications,
   getUnreadCount,
   checkAndGenerateNotifications,
-} from "../controllers/notificationController";
+} from "../services/notificationService";
 import { requireAuth, AuthRequest } from "../middleware/auth";
 import { asyncHandler } from "../utils/asyncHandler";
 import { validate } from "../middleware/validate";

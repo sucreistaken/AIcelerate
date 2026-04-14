@@ -104,6 +104,7 @@ function mockRes() {
   const res: any = {
     json: vi.fn().mockReturnThis(),
     status: vi.fn().mockReturnThis(),
+    end: vi.fn().mockReturnThis(),
   };
   return res;
 }
@@ -194,7 +195,8 @@ describe("courseRoutes", () => {
 
       expect(mockGetCourseForUser).toHaveBeenCalledWith("course-del", "test-user-id");
       expect(mockDeleteCourse).toHaveBeenCalledWith("course-del");
-      expect(res.json).toHaveBeenCalledWith({ ok: true });
+      expect(res.status).toHaveBeenCalledWith(204);
+      expect(res.end).toHaveBeenCalled();
     });
 
     it("throws 404 when course to delete is not found", async () => {
