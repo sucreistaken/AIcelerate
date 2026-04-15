@@ -111,7 +111,7 @@ export const profileService = {
         friendCode,
         status: "online",
       },
-    }, { new: true }).select("-passwordHash");
+    }, { returnDocument: 'after' }).select("-passwordHash");
 
     if (!updated) throw notFound("User not found");
     return toProfile(updated);
@@ -138,13 +138,13 @@ export const profileService = {
       set.friendCode = code;
     }
 
-    const updated = await User.findByIdAndUpdate(id, { $set: set }, { new: true }).select("-passwordHash");
+    const updated = await User.findByIdAndUpdate(id, { $set: set }, { returnDocument: 'after' }).select("-passwordHash");
     if (!updated) throw notFound("Profile not found");
     return toProfile(updated);
   },
 
   async setStatus(id: string, status: string) {
-    const updated = await User.findByIdAndUpdate(id, { $set: { status } }, { new: true }).select("-passwordHash");
+    const updated = await User.findByIdAndUpdate(id, { $set: { status } }, { returnDocument: 'after' }).select("-passwordHash");
     if (!updated) throw notFound("Profile not found");
     eventBus.emit("profile:statusChanged", { userId: id, status });
     return toProfile(updated);

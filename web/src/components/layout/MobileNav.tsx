@@ -69,7 +69,9 @@ const moreItems: MoreItem[] = [
 ];
 
 export function MobileNav() {
-  const { mode, setMode } = useUiStore();
+  // Per-field selectors — MobileNav stays static on unrelated ui-store ticks.
+  const mode = useUiStore((s) => s.mode);
+  const setMode = useUiStore((s) => s.setMode);
   const [showMore, setShowMore] = useState(false);
 
   const isMoreActive = !navItems.some((item) => item.id === mode);

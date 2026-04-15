@@ -494,7 +494,7 @@ export const schedulerPersistence = {
           "streak.lastStudyDate": today,
         }},
       ],
-      { upsert: true, new: true, updatePipeline: true }
+      { upsert: true, returnDocument: 'after' }
     ).lean() as ScheduleStore | null;
 
     const store = updated ?? { ...DEFAULT_STORE };

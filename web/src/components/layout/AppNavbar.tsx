@@ -15,9 +15,13 @@ interface AppNavbarProps {
 }
 
 function NavBreadcrumb() {
-  const { courses, currentCourseId } = useCourseStore();
-  const { lessons, currentLessonId } = useLessonStore();
-  const { mode } = useUiStore();
+  // Per-field selectors — navbar is mounted app-wide; skip re-renders on
+  // unrelated ui/lesson/course mutations.
+  const courses = useCourseStore((s) => s.courses);
+  const currentCourseId = useCourseStore((s) => s.currentCourseId);
+  const lessons = useLessonStore((s) => s.lessons);
+  const currentLessonId = useLessonStore((s) => s.currentLessonId);
+  const mode = useUiStore((s) => s.mode);
 
   const course = courses.find((c) => c.id === currentCourseId);
   const lesson = lessons.find((l) => l.id === currentLessonId);

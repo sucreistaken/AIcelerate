@@ -4,6 +4,7 @@
 import { logger } from "../utils/logger";
 import { t } from "../utils/i18n";
 import { API_BASE, LessonData, PlanResponse, TranscribeStartResponse } from './httpClient';
+import { apiFetch, apiJson } from './fetchWithAuth';
 import { consumeSseStream } from './sseClient';
 import { Plan, CheatSheet, ConceptConnection } from '../types';
 
@@ -11,9 +12,12 @@ import { Plan, CheatSheet, ConceptConnection } from '../types';
 export const lessonsApi = {
     async getAll(): Promise<LessonData[]> {
         try {
-            const res = await fetch(`${API_BASE}/api/lessons`);
+            const res = await apiFetch(`${API_BASE}/api/lessons`);
             const json = await res.json();
-            return Array.isArray(json) ? json : [];
+            // Backend: { ok: true, lessons: [...] }. Tolerate raw arrays for safety.
+            if (Array.isArray(json)) return json;
+            if (json?.ok && Array.isArray(json.lessons)) return json.lessons;
+            return [];
         } catch (error) {
             logger.warn('Dersler yuklenemedi', error);
             return [];
@@ -22,9 +26,11 @@ export const lessonsApi = {
 
     async getById(id: string): Promise<LessonData | null> {
         try {
-            const res = await fetch(`${API_BASE}/api/lessons/${id}`);
+            const res = await apiFetch(`${API_BASE}/api/lessons/${id}`);
             if (!res.ok) return null;
-            return await res.json();
+            const json = await res.json();
+            // Backend: { ok: true, lesson: {...} }. Tolerate flat shape too.
+            return json?.lesson ?? json ?? null;
         } catch (error) {
             logger.warn('Ders yuklenemedi', error);
             return null;
@@ -33,14 +39,13 @@ export const lessonsApi = {
 
     async create(title: string): Promise<{ id: string; title: string } | null> {
         try {
-            const res = await fetch(`${API_BASE}/api/lessons`, {
+            const res = await apiFetch(`${API_BASE}/api/lessons`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ title }),
             });
             const json = await res.json();
-            if (res.ok && json.id) {
-                return { id: json.id, title: json.title };
+            if (res.ok && json.ok && json.lesson?.id) {
+                return { id: json.lesson.id, title: json.lesson.title };
             }
             return null;
         } catch (error) {
@@ -51,13 +56,12 @@ export const lessonsApi = {
 
     async delete(id: string): Promise<{ ok: boolean; error?: string }> {
         try {
-            const res = await fetch(`${API_BASE}/api/lessons/${id}`, {
-                method: 'DELETE',
-            });
-            return await res.json();
+            // Backend returns 204 No Content. apiJson synthesizes { ok: true } for that.
+            await apiJson(`${API_BASE}/api/lessons/${id}`, { method: 'DELETE' });
+            return { ok: true };
         } catch (error) {
             logger.error('Ders silme hatasi:', error);
-            return { ok: false, error: t('error.lessonDeleteSingle') };
+            return { ok: false, error: (error as Error).message || t('error.lessonDeleteSingle') };
         }
     },
 
@@ -67,7 +71,7 @@ export const lessonsApi = {
         formData.append('lessonId', lessonId);
 
         try {
-            const res = await fetch(`${API_BASE}/api/slides/upload`, {
+            const res = await apiFetch(`${API_BASE}/api/slides/upload`, {
                 method: 'POST',
                 body: formData,
             });
@@ -95,7 +99,7 @@ export const planApi = {
         courseCode?: string;
         learningOutcomes?: string[];
     }): Promise<PlanResponse> {
-        const res = await fetch(`${API_BASE}/api/plan-from-text`, {
+        const res = await apiFetch(`${API_BASE}/api/plan-from-text`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(params),
@@ -125,7 +129,7 @@ export const planApi = {
 
         (async () => {
             try {
-                const res = await fetch(`${API_BASE}/api/plan-from-text/stream`, {
+                const res = await apiFetch(`${API_BASE}/api/plan-from-text/stream`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(params),
@@ -199,22 +203,15 @@ export const planApi = {
 };
 
 // ============ Upload API ============
+// Note: PDF upload is performed via lessonsApi.uploadSlides (POST /api/slides/upload).
+// The previous `uploadPdf` method here pointed to /api/upload/pdf which the backend
+// never exposed; it has been removed to prevent future drift.
 export const uploadApi = {
-    async uploadPdf(file: File): Promise<{ ok: boolean; text?: string; error?: string }> {
-        const formData = new FormData();
-        formData.append('file', file);
-        const res = await fetch(`${API_BASE}/api/upload/pdf`, {
-            method: 'POST',
-            body: formData,
-        });
-        return await res.json();
-    },
-
     async startTranscribe(file: File, lessonId: string): Promise<TranscribeStartResponse> {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('lessonId', lessonId);
-        const res = await fetch(`${API_BASE}/api/transcribe/start`, {
+        const res = await apiFetch(`${API_BASE}/api/transcribe/start`, {
             method: 'POST',
             body: formData,
         });
@@ -229,7 +226,7 @@ export const uploadApi = {
 // ============ Cheat Sheet API ============
 export const cheatSheetApi = {
     async generate(lessonId: string, language: 'tr' | 'en' = 'tr'): Promise<{ ok: boolean; cheatSheet?: CheatSheet; error?: string }> {
-        const res = await fetch(`${API_BASE}/api/lessons/${lessonId}/cheat-sheet`, {
+        const res = await apiFetch(`${API_BASE}/api/lessons/${lessonId}/cheat-sheet`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ language }),
@@ -244,7 +241,7 @@ export const deviationApi = {
         const url = force
             ? `${API_BASE}/api/lessons/${lessonId}/deviation?force=true`
             : `${API_BASE}/api/lessons/${lessonId}/deviation`;
-        const res = await fetch(url, {
+        const res = await apiFetch(url, {
             method: 'POST',
         });
         return await res.json();
@@ -258,7 +255,7 @@ export const deviationApi = {
 // ============ Deep Dive (Chat & MindMap) API ============
 export const deepDiveApi = {
     async chat(lessonId: string, message: string, history: any[]): Promise<{ ok: boolean; text?: string; suggestions?: string[]; error?: string }> {
-        const res = await fetch(`${API_BASE}/api/lessons/${lessonId}/chat`, {
+        const res = await apiFetch(`${API_BASE}/api/lessons/${lessonId}/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ message, history }),
@@ -303,7 +300,7 @@ export const deepDiveApi = {
     },
 
     async generateMindMap(lessonId: string): Promise<{ ok: boolean; code?: string; error?: string }> {
-        const res = await fetch(`${API_BASE}/api/lessons/${lessonId}/mindmap`, {
+        const res = await apiFetch(`${API_BASE}/api/lessons/${lessonId}/mindmap`, {
             method: 'POST',
         });
         return await res.json();
@@ -311,13 +308,13 @@ export const deepDiveApi = {
 
     // Multi-Map: Get list of modules
     async getModules(lessonId: string): Promise<{ ok: boolean; lessonTitle?: string; modules?: Array<{ id: number; title: string; topics: string[] }>; error?: string }> {
-        const res = await fetch(`${API_BASE}/api/lessons/${lessonId}/modules`);
+        const res = await apiFetch(`${API_BASE}/api/lessons/${lessonId}/modules`);
         return await res.json();
     },
 
     // Multi-Map: Generate mindmap for specific module
     async generateModuleMindMap(lessonId: string, moduleIndex: number): Promise<{ ok: boolean; code?: string; moduleTitle?: string; error?: string }> {
-        const res = await fetch(`${API_BASE}/api/lessons/${lessonId}/mindmap/module`, {
+        const res = await apiFetch(`${API_BASE}/api/lessons/${lessonId}/mindmap/module`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ moduleIndex }),
@@ -337,7 +334,7 @@ export const deepDiveApi = {
         quiz?: { question: string; options: string[]; correctAnswer: string; explanation: string };
         error?: string;
     }> {
-        const res = await fetch(`${API_BASE}/api/lessons/${lessonId}/mindmap/node-detail`, {
+        const res = await apiFetch(`${API_BASE}/api/lessons/${lessonId}/mindmap/node-detail`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ nodeName, action }),
@@ -357,7 +354,7 @@ export const deepDiveApi = {
         quiz?: { question: string; options: string[]; correctAnswer: string; explanation: string };
         error?: string;
     }> {
-        const res = await fetch(`${API_BASE}/api/lessons/${lessonId}/mindmap/node-detail`, {
+        const res = await apiFetch(`${API_BASE}/api/lessons/${lessonId}/mindmap/node-detail`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ nodeName, action: 'all' }),
@@ -369,12 +366,12 @@ export const deepDiveApi = {
 // ============ Connections API ============
 export const connectionsApi = {
     async get(): Promise<{ ok: boolean; connections?: ConceptConnection[]; error?: string }> {
-        const res = await fetch(`${API_BASE}/api/connections`);
+        const res = await apiFetch(`${API_BASE}/api/connections`);
         return await res.json();
     },
 
     async build(): Promise<{ ok: boolean; connections?: ConceptConnection[]; error?: string }> {
-        const res = await fetch(`${API_BASE}/api/connections/build`, { method: 'POST' });
+        const res = await apiFetch(`${API_BASE}/api/connections/build`, { method: 'POST' });
         return await res.json();
     },
 
@@ -383,7 +380,7 @@ export const connectionsApi = {
         lessonTitles: string[],
         relatedConcepts: string[]
     ): Promise<{ ok: boolean; analysis?: string; error?: string }> {
-        const res = await fetch(`${API_BASE}/api/connections/deep-dive`, {
+        const res = await apiFetch(`${API_BASE}/api/connections/deep-dive`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ concept, lessonTitles, relatedConcepts }),

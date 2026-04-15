@@ -2,6 +2,7 @@
 // Scheduler, Notification, and Gamification APIs
 
 import { API_BASE } from './httpClient';
+import { apiFetch } from './fetchWithAuth';
 import { t } from '../utils/i18n';
 import { StudyTask, DailyPlan, WeeklyOverview, StreakData, AppNotification } from '../types';
 
@@ -12,7 +13,7 @@ export const schedulerApi = {
             const url = courseId
                 ? `${API_BASE}/api/scheduler/next-session?courseId=${encodeURIComponent(courseId)}`
                 : `${API_BASE}/api/scheduler/next-session`;
-            const res = await fetch(url);
+            const res = await apiFetch(url);
             return await res.json();
         } catch (error) {
             return { ok: false, error: t('error.loadFailed') };
@@ -24,7 +25,7 @@ export const schedulerApi = {
             const url = courseId
                 ? `${API_BASE}/api/scheduler/daily?courseId=${encodeURIComponent(courseId)}`
                 : `${API_BASE}/api/scheduler/daily`;
-            const res = await fetch(url);
+            const res = await apiFetch(url);
             return await res.json();
         } catch (error) {
             return { ok: false, error: t('error.loadFailed') };
@@ -36,7 +37,7 @@ export const schedulerApi = {
             const url = courseId
                 ? `${API_BASE}/api/scheduler/weekly?courseId=${encodeURIComponent(courseId)}`
                 : `${API_BASE}/api/scheduler/weekly`;
-            const res = await fetch(url);
+            const res = await apiFetch(url);
             return await res.json();
         } catch (error) {
             return { ok: false, error: t('error.loadFailed') };
@@ -45,7 +46,7 @@ export const schedulerApi = {
 
     async completeTask(taskId: string): Promise<{ ok: boolean; streak?: StreakData; error?: string }> {
         try {
-            const res = await fetch(`${API_BASE}/api/scheduler/complete-task`, {
+            const res = await apiFetch(`${API_BASE}/api/scheduler/complete-task`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ taskId }),
@@ -58,7 +59,7 @@ export const schedulerApi = {
 
     async getStreak(): Promise<{ ok: boolean; streak?: StreakData; error?: string }> {
         try {
-            const res = await fetch(`${API_BASE}/api/scheduler/streak`);
+            const res = await apiFetch(`${API_BASE}/api/scheduler/streak`);
             return await res.json();
         } catch (error) {
             return { ok: false, error: t('error.loadFailed') };
@@ -73,7 +74,7 @@ export const notificationApi = {
             const url = unreadOnly
                 ? `${API_BASE}/api/notifications?unread=true`
                 : `${API_BASE}/api/notifications`;
-            const res = await fetch(url);
+            const res = await apiFetch(url);
             return await res.json();
         } catch (error) {
             return { ok: false, error: t('error.loadFailed') };
@@ -82,7 +83,7 @@ export const notificationApi = {
 
     async dismiss(notifId: string): Promise<{ ok: boolean; notification?: AppNotification; error?: string }> {
         try {
-            const res = await fetch(`${API_BASE}/api/notifications/${notifId}/dismiss`, {
+            const res = await apiFetch(`${API_BASE}/api/notifications/${notifId}/dismiss`, {
                 method: 'POST',
             });
             return await res.json();
@@ -93,7 +94,7 @@ export const notificationApi = {
 
     async dismissAll(): Promise<{ ok: boolean; error?: string }> {
         try {
-            const res = await fetch(`${API_BASE}/api/notifications/dismiss-all`, {
+            const res = await apiFetch(`${API_BASE}/api/notifications/dismiss-all`, {
                 method: 'POST',
             });
             return await res.json();
@@ -104,7 +105,7 @@ export const notificationApi = {
 
     async getUnreadCount(): Promise<{ ok: boolean; count?: number; error?: string }> {
         try {
-            const res = await fetch(`${API_BASE}/api/notifications/unread-count`);
+            const res = await apiFetch(`${API_BASE}/api/notifications/unread-count`);
             return await res.json();
         } catch (error) {
             return { ok: false, error: t('error.loadFailed') };
@@ -113,7 +114,7 @@ export const notificationApi = {
 
     async check(): Promise<{ ok: boolean; newNotifications?: AppNotification[]; count?: number; error?: string }> {
         try {
-            const res = await fetch(`${API_BASE}/api/notifications/check`, {
+            const res = await apiFetch(`${API_BASE}/api/notifications/check`, {
                 method: 'POST',
             });
             return await res.json();
@@ -127,7 +128,7 @@ export const notificationApi = {
 export const gamificationApi = {
     async addXp(action: string, amount?: number): Promise<{ ok: boolean; totalXp?: number; earned?: number; streakDays?: number; error?: string }> {
         try {
-            const res = await fetch(`${API_BASE}/api/xp/add`, {
+            const res = await apiFetch(`${API_BASE}/api/xp/add`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action, amount }),
@@ -140,7 +141,7 @@ export const gamificationApi = {
 
     async getStats(): Promise<{ ok: boolean; totalXp?: number; streakDays?: number; todayXp?: number; error?: string }> {
         try {
-            const res = await fetch(`${API_BASE}/api/xp/stats`);
+            const res = await apiFetch(`${API_BASE}/api/xp/stats`);
             return await res.json();
         } catch (error) {
             return { ok: false, error: t('error.loadFailed') };

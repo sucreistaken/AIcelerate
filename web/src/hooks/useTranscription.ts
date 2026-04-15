@@ -3,6 +3,7 @@ import { useCallback, useRef } from 'react';
 import { useLessonStore } from '../stores/lessonStore';
 import { useUiStore } from '../stores/uiStore';
 import { uploadApi } from '../services/api';
+import { consumeSseStream } from '../services/sseClient';
 
 import { formatSeconds as fmtTime, formatDuration as formatTime } from '../utils/formatters';
 
@@ -14,7 +15,7 @@ export function useTranscription() {
     const store = useLessonStore();
     const ui = useUiStore();
     const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const eventSourceRef = useRef<EventSource | null>(null);
+    const streamCtrlRef = useRef<AbortController | null>(null);
     const segmentCountRef = useRef(0);
     const transcriptionStartRef = useRef<number>(0);
 
@@ -74,96 +75,90 @@ export function useTranscription() {
             store.setLectureText('');
             ui.setSttProgress({ status: 'Transcribing...' });
 
-            // Start SSE connection
+            // Stream transcription progress via fetch-based SSE (Bearer-auth capable,
+            // unlike native EventSource which can't set Authorization).
             const streamUrl = uploadApi.getTranscribeStreamUrl(result.jobId);
-            const es = new EventSource(streamUrl);
-            eventSourceRef.current = es;
-
-            es.onmessage = (ev) => {
-                try {
-                    const msg = JSON.parse(ev.data);
-
-                    if (msg.type === 'meta') {
-                        ui.setSttProgress({
-                            status: `Model: ${msg.model} • Duration: ${(msg.duration / 60).toFixed(1)} min`,
-                        });
-                        return;
-                    }
-
-                    if (msg.type === 'log') {
-                        if (typeof msg.message === 'string' && msg.message.trim()) {
+            streamCtrlRef.current?.abort();
+            streamCtrlRef.current = consumeSseStream(
+                streamUrl,
+                { method: 'GET' },
+                {
+                    onEvent: (msg) => {
+                        if (msg.type === 'meta') {
                             ui.setSttProgress({
-                                status: `Preparing... (${msg.message.trim().slice(0, 60)})`,
+                                status: `Model: ${msg.model} • Duration: ${((msg.duration as number) / 60).toFixed(1)} min`,
                             });
+                            return;
                         }
-                        return;
-                    }
 
-                    if (msg.type === 'segment') {
-                        const p = Math.round((msg.progress ?? 0) * 100);
-
-                        if (typeof msg.start === 'number' && typeof msg.end === 'number') {
-                            // Calculate estimated remaining time
-                            let etaStr = '';
-                            if (p > 5 && transcriptionStartRef.current) {
-                                const elapsed = (Date.now() - transcriptionStartRef.current) / 1000;
-                                const remaining = (elapsed / (p / 100)) - elapsed;
-                                if (remaining > 60) {
-                                    etaStr = ` • ~${Math.ceil(remaining / 60)} dk kaldı`;
-                                } else if (remaining > 0) {
-                                    etaStr = ` • ~${Math.round(remaining)}s kaldı`;
-                                }
+                        if (msg.type === 'log') {
+                            if (typeof msg.message === 'string' && msg.message.trim()) {
+                                ui.setSttProgress({
+                                    status: `Preparing... (${msg.message.trim().slice(0, 60)})`,
+                                });
                             }
+                            return;
+                        }
+
+                        if (msg.type === 'segment') {
+                            const p = Math.round(((msg.progress as number) ?? 0) * 100);
+
+                            if (typeof msg.start === 'number' && typeof msg.end === 'number') {
+                                let etaStr = '';
+                                if (p > 5 && transcriptionStartRef.current) {
+                                    const elapsed = (Date.now() - transcriptionStartRef.current) / 1000;
+                                    const remaining = (elapsed / (p / 100)) - elapsed;
+                                    if (remaining > 60) {
+                                        etaStr = ` • ~${Math.ceil(remaining / 60)} dk kaldı`;
+                                    } else if (remaining > 0) {
+                                        etaStr = ` • ~${Math.round(remaining)}s kaldı`;
+                                    }
+                                }
+                                ui.setSttProgress({
+                                    progress: p,
+                                    now: { start: msg.start, end: msg.end },
+                                    status: `Transcribing ${fmtTime(msg.start)}–${fmtTime(msg.end)} (${p}%)${etaStr}`,
+                                });
+                                showToast(`${fmtTime(msg.start)}–${fmtTime(msg.end)}`);
+                            }
+
+                            if (msg.text) {
+                                const line = `[${formatTime(msg.start as number)} – ${formatTime(msg.end as number)}] ${msg.text}`;
+                                const currentText = useLessonStore.getState().lectureText;
+                                store.setLectureText(
+                                    currentText ? currentText + '\n' + line : line
+                                );
+                            }
+                            return;
+                        }
+
+                        if (msg.type === 'error') {
+                            store.setError((msg.message as string) || 'Transcribe error');
+                            ui.setSttProgress({ status: 'Error ❌', now: null });
+                            streamCtrlRef.current?.abort();
+                            return;
+                        }
+
+                        if (msg.type === 'done') {
                             ui.setSttProgress({
-                                progress: p,
-                                now: { start: msg.start, end: msg.end },
-                                status: `Transcribing ${fmtTime(msg.start)}–${fmtTime(msg.end)} (${p}%)${etaStr}`,
+                                progress: 100,
+                                status: 'Done ✅',
+                                now: null,
+                                toast: null,
                             });
-                            showToast(`${fmtTime(msg.start)}–${fmtTime(msg.end)}`);
+                            streamCtrlRef.current?.abort();
+                            return;
                         }
-
-                        if (msg.text) {
-                            const line = `[${formatTime(msg.start)} – ${formatTime(msg.end)}] ${msg.text}`;
-                            const currentText = useLessonStore.getState().lectureText;
-                            store.setLectureText(
-                                currentText ? currentText + '\n' + line : line
-                            );
-                        }
-                        return;
-                    }
-
-                    if (msg.type === 'error') {
-                        store.setError(msg.message || 'Transcribe error');
-                        ui.setSttProgress({
-                            status: 'Error ❌',
-                            now: null,
-                        });
-                        es.close();
-                        return;
-                    }
-
-                    if (msg.type === 'done') {
-                        ui.setSttProgress({
-                            progress: 100,
-                            status: 'Done ✅',
-                            now: null,
-                            toast: null,
-                        });
-                        es.close();
-                        return;
-                    }
-                } catch {
-                    // ignore parse errors
-                }
-            };
-
-            es.onerror = () => {
-                ui.setSttProgress({
-                    status: 'Connection error (SSE) ❌',
-                    now: null,
-                });
-                es.close();
-            };
+                    },
+                    onError: (err) => {
+                        store.setError(err);
+                        ui.setSttProgress({ status: 'Connection error ❌', now: null });
+                    },
+                    onClose: () => {
+                        streamCtrlRef.current = null;
+                    },
+                },
+            );
         } catch (e: any) {
             store.setError(e.message || 'Start transcribe error');
             ui.setSttProgress({ status: 'Failed to start ❌' });
@@ -173,17 +168,13 @@ export function useTranscription() {
     const clearTranscription = useCallback(() => {
         store.setLectureText('');
         ui.resetStt();
-        if (eventSourceRef.current) {
-            eventSourceRef.current.close();
-            eventSourceRef.current = null;
-        }
+        streamCtrlRef.current?.abort();
+        streamCtrlRef.current = null;
     }, [store, ui]);
 
     const cancelTranscription = useCallback(() => {
-        if (eventSourceRef.current) {
-            eventSourceRef.current.close();
-            eventSourceRef.current = null;
-        }
+        streamCtrlRef.current?.abort();
+        streamCtrlRef.current = null;
         ui.setSttProgress({
             status: 'Cancelled',
             now: null,

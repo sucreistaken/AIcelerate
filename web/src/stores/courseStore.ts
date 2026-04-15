@@ -1,16 +1,19 @@
 // src/stores/courseStore.ts
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
 import toast from "react-hot-toast";
 import { Course, CourseProgress, WeeklySchedule } from "../types";
 import { courseApi } from "../services/api";
 import { t } from "../utils/i18n";
 import { dedup } from "../utils/dedup";
+import { quotaSafeLocalStorage } from "../utils/quotaSafeStorage";
 
 interface CourseState {
   courses: Course[];
   currentCourseId: string | null;
   loading: boolean;
+  /** True while a background refetch is running (non-blocking). */
+  revalidating: boolean;
   error: string | null;
 
   // Progress & Schedule
@@ -30,6 +33,8 @@ interface CourseState {
   rebuildIndex: (courseId: string) => Promise<void>;
   getCourseForCurrentLesson: (lessonId: string) => Course | null;
   setCourses: (courses: Course[]) => void;
+  setRevalidating: (v: boolean) => void;
+  reset: () => void;
 
   // New actions
   fetchCourseProgress: (courseId: string) => Promise<void>;
@@ -37,19 +42,26 @@ interface CourseState {
   exportCourse: (courseId: string) => Promise<void>;
 }
 
+const courseInitialState = {
+  courses: [] as Course[],
+  currentCourseId: null as string | null,
+  loading: false,
+  revalidating: false,
+  error: null as string | null,
+  courseProgress: null as CourseProgress | null,
+  weeklySchedule: null as WeeklySchedule | null,
+  progressLoading: false,
+  scheduleLoading: false,
+};
+
 export const useCourseStore = create<CourseState>()(
   persist(
     (set, get) => ({
-      courses: [],
-      currentCourseId: null,
-      loading: false,
-      error: null,
-      courseProgress: null,
-      weeklySchedule: null,
-      progressLoading: false,
-      scheduleLoading: false,
+      ...courseInitialState,
 
       setCourses: (courses: Course[]) => set({ courses, loading: false }),
+      setRevalidating: (v: boolean) => set({ revalidating: v }),
+      reset: () => set(courseInitialState),
 
       fetchCourses: async () => {
         set({ loading: true, error: null });
@@ -207,8 +219,13 @@ export const useCourseStore = create<CourseState>()(
     }),
     {
       name: "learncraft-course-storage",
+      version: 1,
+      storage: createJSONStorage(() => quotaSafeLocalStorage()),
+      // Persist course list for instant first render (stale-while-revalidate).
+      // Courses are small (~500 bytes each) — safe for localStorage at any scale.
       partialize: (state) => ({
         currentCourseId: state.currentCourseId,
+        courses: state.courses,
       }),
     }
   )

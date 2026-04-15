@@ -85,7 +85,7 @@ export const notificationService = {
     const doc = await AppNotificationModel.findOneAndUpdate(
       { _id: notifId, userId },
       { $set: { dismissed: true, dismissedAt: new Date() } },
-      { new: true }
+      { returnDocument: 'after' }
     ).lean();
 
     return doc ? toStudyNotification(doc) : null;

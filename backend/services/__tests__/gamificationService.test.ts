@@ -67,7 +67,7 @@ describe("gamificationService", () => {
       expect(mockFindOneAndUpdate).toHaveBeenCalledWith(
         { userId: "user-1" },
         expect.arrayContaining([expect.objectContaining({ $set: expect.any(Object) })]),
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
       );
       expect(result.totalXp).toBe(10);
       expect(result.earned).toBe(10);
@@ -117,7 +117,7 @@ describe("gamificationService", () => {
       expect(mockFindOneAndUpdate).toHaveBeenCalledWith(
         { userId: "user-1" },
         expect.arrayContaining([expect.objectContaining({ $set: expect.any(Object) })]),
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
       );
       expect(result.earned).toBe(50);
     });
@@ -132,7 +132,7 @@ describe("gamificationService", () => {
       expect(mockFindOneAndUpdate).toHaveBeenCalledWith(
         { userId: "user-1" },
         expect.arrayContaining([expect.objectContaining({ $set: expect.any(Object) })]),
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
       );
       expect(result.earned).toBe(0);
     });
@@ -146,7 +146,7 @@ describe("gamificationService", () => {
       expect(mockFindOneAndUpdate).toHaveBeenCalledWith(
         { userId: "user-1" },
         expect.arrayContaining([expect.objectContaining({ $set: expect.any(Object) })]),
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
       );
     });
 

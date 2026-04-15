@@ -32,7 +32,7 @@ class SettingsRepository {
     const doc = await SystemSettingsModel.findOneAndUpdate(
       { key: SETTINGS_KEY },
       { $setOnInsert: DEFAULT_SETTINGS },
-      { upsert: true, new: true, lean: true }
+      { upsert: true, returnDocument: 'after', lean: true }
     );
 
     if (!doc) {
@@ -49,7 +49,7 @@ class SettingsRepository {
     const doc = await SystemSettingsModel.findOneAndUpdate(
       { key: SETTINGS_KEY },
       { $set: { ...updates, updatedAt: new Date() } },
-      { upsert: true, new: true, lean: true }
+      { upsert: true, returnDocument: 'after', lean: true }
     );
 
     if (!doc) {

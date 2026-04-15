@@ -18,6 +18,7 @@ interface LessonSummary {
   date?: string;
   highlights?: string[];
   plan?: { modules?: any[] };
+  hasPlan?: boolean;
 }
 
 export interface SparklinePoint {
@@ -112,7 +113,7 @@ export function useDashboard() {
         name: c.name,
         lessonCount: c.lessonIds.length,
         completedCount: c.lessonIds.filter((id: string) =>
-          lessons.find((l) => l.id === id && l.plan)
+          lessons.find((l) => l.id === id && (l.hasPlan ?? !!l.plan))
         ).length,
       })),
     [courses, lessons]

@@ -2,7 +2,8 @@ import { Request, Response } from "express";
 import { env } from "../config/env";
 
 const REFRESH_TOKEN_COOKIE = "lc_rt";
-const REFRESH_TOKEN_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const REFRESH_TOKEN_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days (default session)
+const REFRESH_TOKEN_REMEMBER_MAX_AGE_MS = 10 * 365 * 24 * 60 * 60 * 1000; // 10 years (remember me)
 
 const isProduction = env.NODE_ENV === "production";
 
@@ -12,14 +13,15 @@ const isProduction = env.NODE_ENV === "production";
  * - Secure: only sent over HTTPS (production)
  * - SameSite=Lax: protects against CSRF while allowing same-site requests
  * - Path=/api/auth: only sent to auth endpoints (minimizes exposure)
+ * - rememberMe=true extends expiry from 30 days to 10 years (effectively permanent)
  */
-export function setRefreshTokenCookie(res: Response, token: string): void {
+export function setRefreshTokenCookie(res: Response, token: string, rememberMe = false): void {
   res.cookie(REFRESH_TOKEN_COOKIE, token, {
     httpOnly: true,
     secure: isProduction,
     sameSite: "lax",
     path: "/api/auth",
-    maxAge: REFRESH_TOKEN_MAX_AGE_MS,
+    maxAge: rememberMe ? REFRESH_TOKEN_REMEMBER_MAX_AGE_MS : REFRESH_TOKEN_MAX_AGE_MS,
   });
 }
 

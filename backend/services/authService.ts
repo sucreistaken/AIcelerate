@@ -12,6 +12,7 @@ import { logger } from "../utils/logger";
 
 const ACCESS_TOKEN_EXPIRY = "15m";
 const REFRESH_TOKEN_EXPIRY_DAYS = 30;
+const REFRESH_TOKEN_REMEMBER_EXPIRY_DAYS = 10 * 365; // 10 years — effectively permanent
 
 // --- Password strength validation ---
 function validatePasswordStrength(password: string): void {
@@ -144,27 +145,29 @@ function generateRefreshToken(): string {
   return crypto.randomBytes(48).toString("base64url");
 }
 
-async function createTokenPair(userId: string, role = "", session?: mongoose.ClientSession) {
+async function createTokenPair(userId: string, role = "", session?: mongoose.ClientSession, rememberMe = false) {
   const accessToken = signAccessToken(userId, role);
   const refreshTokenStr = generateRefreshToken();
 
-  // Store hashed refresh token in DB
+  const expiryDays = rememberMe ? REFRESH_TOKEN_REMEMBER_EXPIRY_DAYS : REFRESH_TOKEN_EXPIRY_DAYS;
   const hashedToken = crypto.createHash("sha256").update(refreshTokenStr).digest("hex");
   await RefreshToken.create([{
     userId,
     token: hashedToken,
-    expiresAt: new Date(Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000),
+    expiresAt: new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000),
+    rememberMe,
   }], session ? { session } : {});
 
   return {
     token: accessToken,
     refreshToken: refreshTokenStr,
     expiresIn: ACCESS_TOKEN_EXPIRY,
+    rememberMe,
   };
 }
 
 export const authService = {
-  async register(email: string, password: string, nickname: string) {
+  async register(email: string, password: string, nickname: string, rememberMe = false) {
     const existing = await User.exists({ email: email.toLowerCase().trim() });
     if (existing) throw new AppError(409, "Email already registered", "CONFLICT");
 
@@ -173,10 +176,9 @@ export const authService = {
     const passwordHash = await bcrypt.hash(password, 12);
     const friendCode = generateFriendCode();
 
-    // Transaction: create User + RefreshToken atomically
     const session = await mongoose.startSession();
     try {
-      let result: { user: { id: string; email: string; profile: unknown; friendCode: string }; token: string; refreshToken: string; expiresIn: string };
+      let result: { user: { id: string; email: string; profile: unknown; friendCode: string }; token: string; refreshToken: string; expiresIn: string; rememberMe: boolean };
       await session.withTransaction(async () => {
         const [user] = await User.create([{
           email: email.toLowerCase().trim(),
@@ -185,7 +187,7 @@ export const authService = {
           friendCode,
         }], { session });
 
-        const tokens = await createTokenPair(user._id.toString(), user.role || "", session);
+        const tokens = await createTokenPair(user._id.toString(), user.role || "", session, rememberMe);
         result = {
           user: { id: user._id.toString(), email: user.email, profile: user.profile, friendCode: user.friendCode },
           ...tokens,
@@ -197,7 +199,7 @@ export const authService = {
     }
   },
 
-  async login(email: string, password: string) {
+  async login(email: string, password: string, rememberMe = false) {
     const normalizedEmail = email.toLowerCase().trim();
     await checkLoginLockout(normalizedEmail);
 
@@ -214,7 +216,7 @@ export const authService = {
     }
 
     await clearFailedLogins(normalizedEmail);
-    const tokens = await createTokenPair(user._id.toString(), user.role || "");
+    const tokens = await createTokenPair(user._id.toString(), user.role || "", undefined, rememberMe);
     return {
       user: { id: user._id.toString(), email: user.email, profile: user.profile, friendCode: user.friendCode, settings: user.settings },
       ...tokens,
@@ -241,13 +243,13 @@ export const authService = {
       throw notFound("User not found");
     }
 
-    // Rotate: delete old + create new pair atomically
-    let tokens!: { token: string; refreshToken: string; expiresIn: string };
+    // Rotate: delete old + create new pair atomically, preserving rememberMe
+    let tokens!: { token: string; refreshToken: string; expiresIn: string; rememberMe: boolean };
     const session = await mongoose.startSession();
     try {
       await session.withTransaction(async () => {
         await RefreshToken.findByIdAndDelete(stored._id, { session });
-        tokens = await createTokenPair(user._id.toString(), user.role || "", session);
+        tokens = await createTokenPair(user._id.toString(), user.role || "", session, stored.rememberMe ?? false);
       });
     } finally {
       await session.endSession();

@@ -1,10 +1,19 @@
 import React from "react";
-import { motion } from "framer-motion";
-import CollapsibleSection from "./CollapsibleSection";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  FileText,
+  Mic,
+  Upload,
+  ArrowRight,
+  Check,
+  AlertCircle,
+  RotateCcw,
+  Loader2,
+} from "lucide-react";
 import CourseInfoSection from "./CourseInfoSection";
-import { ProgressStepper } from "../ui/ProgressStepper";
 import { formatSeconds as fmtTime } from "../../utils/formatters";
 import { t } from "../../utils/i18n";
+import "../../styles/components/upload-drawer.css";
 
 export interface LeftPanelLessonProps {
   currentLessonId: string | null;
@@ -52,6 +61,34 @@ interface AppLeftPanelFormProps {
   onGoToWizard?: () => void;
 }
 
+/**
+ * At any moment the drawer should show AT MOST ONE progress signal in the
+ * masthead. Precedence: in-flight transcription (has real % progress) beats
+ * any other async op (indeterminate bar). This eliminates the "multiple
+ * stacked checkmarks" bug seen with the previous per-section steppers.
+ */
+type ActiveOp = { label: string; indeterminate: boolean; progress?: number };
+
+function pickActiveOp(
+  ui: LeftPanelUiProps,
+  tx: LeftPanelTranscriptionProps
+): ActiveOp | null {
+  if (tx.stt.progress > 0 && tx.stt.progress < 100 && tx.stt.status) {
+    return {
+      label: tx.stt.status,
+      indeterminate: false,
+      progress: tx.stt.progress,
+    };
+  }
+  if (ui.isLoading) {
+    return {
+      label: ui.loadingMessage || t("leftPanel.analyzing"),
+      indeterminate: true,
+    };
+  }
+  return null;
+}
+
 export default function AppLeftPanelForm({
   lesson,
   ui,
@@ -62,220 +99,249 @@ export default function AppLeftPanelForm({
   onAudioUpload,
   onGoToWizard,
 }: AppLeftPanelFormProps) {
-  // No lesson selected → show empty state with wizard link
   if (!lesson.currentLessonId) {
     return (
-      <div style={{ padding: "20px 0", textAlign: "center" }}>
-        <div style={{ fontSize: 40, marginBottom: 12, opacity: 0.5 }}>📚</div>
-        <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>{t("leftPanel.noLessonSelected")}</div>
-        <p className="muted" style={{ fontSize: 12, marginBottom: 16, lineHeight: 1.5 }}>
-          {t("leftPanel.noLessonDesc")}
-        </p>
+      <div className="ingest-empty">
+        <div className="ingest-empty__icon">
+          <FileText size={28} strokeWidth={1.4} />
+        </div>
+        <h3 className="ingest-empty__title">{t("leftPanel.noLessonSelected")}</h3>
+        <p className="ingest-empty__desc">{t("leftPanel.noLessonDesc")}</p>
         {onGoToWizard && (
           <button
-            className="btn btn-primary"
+            type="button"
+            className="ingest-btn ingest-btn--primary"
             onClick={onGoToWizard}
-            style={{ fontSize: 13 }}
           >
-            {t("leftPanel.createLesson")}
+            <span>{t("leftPanel.createLesson")}</span>
+            <ArrowRight size={14} strokeWidth={2.2} />
           </button>
         )}
       </div>
     );
   }
 
-  // Lesson selected → show material status + update options
+  const slideChars = lesson.slidesText.trim().length;
+  const lectureChars = lesson.lectureText.trim().length;
+  const hasSlides = slideChars > 0;
+  const hasTranscript = lectureChars > 0;
+  const activeOp = pickActiveOp(ui, transcription);
+
   return (
-    <>
-      {/* Material status cards */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: "var(--text-secondary)" }}>
-          {t("leftPanel.materials")}
+    <form
+      className="ingest"
+      onSubmit={onSubmit}
+      aria-label="Material update form"
+    >
+      <IndicatorBar op={activeOp} />
+
+      {/* Section 01 — Materials ledger (at-a-glance status) */}
+      <section className="ingest-section">
+        <div className="ingest-eyebrow">{t("leftPanel.materials")}</div>
+        <div className="ingest-ledger">
+          <LedgerRow
+            icon={<FileText size={13} strokeWidth={1.8} />}
+            label={t("leftPanel.slides")}
+            chars={slideChars}
+            has={hasSlides}
+          />
+          <LedgerRow
+            icon={<Mic size={13} strokeWidth={1.8} />}
+            label={t("leftPanel.transcript")}
+            chars={lectureChars}
+            has={hasTranscript}
+            optional
+          />
         </div>
-        <MaterialStatus
-          label={t("leftPanel.slides")}
-          icon="📄"
-          hasContent={!!lesson.slidesText.trim()}
-          charCount={lesson.slidesText.trim().length}
-        />
-        <MaterialStatus
-          label={t("leftPanel.transcript")}
-          icon="🎙️"
-          hasContent={!!lesson.lectureText.trim()}
-          charCount={lesson.lectureText.trim().length}
-          style={{ marginTop: 6 }}
-        />
-      </div>
+      </section>
 
-      <form
-        className="lc-sidebar-form"
-        onSubmit={onSubmit}
-        aria-label="Material update form"
-      >
-        <CourseInfoSection lesson={lesson} ui={ui} />
+      {/* Section 02 — Course info */}
+      <section className="ingest-section">
+        <div className="ingest-eyebrow">Kurs Bilgisi</div>
+        <div className="ingest-course">
+          <CourseInfoSection lesson={lesson} ui={ui} />
+        </div>
+      </section>
 
-        <SlidesSection
-          slidesText={lesson.slidesText}
-          onSlidesChange={(v) => lesson.setSlidesText(v)}
-          onPdfUpload={onPdfUpload}
-          isLoading={ui.isLoading}
-          loadingMessage={ui.loadingMessage}
+      {/* Section 03 — Slides (update) */}
+      <section className="ingest-section">
+        <div className="ingest-eyebrow">{t("leftPanel.updateSlides")}</div>
+        <div className="ingest-row">
+          <label htmlFor="pdf-upload" className="ingest-btn ingest-btn--ghost">
+            <Upload size={13} strokeWidth={2} />
+            <span>{t("leftPanel.uploadPdfBtn")}</span>
+          </label>
+          <input
+            id="pdf-upload"
+            type="file"
+            accept=".pdf"
+            onChange={onPdfUpload}
+            hidden
+          />
+        </div>
+        <textarea
+          className="ingest-textarea"
+          value={lesson.slidesText}
+          onChange={(e) => lesson.setSlidesText(e.target.value)}
+          placeholder={t("leftPanel.slidePlaceholder")}
+          rows={5}
+          aria-label="Slide content"
         />
+      </section>
 
-        <TranscriptSection
-          lectureText={lesson.lectureText}
-          onLectureChange={(v) => lesson.setLectureText(v)}
-          onAudioUpload={onAudioUpload}
-          transcription={transcription}
+      {/* Section 04 — Transcript (optional) */}
+      <section className="ingest-section">
+        <div className="ingest-eyebrow">
+          <span>{t("leftPanel.updateTranscript")}</span>
+          <span className="ingest-tag">Opsiyonel</span>
+        </div>
+        <div className="ingest-row">
+          <label htmlFor="audio-upload" className="ingest-btn ingest-btn--ghost">
+            <Mic size={13} strokeWidth={2} />
+            <span>{t("leftPanel.uploadAudioBtn")}</span>
+          </label>
+          <input
+            id="audio-upload"
+            type="file"
+            accept=".mp3,.wav,.m4a,.flac,.ogg"
+            onChange={onAudioUpload}
+            hidden
+          />
+          <button
+            type="button"
+            className="ingest-btn ingest-btn--ghost"
+            onClick={transcription.clearTranscription}
+          >
+            <RotateCcw size={13} strokeWidth={2} />
+            <span>{t("leftPanel.clearBtn")}</span>
+          </button>
+        </div>
+        {transcription.stt.now && (
+          <div className="ingest-stt" aria-live="polite">
+            <span>
+              {fmtTime(transcription.stt.now.start)}–
+              {fmtTime(transcription.stt.now.end)}
+            </span>
+            <span className="ingest-stt__pct">
+              {Math.round(transcription.stt.progress)}%
+            </span>
+          </div>
+        )}
+        <textarea
+          className="ingest-textarea"
+          value={lesson.lectureText}
+          onChange={(e) => lesson.setLectureText(e.target.value)}
+          placeholder={t("leftPanel.transcriptPlaceholder")}
+          rows={5}
+          aria-label="Transcript"
         />
+      </section>
 
-        <ReanalyzeActions
-          canSubmit={canSubmit}
-          isLoading={ui.isLoading}
-          error={lesson.error}
-        />
-      </form>
-    </>
+      {/* Sticky footer — submit + hint */}
+      <footer className="ingest-footer">
+        {lesson.error && (
+          <div className="ingest-error" role="alert">
+            <AlertCircle size={13} strokeWidth={2} />
+            <span>{lesson.error}</span>
+          </div>
+        )}
+        <button
+          type="submit"
+          disabled={!canSubmit}
+          className="ingest-btn ingest-btn--primary ingest-btn--full"
+          aria-busy={ui.isLoading}
+        >
+          {ui.isLoading ? (
+            <>
+              <Loader2 size={14} strokeWidth={2.2} className="ingest-spin" />
+              <span>{t("leftPanel.analyzing")}</span>
+            </>
+          ) : (
+            <>
+              <span>{t("leftPanel.reanalyze")}</span>
+              <ArrowRight size={14} strokeWidth={2.2} />
+            </>
+          )}
+        </button>
+        <p className="ingest-hint">
+          {ui.isLoading
+            ? "\u00A0"
+            : !canSubmit
+              ? t("empty.noPlanHint")
+              : t("leftPanel.reanalyzeHint")}
+        </p>
+      </footer>
+    </form>
   );
 }
 
-function MaterialStatus({ label, icon, hasContent, charCount, style }: {
-  label: string; icon: string; hasContent: boolean; charCount: number; style?: React.CSSProperties;
+/* ─────────────── Sub-components ─────────────── */
+
+function LedgerRow({
+  icon,
+  label,
+  chars,
+  has,
+  optional,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  chars: number;
+  has: boolean;
+  optional?: boolean;
 }) {
   return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: 8, padding: "8px 10px",
-      borderRadius: 8, background: hasContent ? "var(--success-soft, rgba(34,197,94,.08))" : "var(--card-hover, #f4f4f6)",
-      fontSize: 12, ...style,
-    }}>
-      <span>{icon}</span>
-      <span style={{ flex: 1, fontWeight: 500 }}>{label}</span>
-      <span style={{ color: hasContent ? "var(--success)" : "var(--muted)", fontWeight: 600, fontSize: 11 }}>
-        {hasContent ? `✓ ${charCount.toLocaleString()} ${t("leftPanel.chars")}` : t("leftPanel.none")}
+    <div className={`ingest-ledger__row${has ? " ingest-ledger__row--has" : ""}`}>
+      <span className="ingest-ledger__icon">{icon}</span>
+      <span className="ingest-ledger__label">
+        {label}
+        {optional && <span className="ingest-ledger__opt">· opsiyonel</span>}
+      </span>
+      <span className="ingest-ledger__val">
+        {has ? (
+          <>
+            <Check size={11} strokeWidth={3} />
+            <span>
+              {chars.toLocaleString()} {t("leftPanel.chars")}
+            </span>
+          </>
+        ) : (
+          <span className="ingest-ledger__empty">— {t("leftPanel.none")}</span>
+        )}
       </span>
     </div>
   );
 }
 
-function SlidesSection({
-  slidesText, onSlidesChange, onPdfUpload, isLoading, loadingMessage,
-}: {
-  slidesText: string; onSlidesChange: (v: string) => void;
-  onPdfUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  isLoading: boolean; loadingMessage: string | null;
-}) {
+function IndicatorBar({ op }: { op: ActiveOp | null }) {
   return (
-    <CollapsibleSection
-      title={t("leftPanel.updateSlides")}
-      summary={slidesText.trim() ? `${slidesText.trim().length.toLocaleString()} ${t("leftPanel.chars")}` : t("leftPanel.empty")}
-      defaultOpen={!slidesText.trim()}
-    >
-      <div className="flex-between mb-2">
-        <label className="label m-0">{t("leftPanel.slide")}</label>
-        <div className="file-upload-wrapper">
-          <label htmlFor="pdf-upload" className="btn-small">{t("leftPanel.uploadPdfBtn")}</label>
-          <input id="pdf-upload" type="file" accept=".pdf" onChange={onPdfUpload} style={{ display: "none" }} />
-          {isLoading && loadingMessage?.includes("PDF") && (
-            <div className="mt-2">
-              <div style={{ height: 4, background: "var(--border)", borderRadius: 2, overflow: "hidden", width: "100%" }}>
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: "100%" }}
-                  transition={{ duration: 2, ease: "easeInOut", repeat: Infinity }}
-                  style={{ height: "100%", background: "var(--accent-2)", borderRadius: 2 }}
-                />
-              </div>
-              <div style={{ fontSize: 10, marginTop: 4, opacity: 0.7, textAlign: "center" }}>{loadingMessage}</div>
-            </div>
-          )}
-        </div>
-      </div>
-      <textarea
-        className="lc-textarea textarea"
-        value={slidesText}
-        onChange={(e) => onSlidesChange(e.target.value)}
-        placeholder={t("leftPanel.slidePlaceholder")}
-        rows={6}
-        aria-label="Slide content"
-      />
-    </CollapsibleSection>
-  );
-}
-
-function TranscriptSection({
-  lectureText, onLectureChange, onAudioUpload, transcription,
-}: {
-  lectureText: string; onLectureChange: (v: string) => void;
-  onAudioUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  transcription: LeftPanelTranscriptionProps;
-}) {
-  return (
-    <CollapsibleSection
-      title={t("leftPanel.updateTranscript")}
-      summary={lectureText.trim() ? `${lectureText.trim().length.toLocaleString()} ${t("leftPanel.chars")}` : t("leftPanel.empty")}
-      defaultOpen={!lectureText.trim()}
-    >
-      <label className="label">{t("leftPanel.audioFile")}</label>
-      <div className="stt-row">
-        <div className="stt-left">
-          <span className="stt-hint">
-            {transcription.stt.status || t("leftPanel.editManually")}
-            {transcription.stt.now && (
-              <span className="stt-now">
-                {fmtTime(transcription.stt.now.start)}–{fmtTime(transcription.stt.now.end)}
-              </span>
+    <AnimatePresence initial={false}>
+      {op && (
+        <motion.div
+          className="ingest-indicator"
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.18, ease: [0.2, 0.7, 0.2, 1] }}
+        >
+          <div className="ingest-indicator__label">{op.label}</div>
+          <div className="ingest-indicator__bar">
+            {op.indeterminate ? (
+              <motion.div
+                className="ingest-indicator__fill ingest-indicator__fill--indet"
+                initial={{ x: "-40%" }}
+                animate={{ x: "140%" }}
+                transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+              />
+            ) : (
+              <div
+                className="ingest-indicator__fill"
+                style={{ width: `${Math.max(2, op.progress ?? 0)}%` }}
+              />
             )}
-          </span>
-        </div>
-        <div className="stt-right">
-          <label className="stt-upload" htmlFor="audio-upload" title={t("leftPanel.uploadAudioBtn")}>{t("leftPanel.uploadAudioBtn")}</label>
-          <button type="button" className="stt-clear" onClick={transcription.clearTranscription} title={t("leftPanel.clearBtn")}>{t("leftPanel.clearBtn")}</button>
-          <input id="audio-upload" type="file" accept=".mp3,.wav,.m4a,.flac,.ogg" onChange={onAudioUpload} style={{ display: "none" }} />
-        </div>
-      </div>
-      <div className="stt-progress" aria-hidden={transcription.stt.progress <= 0}>
-        <div className="stt-progress-bar" style={{ width: `${transcription.stt.progress}%` }} />
-      </div>
-      <textarea
-        className="lc-textarea textarea"
-        value={lectureText}
-        onChange={(e) => onLectureChange(e.target.value)}
-        placeholder={t("leftPanel.transcriptPlaceholder")}
-        rows={6}
-        aria-label="Transcript"
-      />
-    </CollapsibleSection>
-  );
-}
-
-function ReanalyzeActions({ canSubmit, isLoading, error }: {
-  canSubmit: boolean; isLoading: boolean; error: string | null;
-}) {
-  return (
-    <div className="actions actions--sticky">
-      <button
-        type="submit"
-        disabled={!canSubmit}
-        className={canSubmit ? "btn" : "btn btn--disabled"}
-        aria-busy={isLoading}
-        style={{ width: "100%", padding: "12px" }}
-      >
-        {isLoading ? t("leftPanel.analyzing") : t("leftPanel.reanalyze")}
-      </button>
-      <ProgressStepper isActive={isLoading} />
-      {!canSubmit && !isLoading && (
-        <div style={{ fontSize: 11, color: "var(--muted)", textAlign: "center", marginTop: 6 }}>
-          {t("leftPanel.fillContent")}
-        </div>
+          </div>
+        </motion.div>
       )}
-      {canSubmit && !isLoading && (
-        <div style={{ fontSize: 11, color: "var(--muted)", textAlign: "center", marginTop: 6 }}>
-          {t("leftPanel.reanalyzeHint")}
-        </div>
-      )}
-      {error && (
-        <div className="error mt-2 text-red-500 text-sm" role="alert">{error}</div>
-      )}
-    </div>
+    </AnimatePresence>
   );
 }

@@ -100,7 +100,7 @@ export const channelService = {
     if (updates.lessonId !== undefined) safeUpdates.lessonId = updates.lessonId;
     if (updates.lessonTitle !== undefined) safeUpdates.lessonTitle = updates.lessonTitle;
 
-    const updated = await Channel.findByIdAndUpdate(channelId, { $set: safeUpdates }, { new: true });
+    const updated = await Channel.findByIdAndUpdate(channelId, { $set: safeUpdates }, { returnDocument: 'after' });
     if (!updated) throw notFound("Channel not found");
     return updated.toJSON();
   },
@@ -147,7 +147,7 @@ export const channelService = {
     const updated = await Channel.findByIdAndUpdate(
       channelId,
       { $set: { lessonId, lessonTitle } },
-      { new: true }
+      { returnDocument: 'after' }
     );
     if (!updated) throw notFound("Channel not found");
     return { ...updated.toJSON(), id: updated._id.toString() };
@@ -157,7 +157,7 @@ export const channelService = {
     const updated = await Channel.findByIdAndUpdate(
       channelId,
       { $unset: { lessonId: "", lessonTitle: "" } },
-      { new: true }
+      { returnDocument: 'after' }
     );
     if (!updated) throw notFound("Channel not found");
     return { ...updated.toJSON(), id: updated._id.toString() };
@@ -172,7 +172,7 @@ export const channelService = {
     const removed = await Channel.findOneAndUpdate(
       { _id: channelId, pinnedMessageIds: messageId },
       { $pull: { pinnedMessageIds: messageId } },
-      { new: true }
+      { returnDocument: 'after' }
     ).lean();
 
     if (removed) return { ...removed, id: String(removed._id), serverId: removed.roomId };
@@ -181,7 +181,7 @@ export const channelService = {
     const added = await Channel.findByIdAndUpdate(
       channelId,
       { $addToSet: { pinnedMessageIds: messageId } },
-      { new: true }
+      { returnDocument: 'after' }
     ).lean();
     if (!added) throw notFound("Channel not found");
     return { ...added, id: String(added._id), serverId: added.roomId };

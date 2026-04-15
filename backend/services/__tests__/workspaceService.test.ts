@@ -277,7 +277,7 @@ describe("workspaceService", () => {
             "flashcards.$.front": "Updated Q",
           }),
         },
-        { new: true }
+        { returnDocument: 'after' }
       );
       expect(result).not.toBeNull();
       expect(result!.id).toBe("fc-1");
@@ -437,7 +437,7 @@ describe("workspaceService", () => {
             "notes.$.title": "Updated Title",
           }),
         },
-        { new: true }
+        { returnDocument: 'after' }
       );
       expect(result).not.toBeNull();
       expect(result!.id).toBe("note-1");

@@ -245,7 +245,7 @@ export const workspaceService = {
     const ws = await WorkspaceModel.findOneAndUpdate(
       { roomId, "flashcards.id": cardId },
       { $set: setFields },
-      { new: true },
+      { returnDocument: 'after' },
     );
 
     if (!ws) return null;
@@ -392,7 +392,7 @@ export const workspaceService = {
     const ws = await WorkspaceModel.findOneAndUpdate(
       { roomId, "notes.id": noteId },
       { $set: setFields },
-      { new: true },
+      { returnDocument: 'after' },
     );
 
     if (!ws) return null;

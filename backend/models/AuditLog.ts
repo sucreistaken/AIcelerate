@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from "mongoose";
 
-export interface IAuditLog extends Document {
+export interface IAuditLog extends Document<string> {
+  _id: string;
   userId: string;
   action: string;
   resource: string;
@@ -12,6 +13,7 @@ export interface IAuditLog extends Document {
 
 const auditLogSchema = new Schema<IAuditLog>(
   {
+    _id: { type: String, required: true },
     userId: { type: String, required: true },
     action: { type: String, required: true },
     resource: { type: String, required: true },
@@ -19,7 +21,7 @@ const auditLogSchema = new Schema<IAuditLog>(
     ip: { type: String, default: "" },
     timestamp: { type: String, required: true },
   },
-  { timestamps: true }
+  { timestamps: true, _id: false }
 );
 
 // ── Indexes ───────────────────────────────────────────────────────────────────

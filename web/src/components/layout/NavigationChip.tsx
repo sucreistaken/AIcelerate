@@ -1,5 +1,5 @@
 // src/components/layout/NavigationChip.tsx
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCourseStore } from "../../stores/courseStore";
 import { useLessonStore } from "../../stores/lessonStore";
@@ -7,24 +7,40 @@ import { useUiStore } from "../../stores/uiStore";
 import { t } from "../../utils/i18n";
 
 function NavigationChip() {
-  const courseStore = useCourseStore();
-  const lessonStore = useLessonStore();
-  const ui = useUiStore();
+  // Per-field selectors so this chip doesn't re-render on unrelated store
+  // mutations (theme toggles, stt progress ticks, dashboard revalidations).
+  const courses = useCourseStore((s) => s.courses);
+  const currentCourseId = useCourseStore((s) => s.currentCourseId);
+  const selectCourse = useCourseStore((s) => s.selectCourse);
+  const lessons = useLessonStore((s) => s.lessons);
+  const currentLessonId = useLessonStore((s) => s.currentLessonId);
+  const setCurrentLessonId = useLessonStore((s) => s.setCurrentLessonId);
+  const clearCurrentLesson = useLessonStore((s) => s.clearCurrentLesson);
+  const draftTitle = useUiStore((s) => s.draftTitle);
+  const setDraftTitle = useUiStore((s) => s.setDraftTitle);
+  const setShowNewLessonModal = useUiStore((s) => s.setShowNewLessonModal);
   const [open, setOpen] = useState(false);
 
-  const currentCourse = courseStore.courses.find((c) => c.id === courseStore.currentCourseId) || null;
-  const currentLesson = lessonStore.lessons.find((l) => l.id === lessonStore.currentLessonId) || null;
+  const currentCourse = useMemo(
+    () => courses.find((c) => c.id === currentCourseId) ?? null,
+    [courses, currentCourseId]
+  );
+  const currentLesson = useMemo(
+    () => lessons.find((l) => l.id === currentLessonId) ?? null,
+    [lessons, currentLessonId]
+  );
 
   const courseLabel = currentCourse ? currentCourse.code : t("nav.allCourses");
   const lessonLabel = currentLesson ? currentLesson.title : t("nav.noLesson");
 
-  const filteredLessons = currentCourse
-    ? lessonStore.lessons.filter((l) => currentCourse.lessonIds.includes(l.id))
-    : lessonStore.lessons;
-
-  const otherLessons = currentCourse
-    ? lessonStore.lessons.filter((l) => !currentCourse.lessonIds.includes(l.id))
-    : [];
+  const { filteredLessons, otherLessons } = useMemo(() => {
+    if (!currentCourse) return { filteredLessons: lessons, otherLessons: [] };
+    const assignedIds = new Set(currentCourse.lessonIds);
+    return {
+      filteredLessons: lessons.filter((l) => assignedIds.has(l.id)),
+      otherLessons: lessons.filter((l) => !assignedIds.has(l.id)),
+    };
+  }, [currentCourse, lessons]);
 
   return (
     <div className="nav-chip">
@@ -57,11 +73,11 @@ function NavigationChip() {
           >
             <select
               className="lc-select"
-              value={courseStore.currentCourseId || ""}
-              onChange={(e) => courseStore.selectCourse(e.target.value || null)}
+              value={currentCourseId || ""}
+              onChange={(e) => selectCourse(e.target.value || null)}
             >
               <option value="">{t("nav.selectCourse")}</option>
-              {courseStore.courses.map((c) => (
+              {courses.map((c) => (
                 <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
               ))}
             </select>
@@ -73,24 +89,24 @@ function NavigationChip() {
             )}
             <select
               className="lc-select"
-              value={lessonStore.currentLessonId ?? (ui.draftTitle ? "__draft__" : "")}
+              value={currentLessonId ?? (draftTitle ? "__draft__" : "")}
               onChange={(e) => {
                 const val = e.target.value;
                 if (val === "__new__") {
-                  lessonStore.clearCurrentLesson();
-                  ui.setDraftTitle("");
-                  ui.setShowNewLessonModal(true);
+                  clearCurrentLesson();
+                  setDraftTitle("");
+                  setShowNewLessonModal(true);
                   return;
                 }
                 if (val === "__draft__") return;
-                lessonStore.setCurrentLessonId(val === "" ? null : val);
+                setCurrentLessonId(val === "" ? null : val);
                 if (val) localStorage.setItem("lc.lastLessonId", val);
                 else localStorage.removeItem("lc.lastLessonId");
               }}
             >
               <option value="">{t("nav.selectLesson")}</option>
               <option value="__new__" className="fw-700">{t("nav.createNewLesson")}</option>
-              {ui.draftTitle && <option value="__draft__">Draft: {ui.draftTitle}</option>}
+              {draftTitle && <option value="__draft__">Draft: {draftTitle}</option>}
               {filteredLessons.map((l) => (
                 <option key={l.id} value={l.id}>{l.title}</option>
               ))}

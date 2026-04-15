@@ -92,9 +92,21 @@ interface AppSidebarProps {
 }
 
 export default function AppSidebar({ onOpenUpload }: AppSidebarProps) {
-  const { mode, setMode, leftPanelCollapsed: collapsed, toggleLeftPanel, setShowCreateCourseModal } = useUiStore();
-  const { lessons, currentLessonId, setCurrentLessonId } = useLessonStore();
-  const { courses, currentCourseId, selectCourse } = useCourseStore();
+  // Per-field selectors — AppSidebar is mounted app-wide and would otherwise
+  // re-render on every unrelated UI tick (theme, stt progress, modal toggles,
+  // loading flags) and every lesson/course revalidation tick. Narrow reads
+  // keep this component static except when its own inputs change.
+  const mode = useUiStore((s) => s.mode);
+  const setMode = useUiStore((s) => s.setMode);
+  const collapsed = useUiStore((s) => s.leftPanelCollapsed);
+  const toggleLeftPanel = useUiStore((s) => s.toggleLeftPanel);
+  const setShowCreateCourseModal = useUiStore((s) => s.setShowCreateCourseModal);
+  const lessons = useLessonStore((s) => s.lessons);
+  const currentLessonId = useLessonStore((s) => s.currentLessonId);
+  const setCurrentLessonId = useLessonStore((s) => s.setCurrentLessonId);
+  const courses = useCourseStore((s) => s.courses);
+  const currentCourseId = useCourseStore((s) => s.currentCourseId);
+  const selectCourse = useCourseStore((s) => s.selectCourse);
 
   // Track which course is expanded in sidebar (syncs with store selection)
   const [expandedCourseId, setExpandedCourseId] = useState<string | null>(currentCourseId);

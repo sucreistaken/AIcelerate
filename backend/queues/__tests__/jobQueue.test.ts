@@ -138,7 +138,7 @@ describe("MongoJobQueue", () => {
       expect(mockFindOneAndUpdate).toHaveBeenCalledWith(
         { _id: "job-1", status: "pending" },
         { $set: { status: "processing", processedAt: expect.any(Date) } },
-        { new: true },
+        { returnDocument: 'after' },
       );
       expect(job).not.toBeNull();
       expect(job!.status).toBe("processing");
@@ -165,7 +165,7 @@ describe("MongoJobQueue", () => {
       expect(mockFindByIdAndUpdate).toHaveBeenCalledWith(
         "job-1",
         { $set: { status: "completed", result: { ok: true } } },
-        { new: true },
+        { returnDocument: 'after' },
       );
       expect(job!.status).toBe("completed");
       expect(job!.result).toEqual({ ok: true });
@@ -195,7 +195,7 @@ describe("MongoJobQueue", () => {
         expect.arrayContaining([
           expect.objectContaining({ $set: expect.objectContaining({ error: "oops" }) }),
         ]),
-        { new: true, updatePipeline: true },
+        { returnDocument: 'after' },
       );
       expect(job!.status).toBe("pending");
     });
@@ -314,7 +314,7 @@ describe("MongoJobQueue", () => {
       expect(mockFindOneAndUpdate).toHaveBeenCalledWith(
         { _id: "job-1", status: "dead" },
         { $set: { status: "pending", attempts: 0 } },
-        { new: true },
+        { returnDocument: 'after' },
       );
       expect(job!.status).toBe("pending");
       expect(job!.attempts).toBe(0);

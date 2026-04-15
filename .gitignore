@@ -44,6 +44,14 @@ logs/
 tmp/
 temp/
 
+# ── Browser automation artifacts (Playwright MCP) ──
+.playwright-mcp/
+test-results/
+playwright-report/
+/*.png
+/*.jpeg
+/*.jpg
+
 # ── Docs/plans (generated) ──
 docs/plans/
 PLAN-*.md

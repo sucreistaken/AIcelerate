@@ -44,13 +44,13 @@ class MongoJobQueue {
     const doc = await JobModel.findOneAndUpdate(
       { _id: id, status: "pending" },
       { $set: { status: "processing", processedAt: new Date() } },
-      { new: true },
+      { returnDocument: 'after' },
     );
     return doc ? toJob(doc) : null;
   }
 
   async markCompleted(id: string, result?: unknown): Promise<Job | null> {
-    const doc = await JobModel.findByIdAndUpdate(id, { $set: { status: "completed", result } }, { new: true });
+    const doc = await JobModel.findByIdAndUpdate(id, { $set: { status: "completed", result } }, { returnDocument: 'after' });
     return doc ? toJob(doc) : null;
   }
 
@@ -75,7 +75,7 @@ class MongoJobQueue {
           },
         }},
       ],
-      { new: true, updatePipeline: true },
+      { returnDocument: 'after' },
     );
     if (!doc) return null;
 
@@ -94,7 +94,7 @@ class MongoJobQueue {
     const doc = await JobModel.findOneAndUpdate(
       { _id: id, status: "dead" },
       { $set: { status: "pending", attempts: 0 } },
-      { new: true },
+      { returnDocument: 'after' },
     );
     return doc ? toJob(doc) : null;
   }

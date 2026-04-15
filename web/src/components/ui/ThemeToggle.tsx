@@ -4,7 +4,11 @@ import { motion } from 'framer-motion';
 import { useUiStore } from '../../stores/uiStore';
 
 export function ThemeToggle() {
-    const { theme, setTheme } = useUiStore();
+    // Per-field selectors — this toggle is rendered in the navbar (mounted
+    // app-wide) and should not re-render on unrelated ui-store mutations
+    // (mode changes, stt progress ticks, modal toggles).
+    const theme = useUiStore((s) => s.theme);
+    const setTheme = useUiStore((s) => s.setTheme);
 
     const isDark = theme === 'dark' || theme === 'system';
     const toggle = () => setTheme(isDark ? 'light' : 'dark');

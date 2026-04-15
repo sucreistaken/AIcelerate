@@ -960,10 +960,10 @@ describe("schedulerPersistence.completeTask", () => {
     expect(args[0]).toEqual({ _id: "global" });
     // Second arg: aggregation pipeline (array)
     expect(Array.isArray(args[1])).toBe(true);
-    // Third arg: options with upsert and new
-    const options = args[2] as { upsert: boolean; new: boolean };
+    // Third arg: options with upsert and returnDocument
+    const options = args[2] as { upsert: boolean; returnDocument: string };
     expect(options.upsert).toBe(true);
-    expect(options.new).toBe(true);
+    expect(options.returnDocument).toBe('after');
   });
 
   it("should handle null response from database gracefully", async () => {

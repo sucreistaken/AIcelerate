@@ -81,7 +81,7 @@ describe("sprintService", () => {
       expect(mockFindOneAndUpdate).toHaveBeenCalledWith(
         { userId: "global" },
         { $setOnInsert: { settings: DEFAULT_SETTINGS, sessions: [] } },
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
       );
     });
   });
@@ -100,7 +100,7 @@ describe("sprintService", () => {
       expect(mockFindOneAndUpdate).toHaveBeenCalledWith(
         { userId: "global" },
         { $set: { "settings.studyDurationMin": 30 } },
-        { new: true, upsert: true }
+        { returnDocument: 'after', upsert: true }
       );
       expect(result.studyDurationMin).toBe(30);
     });
@@ -126,7 +126,7 @@ describe("sprintService", () => {
             "settings.intensiveMode": true,
           },
         },
-        { new: true, upsert: true }
+        { returnDocument: 'after', upsert: true }
       );
       expect(result.studyDurationMin).toBe(50);
       expect(result.breakDurationMin).toBe(15);
@@ -142,7 +142,7 @@ describe("sprintService", () => {
       expect(mockFindOneAndUpdate).toHaveBeenCalledWith(
         { userId: "global" },
         { $set: { "settings.breakDurationMin": 5 } },
-        { new: true, upsert: true }
+        { returnDocument: 'after', upsert: true }
       );
     });
   });
@@ -215,7 +215,7 @@ describe("sprintService", () => {
             "sessions.$.pomodorosCompleted": 3,
           },
         },
-        { new: true }
+        { returnDocument: 'after' }
       );
       expect(result).not.toBeNull();
       expect(result!.status).toBe("completed");

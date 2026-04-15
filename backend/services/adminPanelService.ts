@@ -99,7 +99,7 @@ export async function updateUser(id: string, updates: Record<string, unknown>) {
   delete updates.passwordHash;
   delete updates.password;
 
-  const user = await User.findByIdAndUpdate(id, updates, { new: true }).select(
+  const user = await User.findByIdAndUpdate(id, updates, { returnDocument: 'after' }).select(
     "-passwordHash"
   );
   if (!user) throw notFound("User not found");
@@ -114,7 +114,7 @@ export async function setUserRole(id: string, role: string) {
   const user = await User.findByIdAndUpdate(
     id,
     { role },
-    { new: true }
+    { returnDocument: 'after' }
   ).select("-passwordHash");
   if (!user) throw notFound("User not found");
   return user;

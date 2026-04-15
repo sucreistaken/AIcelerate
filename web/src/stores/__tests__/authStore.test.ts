@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useAuthStore } from "../authStore";
+import { useCourseStore } from "../courseStore";
+import { useLessonStore } from "../lessonStore";
 
 vi.mock("../../services/authApi", () => ({
   authApi: {
@@ -68,12 +70,18 @@ describe("authStore", () => {
     expect(state.loading).toBe(false);
   });
 
-  it("register persists token to localStorage", async () => {
+  it("register persists auth state via zustand persist", async () => {
     mockedAuthApi.register.mockResolvedValue(mockAuthResponse);
 
     await useAuthStore.getState().register("test@example.com", "pass123", "Tester");
 
-    expect(localStorage.getItem("lc_token")).toBe("jwt-token-123");
+    // The in-memory access token is set inside authApi (mocked here), so we
+    // assert the persisted auth blob instead.
+    const raw = localStorage.getItem("lc-auth");
+    expect(raw).not.toBeNull();
+    const blob = JSON.parse(raw as string);
+    expect(blob.state.token).toBe("jwt-token-123");
+    expect(blob.state.isAuthenticated).toBe(true);
   });
 
   it("register sets error and re-throws on failure", async () => {
@@ -99,7 +107,10 @@ describe("authStore", () => {
     expect(state.user).toEqual(mockUser);
     expect(state.token).toBe("jwt-token-123");
     expect(state.isAuthenticated).toBe(true);
-    expect(localStorage.getItem("lc_token")).toBe("jwt-token-123");
+    // Persisted blob contains the token (in-memory lc_token is set by authApi,
+    // which is mocked here so that side effect isn't exercised).
+    const blob = JSON.parse(localStorage.getItem("lc-auth") as string);
+    expect(blob.state.token).toBe("jwt-token-123");
   });
 
   it("login sets error on failure", async () => {
@@ -194,5 +205,44 @@ describe("authStore", () => {
     useAuthStore.getState().updateProfile({ nickname: "Ghost" });
 
     expect(useAuthStore.getState().user).toBeNull();
+  });
+
+  // ---- cross-store cleanup on logout / session loss ----
+  describe("cross-store cleanup", () => {
+    beforeEach(() => {
+      // Seed other stores with per-user data to prove logout clears it.
+      useCourseStore.setState({
+        courses: [
+          { id: "c1", code: "CS101", name: "Intro", description: "", lessonIds: [], createdAt: "", updatedAt: "" } as any,
+        ],
+        currentCourseId: "c1",
+      });
+      useLessonStore.setState({
+        lessons: [{ id: "l1", title: "Lecture", date: "2026-04-15" }],
+        currentLessonId: "l1",
+      });
+    });
+
+    it("logout() also resets courseStore and lessonStore", () => {
+      useAuthStore.setState({ user: mockUser, token: "t", isAuthenticated: true });
+
+      useAuthStore.getState().logout();
+
+      expect(useCourseStore.getState().courses).toEqual([]);
+      expect(useCourseStore.getState().currentCourseId).toBeNull();
+      expect(useLessonStore.getState().lessons).toEqual([]);
+      expect(useLessonStore.getState().currentLessonId).toBeNull();
+    });
+
+    it("fetchMe failure also resets per-user stores (implicit logout)", async () => {
+      useAuthStore.setState({ token: "expired", isAuthenticated: true, user: mockUser });
+      mockedAuthApi.me.mockRejectedValue(new Error("401"));
+
+      await useAuthStore.getState().fetchMe();
+
+      expect(useAuthStore.getState().isAuthenticated).toBe(false);
+      expect(useCourseStore.getState().courses).toEqual([]);
+      expect(useLessonStore.getState().lessons).toEqual([]);
+    });
   });
 });

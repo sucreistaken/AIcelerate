@@ -1,23 +1,11 @@
 // admin/services/adminApi.ts — Admin API client
+// Routes through the shared apiFetch wrapper so admin inherits the same
+// Bearer + HttpOnly refresh cookie flow as the main app (single auth layer).
 import toast from "react-hot-toast";
 import { API_BASE } from "../../config";
+import { apiFetch } from "../../services/fetchWithAuth";
 
 const ADMIN_BASE = `${API_BASE}/api/admin`;
-
-function getToken(): string | null {
-  return localStorage.getItem("lc_token");
-}
-
-function buildHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  const token = getToken();
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-  return headers;
-}
 
 function buildUrl(
   endpoint: string,
@@ -49,40 +37,28 @@ export const adminApi = {
     endpoint: string,
     params?: Record<string, string | number | boolean | undefined>
   ): Promise<T> {
-    const url = buildUrl(endpoint, params);
-    const res = await fetch(url, {
-      method: "GET",
-      headers: buildHeaders(),
-    });
+    const res = await apiFetch(buildUrl(endpoint, params), { method: "GET" });
     return handleResponse<T>(res);
   },
 
   async post<T>(endpoint: string, body?: unknown): Promise<T> {
-    const url = buildUrl(endpoint);
-    const res = await fetch(url, {
+    const res = await apiFetch(buildUrl(endpoint), {
       method: "POST",
-      headers: buildHeaders(),
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
     return handleResponse<T>(res);
   },
 
   async patch<T>(endpoint: string, body?: unknown): Promise<T> {
-    const url = buildUrl(endpoint);
-    const res = await fetch(url, {
+    const res = await apiFetch(buildUrl(endpoint), {
       method: "PATCH",
-      headers: buildHeaders(),
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
     return handleResponse<T>(res);
   },
 
   async del<T>(endpoint: string): Promise<T> {
-    const url = buildUrl(endpoint);
-    const res = await fetch(url, {
-      method: "DELETE",
-      headers: buildHeaders(),
-    });
+    const res = await apiFetch(buildUrl(endpoint), { method: "DELETE" });
     return handleResponse<T>(res);
   },
 };

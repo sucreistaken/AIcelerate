@@ -1,6 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
 import toast from "react-hot-toast";
-import { API_BASE } from "../config";
 import { SharedBundle } from "../types";
 import { lessonsApi, sharesApi } from "../services/api";
 import { useCourseStore } from "../stores/courseStore";
@@ -126,13 +125,10 @@ export function useLessonsHistory({ currentLessonId, onLessonDeleted, lang }: Us
 
   const loadLessons = () => {
     setLoading(true);
-    fetch(`${API_BASE}/api/lessons`)
-      .then((r) => r.json())
-      .then((j) => {
-        if (Array.isArray(j)) {
-          const sorted = j.sort((a, b) => (new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()));
-          setLessons(sorted);
-        }
+    lessonsApi.getAll()
+      .then((items) => {
+        const sorted = [...items].sort((a, b) => (new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()));
+        setLessons(sorted);
       })
       .catch((e) => logger.warn(e))
       .finally(() => setLoading(false));

@@ -1,7 +1,8 @@
 import { logger } from "../utils/logger";
 import { io, Socket } from "socket.io-client";
 import { API_BASE } from "../config";
-import { getAccessToken, refreshAccessToken, loadTokenFromStorage } from "./fetchWithAuth";
+import { getAccessToken, refreshAccessToken } from "./fetchWithAuth";
+import { isTokenNearExpiry } from "../utils/jwt";
 
 let collabSocket: Socket | null = null;
 let _authenticatedUserId: string | null = null;
@@ -15,19 +16,8 @@ let _authInProgress = false;
  */
 async function getFreshToken(): Promise<string | null> {
   const token = getAccessToken();
-  if (token) {
-    // Quick check: decode JWT expiry without verification
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      const expiresAt = payload.exp * 1000;
-      // If token expires in less than 60 seconds, proactively refresh
-      if (expiresAt - Date.now() > 60_000) return token;
-    } catch {
-      // Malformed token — try refresh
-    }
-  }
+  if (token && !isTokenNearExpiry(token)) return token;
 
-  // Token expired or about to expire — refresh
   try {
     return await refreshAccessToken();
   } catch {
@@ -72,7 +62,8 @@ async function authenticateSocket(socket: Socket): Promise<any> {
 
 export function getCollabSocket(): Socket {
   if (!collabSocket) {
-    const token = getAccessToken();
+    // Auth is performed post-connect via `authenticateSocket()` (see connectCollab)
+    // because the backend validates the JWT on an 'auth' event, not handshake.auth.
     collabSocket = io(`${API_BASE}/collab`, {
       transports: ["websocket", "polling"],
       autoConnect: false,
@@ -82,7 +73,6 @@ export function getCollabSocket(): Socket {
       reconnectionDelayMax: 10_000,
       randomizationFactor: 0.3,
       timeout: 20_000,
-      auth: token ? { token } : undefined,
     });
 
     // Re-authenticate with fresh token on every reconnect

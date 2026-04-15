@@ -153,7 +153,7 @@ describe("notificationService", () => {
       expect(mockFindOneAndUpdate).toHaveBeenCalledWith(
         { _id: "n1", userId: "test-user" },
         { $set: { dismissed: true, dismissedAt: expect.any(Date) } },
-        { new: true }
+        { returnDocument: 'after' }
       );
       expect(result).not.toBeNull();
       expect(result!.dismissed).toBe(true);

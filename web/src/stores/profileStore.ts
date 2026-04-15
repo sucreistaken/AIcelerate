@@ -114,7 +114,7 @@ export const useProfileStore = create<ProfileState>()(
         const result = await profilesApi.sendFriendRequest(profile.id, friendCode);
         // Reload profile to get updated request lists
         await get().loadProfile(profile.id);
-        return result.message;
+        return result.message ?? "Friend request sent";
       },
 
       async acceptFriendRequest(fromId) {

@@ -448,7 +448,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'auth.email': 'E-posta',
     'auth.emailPlaceholder': 'ornek@email.com',
     'auth.password': 'Şifre',
-    'auth.passwordHint': 'Min. 6 karakter',
+    'auth.passwordHint': 'Min. 8 karakter · 1 büyük harf · 1 rakam · 1 özel karakter',
     'auth.nickname': 'Kullanıcı Adı',
     'auth.nicknamePlaceholder': 'Görünen adınız',
     'auth.chooseAvatar': 'Avatarını Seç',
@@ -463,6 +463,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'auth.hasAccount': 'Zaten hesabınız var mı?',
     'auth.signInLink': 'Giriş yap',
     'auth.createAccountSubtitle': 'Hesabınızı oluşturun',
+    'auth.rememberMe': 'Beni hatırla (cihazda 10 yıl aktif kalır)',
 
     // Settings / Profile
     'settings.title': 'Ayarlar',
@@ -511,7 +512,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'empty.createFirstLesson': 'İlk Dersimi Oluştur',
     'empty.noPlan': 'Henüz plan oluşturulmadı',
     'empty.noPlanDesc': 'Sol panelden ders materyalini yükle ve Plan & Analyze\'a tıkla.',
-    'empty.noPlanHint': 'Slayt + transkript = en iyi sonuç',
+    'empty.noPlanHint': 'Slayt yükle — transkript opsiyonel (eklenirse plan zenginleşir)',
     'empty.getStarted': 'Hadi Başlayalım',
     'empty.uploadMaterial': 'Materyal Yükle',
     'empty.noQuiz': 'Quiz henüz hazır değil',
@@ -1405,7 +1406,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'auth.email': 'Email',
     'auth.emailPlaceholder': 'you@example.com',
     'auth.password': 'Password',
-    'auth.passwordHint': 'Min. 6 characters',
+    'auth.passwordHint': 'Min. 8 chars · 1 uppercase · 1 digit · 1 special char',
     'auth.nickname': 'Nickname',
     'auth.nicknamePlaceholder': 'Your display name',
     'auth.chooseAvatar': 'Choose Your Avatar',
@@ -1420,6 +1421,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'auth.hasAccount': 'Already have an account?',
     'auth.signInLink': 'Sign in',
     'auth.createAccountSubtitle': 'Create your account',
+    'auth.rememberMe': 'Keep me signed in (10 years on this device)',
 
     // Settings / Profile
     'settings.title': 'Settings',
@@ -1468,7 +1470,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'empty.createFirstLesson': 'Create My First Lesson',
     'empty.noPlan': 'No plan created yet',
     'empty.noPlanDesc': 'Upload lesson content from the left panel and click Plan & Analyze.',
-    'empty.noPlanHint': 'Slide + transcript = best results',
+    'empty.noPlanHint': 'Upload slides — transcript is optional (adds depth if provided)',
     'empty.getStarted': 'Get Started',
     'empty.uploadMaterial': 'Upload Material',
     'empty.noQuiz': 'No quiz yet',

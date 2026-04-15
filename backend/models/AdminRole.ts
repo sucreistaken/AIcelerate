@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from "mongoose";
 
-export interface IAdminRole extends Document {
+export interface IAdminRole extends Document<string> {
+  _id: string;
   name: string;
   description: string;
   permissions: string[];
@@ -11,12 +12,13 @@ export interface IAdminRole extends Document {
 
 const adminRoleSchema = new Schema<IAdminRole>(
   {
+    _id: { type: String, required: true },
     name: { type: String, required: true, unique: true },
     description: { type: String, default: "" },
     permissions: { type: [String], default: [] },
     isSystem: { type: Boolean, default: false },
   },
-  { timestamps: true }
+  { timestamps: true, _id: false }
 );
 
 // ── Indexes ───────────────────────────────────────────────────────────────────

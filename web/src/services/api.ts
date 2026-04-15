@@ -9,6 +9,7 @@ export { handleResponse } from './httpClient';
 // Dashboard batch endpoint — fetches all initial data in 1 request instead of 7
 // Uses singleton promise pattern: concurrent calls share a single in-flight request
 import { API_BASE } from './httpClient';
+import { apiFetch } from './fetchWithAuth';
 
 let _dashboardPromise: Promise<any | null> | null = null;
 
@@ -21,7 +22,7 @@ export const dashboardApi = {
         const params = new URLSearchParams();
         params.set("lite", "true"); // Skip transcript/slideText for faster dashboard load
         if (courseId) params.set("courseId", courseId);
-        const res = await fetch(`${API_BASE}/api/dashboard/init?${params}`);
+        const res = await apiFetch(`${API_BASE}/api/dashboard/init?${params}`);
         if (!res.ok) return null;
         return await res.json();
       } catch {
@@ -49,5 +50,5 @@ export { courseApi, loApi, knowledgeGraphApi, adaptiveQuizApi, loProgressApi } f
 // Scheduler, Notification, and Gamification APIs
 export { schedulerApi, notificationApi, gamificationApi } from './schedulerApi';
 
-// Share, Rooms, Workspace, Weakness, and Sprint APIs
-export { sharesApi, roomsApi, roomWorkspaceApi, weaknessApi, sprintApi } from './shareApi';
+// Share link APIs
+export { sharesApi } from './shareApi';

@@ -4,6 +4,7 @@ import { useCallback } from 'react';
 import { useLessonStore } from '../stores/lessonStore';
 import { useUiStore } from '../stores/uiStore';
 import { API_BASE } from '../config';
+import { apiFetch } from '../services/fetchWithAuth';
 import { lessonsApi, planApi, loApi, cheatSheetApi, deviationApi, uploadApi } from '../services/api';
 import { invalidateLessonCache } from '../utils/cacheInvalidation';
 import { t } from '../utils/i18n';
@@ -56,6 +57,10 @@ export function useLesson() {
         const currentLesson = lessons.find((l) => l.id === currentLessonId);
         const title = ui.draftTitle || currentLesson?.title || `Lecture ${new Date().toLocaleDateString()}`;
 
+        // Clear any stale STT status from a previous audio upload so the
+        // transcription progress indicator doesn't hang around underneath the
+        // plan-generation spinner (layout bug seen in the upload drawer).
+        ui.resetStt();
         ui.setIsLoading(true, 'Analyzing...');
         store.setError(null);
         store.setPlan(null);
@@ -258,9 +263,8 @@ export function useLesson() {
 
         try {
             // Önce güncel transcript ve slides'ı kaydet
-            await fetch(`${API_BASE}/api/lessons`, {
+            await apiFetch(`${API_BASE}/api/lessons`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     id: currentLessonId,
                     transcript: lectureText,

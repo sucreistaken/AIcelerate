@@ -1,129 +1,155 @@
 import { API_BASE } from "../config";
-import { fetchWithAuth } from "./fetchWithAuth";
+import { apiJson } from "./fetchWithAuth";
+import { useAuthStore } from "../stores/authStore";
 import type { StudyServer, ServerMemberInfo, ServerTemplate } from "../types";
 
 const BASE = `${API_BASE}/api/rooms`;
-const request = fetchWithAuth;
+
+// ── Envelope shapes ────────────────────────────────────────────────────────────
+// Backend convention: { ok: true, ...payload }. We type the envelope explicitly
+// and pull the payload field out at the call site so consumers get the bare
+// domain object, not the wrapper.
+
+interface OkRoom { ok: true; room: StudyServer }
+interface OkRooms { ok: true; rooms: StudyServer[] }
+interface OkTemplates { ok: true; templates: ServerTemplate[] }
+interface OkMembers { ok: true; members: ServerMemberInfo[] }
+interface OkInvite { ok: true; inviteCode: string }
+interface OkSimple { ok: true }
+
+function currentUserId(): string {
+  const id = useAuthStore.getState().user?.id;
+  if (!id) throw new Error("Not authenticated");
+  return id;
+}
 
 export const roomsApi = {
-  create(name: string, description: string, iconColor?: string, options?: {
+  async create(name: string, description: string, iconColor?: string, options?: {
     tags?: string[]; university?: string; isPublic?: boolean; templateId?: string;
-  }) {
-    return request<StudyServer>(`${BASE}`, {
+  }): Promise<StudyServer> {
+    const r = await apiJson<OkRoom>(`${BASE}`, {
       method: "POST",
       body: JSON.stringify({ name, description, iconColor, ...options }),
     });
+    return r.room;
   },
 
-  createSolo(name: string, options?: { topic?: string; templateId?: string; tags?: string[] }) {
-    return request<StudyServer>(`${BASE}/solo`, {
+  async createSolo(name: string, options?: { topic?: string; templateId?: string; tags?: string[] }): Promise<StudyServer> {
+    const r = await apiJson<OkRoom>(`${BASE}/solo`, {
       method: "POST",
       body: JSON.stringify({ name, ...options }),
     });
+    return r.room;
   },
 
-  discover(search?: string, tags?: string[]) {
+  async discover(search?: string, tags?: string[]): Promise<StudyServer[]> {
     const params = new URLSearchParams();
     if (search) params.set("search", search);
     if (tags?.length) params.set("tag", tags.join(","));
-    return request<StudyServer[]>(`${BASE}/discover?${params}`);
+    const r = await apiJson<OkRooms>(`${BASE}/discover?${params}`);
+    return r.rooms ?? [];
   },
 
-  getTemplates() {
-    return request<ServerTemplate[]>(`${BASE}/templates`);
+  async getTemplates(): Promise<ServerTemplate[]> {
+    const r = await apiJson<OkTemplates>(`${BASE}/templates`);
+    return r.templates ?? [];
   },
 
-  get(id: string) {
-    return request<StudyServer>(`${BASE}/${id}`);
+  async get(id: string): Promise<StudyServer> {
+    const r = await apiJson<OkRoom>(`${BASE}/${id}`);
+    return r.room;
   },
 
-  getByInviteCode(code: string) {
-    return request<StudyServer>(`${BASE}/invite/${code}`);
+  async getByInviteCode(code: string): Promise<StudyServer> {
+    const r = await apiJson<OkRoom>(`${BASE}/invite/${code}`);
+    return r.room;
   },
 
-  getUserRooms() {
-    return request<StudyServer[]>(`${BASE}/user/me`);
+  async getUserRooms(): Promise<StudyServer[]> {
+    // Backend route is /user/:userId — passing literal "me" would match userId="me"
+    // and return an empty list rather than the current user's rooms.
+    const r = await apiJson<OkRooms>(`${BASE}/user/${currentUserId()}`);
+    return r.rooms ?? [];
   },
 
-  update(id: string, updates: Record<string, any>) {
-    return request<StudyServer>(`${BASE}/${id}`, {
+  async update(id: string, updates: Record<string, unknown>): Promise<StudyServer> {
+    const r = await apiJson<OkRoom>(`${BASE}/${id}`, {
       method: "PATCH",
       body: JSON.stringify(updates),
     });
+    return r.room;
   },
 
-  updateTopic(id: string, topic: string) {
-    return request<StudyServer>(`${BASE}/${id}/topic`, {
+  async updateTopic(id: string, topic: string): Promise<StudyServer> {
+    const r = await apiJson<OkRoom>(`${BASE}/${id}/topic`, {
       method: "PATCH",
       body: JSON.stringify({ topic }),
     });
+    return r.room;
   },
 
-  join(id: string) {
-    return request<StudyServer>(`${BASE}/${id}/join`, {
-      method: "POST",
-    });
+  async join(id: string): Promise<StudyServer> {
+    const r = await apiJson<OkRoom>(`${BASE}/${id}/join`, { method: "POST" });
+    return r.room;
   },
 
-  joinByInvite(inviteCode: string) {
-    return request<StudyServer>(`${BASE}/join-invite`, {
+  async joinByInvite(inviteCode: string): Promise<StudyServer> {
+    const r = await apiJson<OkRoom>(`${BASE}/join-invite`, {
       method: "POST",
       body: JSON.stringify({ inviteCode }),
     });
+    return r.room;
   },
 
-  leave(id: string) {
-    return request<{ success: boolean }>(`${BASE}/${id}/leave`, {
-      method: "POST",
-    });
+  async leave(id: string): Promise<void> {
+    await apiJson<OkSimple>(`${BASE}/${id}/leave`, { method: "POST" });
   },
 
-  kick(id: string, targetId: string) {
-    return request<{ success: boolean }>(`${BASE}/${id}/kick`, {
+  async kick(id: string, targetId: string): Promise<void> {
+    await apiJson<OkSimple>(`${BASE}/${id}/kick`, {
       method: "POST",
       body: JSON.stringify({ targetId }),
     });
   },
 
-  delete(id: string) {
-    return request<{ success: boolean }>(`${BASE}/${id}`, {
-      method: "DELETE",
-    });
+  async delete(id: string): Promise<void> {
+    // 204 No Content — apiJson returns { ok: true } synthetically.
+    await apiJson<OkSimple>(`${BASE}/${id}`, { method: "DELETE" });
   },
 
-  archive(id: string) {
-    return request<StudyServer>(`${BASE}/${id}/archive`, {
-      method: "POST",
-    });
+  async archive(id: string): Promise<StudyServer> {
+    const r = await apiJson<OkRoom>(`${BASE}/${id}/archive`, { method: "POST" });
+    return r.room;
   },
 
-  unarchive(id: string) {
-    return request<StudyServer>(`${BASE}/${id}/unarchive`, {
-      method: "POST",
-    });
+  async unarchive(id: string): Promise<StudyServer> {
+    const r = await apiJson<OkRoom>(`${BASE}/${id}/unarchive`, { method: "POST" });
+    return r.room;
   },
 
-  transferOwnership(id: string, newOwnerId: string) {
-    return request<StudyServer>(`${BASE}/${id}/transfer-ownership`, {
+  async transferOwnership(id: string, newOwnerId: string): Promise<StudyServer> {
+    const r = await apiJson<OkRoom>(`${BASE}/${id}/transfer-ownership`, {
       method: "POST",
       body: JSON.stringify({ newOwnerId }),
     });
+    return r.room;
   },
 
-  setMaterial(id: string, materialId: string) {
-    return request<StudyServer>(`${BASE}/${id}/material`, {
+  async setMaterial(id: string, materialId: string): Promise<StudyServer> {
+    const r = await apiJson<OkRoom>(`${BASE}/${id}/material`, {
       method: "POST",
       body: JSON.stringify({ materialId }),
     });
+    return r.room;
   },
 
-  getMembers(id: string) {
-    return request<ServerMemberInfo[]>(`${BASE}/${id}/members`);
+  async getMembers(id: string): Promise<ServerMemberInfo[]> {
+    const r = await apiJson<OkMembers>(`${BASE}/${id}/members`);
+    return r.members ?? [];
   },
 
-  regenerateInvite(id: string) {
-    return request<{ inviteCode: string }>(`${BASE}/${id}/regenerate-invite`, {
-      method: "POST",
-    });
+  async regenerateInvite(id: string): Promise<string> {
+    const r = await apiJson<OkInvite>(`${BASE}/${id}/regenerate-invite`, { method: "POST" });
+    return r.inviteCode;
   },
 };

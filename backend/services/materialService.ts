@@ -62,7 +62,7 @@ export const materialService = {
   async update(id: string, data: Partial<MaterialData>): Promise<MaterialData> {
     // Strip the id field so we don't try to overwrite _id
     const { id: _ignored, ...updateData } = data;
-    const doc = await Material.findByIdAndUpdate(id, { $set: updateData }, { new: true }).lean();
+    const doc = await Material.findByIdAndUpdate(id, { $set: updateData }, { returnDocument: 'after' }).lean();
     if (!doc) throw notFound("Material not found");
     return toMaterialData(doc);
   },

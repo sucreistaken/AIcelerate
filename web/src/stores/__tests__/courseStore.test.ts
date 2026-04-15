@@ -41,6 +41,7 @@ const initialState = {
   courses: [],
   currentCourseId: null,
   loading: false,
+  revalidating: false,
   error: null,
   courseProgress: null,
   weeklySchedule: null,
@@ -235,5 +236,42 @@ describe("courseStore", () => {
     await useCourseStore.getState().fetchCourseProgress("c1");
 
     expect(useCourseStore.getState().progressLoading).toBe(false);
+  });
+
+  // ---- setRevalidating ----
+  it("setRevalidating toggles the revalidating flag", () => {
+    expect(useCourseStore.getState().revalidating).toBe(false);
+    useCourseStore.getState().setRevalidating(true);
+    expect(useCourseStore.getState().revalidating).toBe(true);
+    useCourseStore.getState().setRevalidating(false);
+    expect(useCourseStore.getState().revalidating).toBe(false);
+  });
+
+  // ---- reset ----
+  it("reset() returns the store to initial state", () => {
+    useCourseStore.setState({
+      courses: [makeCourse(), makeCourse({ id: "c2" })],
+      currentCourseId: "c1",
+      loading: true,
+      revalidating: true,
+      error: "something",
+      courseProgress: { courseId: "c1" } as any,
+      weeklySchedule: { courseId: "c1" } as any,
+      progressLoading: true,
+      scheduleLoading: true,
+    });
+
+    useCourseStore.getState().reset();
+
+    const s = useCourseStore.getState();
+    expect(s.courses).toEqual([]);
+    expect(s.currentCourseId).toBeNull();
+    expect(s.loading).toBe(false);
+    expect(s.revalidating).toBe(false);
+    expect(s.error).toBeNull();
+    expect(s.courseProgress).toBeNull();
+    expect(s.weeklySchedule).toBeNull();
+    expect(s.progressLoading).toBe(false);
+    expect(s.scheduleLoading).toBe(false);
   });
 });

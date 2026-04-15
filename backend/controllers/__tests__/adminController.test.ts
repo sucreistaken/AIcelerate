@@ -498,7 +498,7 @@ describe("setUserRole", () => {
     expect(mockFindByIdAndUpdate).toHaveBeenCalledWith(
       "user-1",
       { role: "moderator" },
-      { new: true },
+      { returnDocument: 'after' },
     );
   });
 

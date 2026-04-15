@@ -59,7 +59,7 @@ export class MongoRepository<T extends { id: string }> implements IRepository<T>
     // TODO: type properly — TS can't destructure+spread Partial<T> cleanly
     const { id: _ignoredId, ...rest } = updates as Partial<T> & Record<string, unknown>;
     const doc = await this.model
-      .findByIdAndUpdate(id, { $set: rest }, { new: true })
+      .findByIdAndUpdate(id, { $set: rest }, { returnDocument: 'after' })
       .lean();
     return doc ? this.toEntity(doc) : null;
   }
@@ -77,7 +77,7 @@ export class MongoRepository<T extends { id: string }> implements IRepository<T>
     // TODO: type properly — TS can't destructure+spread a generic T cleanly
     const { id, ...rest } = item as T & Record<string, unknown>;
     const doc = await this.model
-      .findByIdAndUpdate(id, { $set: rest }, { new: true, upsert: true })
+      .findByIdAndUpdate(id, { $set: rest }, { returnDocument: 'after', upsert: true })
       .lean();
     return this.toEntity(doc);
   }

@@ -276,7 +276,7 @@ describe("messageService", () => {
             edited: true,
           },
         },
-        { new: true }
+        { returnDocument: 'after' }
       );
       expect(result.edited).toBe(true);
     });
@@ -380,7 +380,7 @@ describe("messageService", () => {
       expect(mockFindByIdAndUpdate).toHaveBeenCalledWith(
         "msg-1",
         { $push: { reactions: { emoji: "thumbsup", userIds: ["user-1"] } } },
-        { new: true }
+        { returnDocument: 'after' }
       );
       expect(result).toBeDefined();
     });
@@ -401,7 +401,7 @@ describe("messageService", () => {
       expect(mockFindOneAndUpdate).toHaveBeenCalledWith(
         { _id: "msg-1", "reactions.emoji": "thumbsup" },
         { $pull: { "reactions.$.userIds": "user-1" } },
-        { new: true }
+        { returnDocument: 'after' }
       );
       expect(result).toBeDefined();
     });
@@ -421,7 +421,7 @@ describe("messageService", () => {
       expect(mockFindOneAndUpdate).toHaveBeenCalledWith(
         { _id: "msg-1", "reactions.emoji": "thumbsup" },
         { $addToSet: { "reactions.$.userIds": "user-1" } },
-        { new: true }
+        { returnDocument: 'after' }
       );
       expect(result).toBeDefined();
     });
@@ -449,7 +449,7 @@ describe("messageService", () => {
       expect(mockFindByIdAndUpdate).toHaveBeenCalledWith(
         "msg-1",
         { $set: { pinned: true } },
-        { new: true }
+        { returnDocument: 'after' }
       );
       expect(result.pinned).toBe(true);
     });
@@ -465,7 +465,7 @@ describe("messageService", () => {
       expect(mockFindByIdAndUpdate).toHaveBeenCalledWith(
         "msg-1",
         { $set: { pinned: false } },
-        { new: true }
+        { returnDocument: 'after' }
       );
       expect(result.pinned).toBe(false);
     });

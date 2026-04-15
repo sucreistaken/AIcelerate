@@ -103,7 +103,7 @@ export const shareService = {
     const doc = await ShareModel.findByIdAndUpdate(
       shareId,
       { $inc: { accessCount: 1 } },
-      { new: true }
+      { returnDocument: 'after' }
     ).lean();
 
     if (!doc) return null;
@@ -129,7 +129,7 @@ export const shareService = {
           },
         },
       },
-      { new: true }
+      { returnDocument: 'after' }
     ).lean();
 
     if (!doc) return null;

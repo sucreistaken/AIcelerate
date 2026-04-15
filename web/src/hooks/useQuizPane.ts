@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import toast from "react-hot-toast";
 import { API_BASE } from "../config";
+import { apiFetch } from "../services/fetchWithAuth";
 import { Plan } from "../types";
 import { useLessonStore } from "../stores/lessonStore";
 import { useUiStore } from "../stores/uiStore";
@@ -142,9 +143,8 @@ export function useQuizPane(
     setLoading(true);
     try {
       const j = await withRetry(async () => {
-        const r = await fetch(`${API_BASE}/api/quiz-from-plan`, {
+        const r = await apiFetch(`${API_BASE}/api/quiz-from-plan`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ plan, lessonId: currentLessonId }),
         });
         return await r.json();
@@ -174,9 +174,8 @@ export function useQuizPane(
     setLoadingAns(true);
     try {
       const j = await withRetry(async () => {
-        const r = await fetch(`${API_BASE}/api/quiz-answers`, {
+        const r = await apiFetch(`${API_BASE}/api/quiz-answers`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ questions: quiz, lessonId: currentLessonId }),
         });
         return await r.json();
@@ -226,9 +225,8 @@ export function useQuizPane(
     setEvaluating(true);
     try {
       const j = await withRetry(async () => {
-        const r = await fetch(`${API_BASE}/api/quiz-eval-batch`, {
+        const r = await apiFetch(`${API_BASE}/api/quiz-eval-batch`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ items, lessonId: currentLessonId }),
         });
         return await r.json();

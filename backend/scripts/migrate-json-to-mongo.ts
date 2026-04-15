@@ -33,6 +33,7 @@ import { WeaknessModel } from "../models/Weakness";
 import { AuditLogModel } from "../models/AuditLog";
 import { SystemSettingsModel } from "../models/SystemSettings";
 import { AdminRoleModel } from "../models/AdminRole";
+import { generateId } from "../utils/idGenerator";
 
 const DATA_DIR = path.join(process.cwd(), "backend", "data");
 const DRY_RUN = process.argv.includes("--dry-run");
@@ -85,7 +86,7 @@ async function migrateArray(
       const item = transform ? transform(raw) : raw;
       const id = item.id || item._id;
       const { id: _id, ...rest } = item;
-      await model.findByIdAndUpdate(id, { $set: rest }, { upsert: true, new: true });
+      await model.findByIdAndUpdate(id, { $set: rest }, { upsert: true, returnDocument: 'after' });
       result.insertedCount++;
     } catch (err) {
       result.errorCount++;
@@ -428,6 +429,7 @@ async function main() {
     for (const entry of auditLog) {
       try {
         await AuditLogModel.create({
+          _id: entry.id || generateId("audit"),
           userId: entry.userId,
           action: entry.action,
           resource: entry.resource,
@@ -449,7 +451,10 @@ async function main() {
       try {
         await AdminRoleModel.findOneAndUpdate(
           { name: role.name },
-          { $set: { description: role.description, permissions: role.permissions, isSystem: role.isSystem } },
+          {
+            $set: { description: role.description, permissions: role.permissions, isSystem: role.isSystem },
+            $setOnInsert: { _id: role.id || generateId("role") },
+          },
           { upsert: true }
         );
         inserted++;

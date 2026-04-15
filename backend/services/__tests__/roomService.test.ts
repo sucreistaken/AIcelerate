@@ -469,7 +469,7 @@ describe("roomService", () => {
             ownerId: "user-2",
           }),
         }),
-        { new: true }
+        { returnDocument: 'after' }
       );
     });
 

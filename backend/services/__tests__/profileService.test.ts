@@ -195,7 +195,7 @@ describe("profileService", () => {
             status: "online",
           },
         },
-        { new: true }
+        { returnDocument: 'after' }
       );
       expect(profile.nickname).toBe("TestUser");
     });
@@ -211,7 +211,7 @@ describe("profileService", () => {
         expect.objectContaining({
           $set: expect.objectContaining({ "profile.avatar": "avatar-5" }),
         }),
-        { new: true }
+        { returnDocument: 'after' }
       );
     });
 
@@ -260,7 +260,7 @@ describe("profileService", () => {
         expect.objectContaining({
           $set: expect.objectContaining({ "profile.nickname": "Padded" }),
         }),
-        { new: true }
+        { returnDocument: 'after' }
       );
     });
   });
@@ -580,7 +580,7 @@ describe("profileService", () => {
             "profile.bio": "Hello",
           }),
         },
-        { new: true }
+        { returnDocument: 'after' }
       );
     });
 
@@ -638,7 +638,7 @@ describe("profileService", () => {
       expect(mockUserFindByIdAndUpdate).toHaveBeenCalledWith(
         "user-1",
         { $set: { status: "dnd" } },
-        { new: true }
+        { returnDocument: 'after' }
       );
       expect(mockEventBusEmit).toHaveBeenCalledWith("profile:statusChanged", {
         userId: "user-1",

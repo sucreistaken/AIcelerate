@@ -225,7 +225,7 @@ describe("MongoRepository", () => {
       expect(mockModel.findByIdAndUpdate).toHaveBeenCalledWith(
         "up1",
         expect.objectContaining({ $set: expect.objectContaining({ name: "Upserted" }) }),
-        expect.objectContaining({ upsert: true, new: true })
+        expect.objectContaining({ upsert: true, returnDocument: 'after' })
       );
     });
 

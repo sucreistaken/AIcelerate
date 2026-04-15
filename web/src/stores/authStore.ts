@@ -1,6 +1,21 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { authApi, AuthUser } from "../services/authApi";
+import { clearTokens } from "../services/fetchWithAuth";
+import { useCourseStore } from "./courseStore";
+import { useLessonStore } from "./lessonStore";
+
+/**
+ * Reset every per-user persisted store so the next session doesn't flash the
+ * previous user's courses/lessons before revalidation completes. Keep this
+ * list in sync whenever a new persisted store is added.
+ */
+function resetPersistedUserStores(): void {
+  useCourseStore.getState().reset();
+  useLessonStore.getState().reset();
+  void useCourseStore.persist.clearStorage?.();
+  void useLessonStore.persist.clearStorage?.();
+}
 
 interface AuthState {
   user: AuthUser | null;
@@ -9,8 +24,8 @@ interface AuthState {
   loading: boolean;
   error: string | null;
 
-  register: (email: string, password: string, nickname: string) => Promise<void>;
-  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, nickname: string, rememberMe?: boolean) => Promise<void>;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   logout: () => void;
   fetchMe: () => Promise<void>;
   clearError: () => void;
@@ -26,11 +41,10 @@ export const useAuthStore = create<AuthState>()(
       loading: false,
       error: null,
 
-      register: async (email, password, nickname) => {
+      register: async (email, password, nickname, rememberMe = false) => {
         set({ loading: true, error: null });
         try {
-          const res = await authApi.register(email, password, nickname);
-          localStorage.setItem("lc_token", res.token);
+          const res = await authApi.register(email, password, nickname, rememberMe);
           set({ user: res.user, token: res.token, isAuthenticated: true, loading: false });
         } catch (err: any) {
           set({ error: err.message, loading: false });
@@ -38,11 +52,10 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      login: async (email, password) => {
+      login: async (email, password, rememberMe = false) => {
         set({ loading: true, error: null });
         try {
-          const res = await authApi.login(email, password);
-          localStorage.setItem("lc_token", res.token);
+          const res = await authApi.login(email, password, rememberMe);
           set({ user: res.user, token: res.token, isAuthenticated: true, loading: false });
         } catch (err: any) {
           set({ error: err.message, loading: false });
@@ -51,7 +64,8 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
-        localStorage.removeItem("lc_token");
+        clearTokens();
+        resetPersistedUserStores();
         set({ user: null, token: null, isAuthenticated: false, error: null });
       },
 
@@ -63,8 +77,9 @@ export const useAuthStore = create<AuthState>()(
           const res = await authApi.me();
           set({ user: res.user, isAuthenticated: true, loading: false });
         } catch {
-          // Token invalid/expired
-          localStorage.removeItem("lc_token");
+          // Token revoked / refresh cookie expired — treat as implicit logout.
+          clearTokens();
+          resetPersistedUserStores();
           set({ user: null, token: null, isAuthenticated: false, loading: false });
         }
       },

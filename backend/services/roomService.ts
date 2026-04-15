@@ -227,7 +227,7 @@ export const roomService = {
       if (updates[key] !== undefined) safeUpdates[key] = updates[key];
     }
 
-    const updated = await Room.findByIdAndUpdate(roomId, { $set: safeUpdates }, { new: true });
+    const updated = await Room.findByIdAndUpdate(roomId, { $set: safeUpdates }, { returnDocument: 'after' });
     if (!updated) throw notFound("Room not found");
     roomCache.del(`room:${roomId}`);
     return updated.toJSON();
@@ -237,7 +237,7 @@ export const roomService = {
     const room = await Room.findById(roomId).select(PERM_FIELDS).lean();
     if (!room) throw notFound("Room not found");
     checkPermission(room, userId, "manage_server");
-    const updated = await Room.findByIdAndUpdate(roomId, { $set: { description: topic.trim() } }, { new: true });
+    const updated = await Room.findByIdAndUpdate(roomId, { $set: { description: topic.trim() } }, { returnDocument: 'after' });
     return updated!.toJSON();
   },
 
@@ -414,7 +414,7 @@ export const roomService = {
     const updated = await Room.findOneAndUpdate(
       { _id: roomId, ownerId: userId },
       { $set: { archivedAt: new Date() } },
-      { new: true }
+      { returnDocument: 'after' }
     ).lean();
     if (!updated) throw forbidden("Room not found or only the owner can archive");
     return { ...updated, id: String(updated._id) };
@@ -424,7 +424,7 @@ export const roomService = {
     const updated = await Room.findOneAndUpdate(
       { _id: roomId, ownerId: userId },
       { $unset: { archivedAt: "" } },
-      { new: true }
+      { returnDocument: 'after' }
     ).lean();
     if (!updated) throw forbidden("Room not found or only the owner can unarchive");
     return { ...updated, id: String(updated._id) };
@@ -442,7 +442,7 @@ export const roomService = {
         [`memberRoles.${newOwnerId}`]: ["role-owner"],
         [`memberRoles.${currentOwnerId}`]: ["role-admin"],
       },
-    }, { new: true });
+    }, { returnDocument: 'after' });
 
     return updated!.toJSON();
   },
@@ -451,7 +451,7 @@ export const roomService = {
     const room = await Room.findById(roomId).select(PERM_FIELDS).lean();
     if (!room) throw notFound("Room not found");
     checkPermission(room, userId, "manage_server");
-    const updated = await Room.findByIdAndUpdate(roomId, { $set: { materialId } }, { new: true });
+    const updated = await Room.findByIdAndUpdate(roomId, { $set: { materialId } }, { returnDocument: 'after' });
     return updated!.toJSON();
   },
 
@@ -470,7 +470,7 @@ export const roomService = {
     const updated = await Room.findByIdAndUpdate(
       roomId,
       { $push: { categories: cat } },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     return updated!.toJSON();

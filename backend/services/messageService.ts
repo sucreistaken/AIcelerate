@@ -86,7 +86,7 @@ export const messageService = {
         mentions: parseMentions(content),
         edited: true,
       },
-    }, { new: true });
+    }, { returnDocument: 'after' });
 
     return updated!.toJSON();
   },
@@ -121,7 +121,7 @@ export const messageService = {
       updated = await Message.findOneAndUpdate(
         { _id: messageId, "reactions.emoji": emoji },
         { $pull: { "reactions.$.userIds": userId } },
-        { new: true }
+        { returnDocument: 'after' }
       );
       // Clean up empty reaction entries
       if (updated) {
@@ -135,14 +135,14 @@ export const messageService = {
       updated = await Message.findOneAndUpdate(
         { _id: messageId, "reactions.emoji": emoji },
         { $addToSet: { "reactions.$.userIds": userId } },
-        { new: true }
+        { returnDocument: 'after' }
       );
     } else {
       // Create new reaction
       updated = await Message.findByIdAndUpdate(
         messageId,
         { $push: { reactions: { emoji, userIds: [userId] } } },
-        { new: true }
+        { returnDocument: 'after' }
       );
     }
 
@@ -155,7 +155,7 @@ export const messageService = {
 
     const updated = await Message.findByIdAndUpdate(messageId, {
       $set: { pinned: !msg.pinned },
-    }, { new: true });
+    }, { returnDocument: 'after' });
 
     await channelService.togglePin(serverId, channelId, messageId);
 

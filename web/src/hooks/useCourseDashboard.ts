@@ -197,10 +197,10 @@ export function useCourseDashboard() {
             id: l.id,
             title: l.title,
             date: l.date,
-            hasSlides: !!l.slideText,
-            hasTranscript: !!l.transcript,
-            hasPlan: !!l.plan,
-            hasQuiz: !!l.plan?.seed_quiz?.length,
+            hasSlides: l.hasSlides ?? !!l.slideText,
+            hasTranscript: l.hasTranscript ?? !!l.transcript,
+            hasPlan: l.hasPlan ?? !!l.plan,
+            hasQuiz: l.hasQuiz ?? !!l.plan?.seed_quiz?.length,
           };
         })
         .filter(Boolean) as Array<{ id: string; title: string; date: string; hasSlides: boolean; hasTranscript: boolean; hasPlan: boolean; hasQuiz: boolean }>

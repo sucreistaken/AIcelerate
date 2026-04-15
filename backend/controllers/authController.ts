@@ -7,35 +7,33 @@ import { setRefreshTokenCookie, clearRefreshTokenCookie, getRefreshTokenFromCook
 
 export const authController = {
   register: asyncHandler(async (req: AuthRequest, res: Response) => {
-    const { email, password, nickname } = req.body;
+    const { email, password, nickname, rememberMe } = req.body;
     if (!email || !password || !nickname) throw badRequest("email, password, and nickname are required");
-    const result = await authService.register(email, password, nickname);
+    const result = await authService.register(email, password, nickname, Boolean(rememberMe));
 
-    // Set refresh token as HttpOnly cookie, remove from response body
-    setRefreshTokenCookie(res, result.refreshToken);
+    setRefreshTokenCookie(res, result.refreshToken, result.rememberMe);
     const { refreshToken: _rt, ...safeResult } = result;
     res.status(201).json({ ok: true, ...safeResult });
   }),
 
   login: asyncHandler(async (req: AuthRequest, res: Response) => {
-    const { email, password } = req.body;
+    const { email, password, rememberMe } = req.body;
     if (!email || !password) throw badRequest("email and password are required");
-    const result = await authService.login(email, password);
+    const result = await authService.login(email, password, Boolean(rememberMe));
 
-    setRefreshTokenCookie(res, result.refreshToken);
+    setRefreshTokenCookie(res, result.refreshToken, result.rememberMe);
     const { refreshToken: _rt, ...safeResult } = result;
     res.json({ ok: true, ...safeResult });
   }),
 
   refresh: asyncHandler(async (req: AuthRequest, res: Response) => {
-    // Read refresh token from cookie (preferred) or body (fallback for mobile/API clients)
     const refreshToken = getRefreshTokenFromCookie(req) || req.body.refreshToken;
     if (!refreshToken) throw badRequest("Refresh token required");
 
     const result = await authService.refreshToken(refreshToken);
 
-    // Set new rotated refresh token cookie
-    setRefreshTokenCookie(res, result.refreshToken);
+    // Preserve rememberMe across token rotation
+    setRefreshTokenCookie(res, result.refreshToken, result.rememberMe);
     const { refreshToken: _rt, ...safeResult } = result;
     res.json({ ok: true, ...safeResult });
   }),

@@ -28,8 +28,8 @@ export default function RoomSettings({ room, onClose }: Props) {
 
   const handleRegenerate = async () => {
     if (!user) return;
-    const res = await roomsApi.regenerateInvite(room.id);
-    setInviteCode(res.inviteCode);
+    const code = await roomsApi.regenerateInvite(room.id);
+    setInviteCode(code);
   };
 
   return (

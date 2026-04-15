@@ -62,7 +62,7 @@ async function saveMemory(userId: string | undefined, mem: GlobalMemory): Promis
           lastUpdated: mem.lastUpdated,
         },
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
   } catch (err) {
     logger.error("Failed to save global memory to MongoDB", err);

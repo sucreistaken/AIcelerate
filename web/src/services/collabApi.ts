@@ -1,5 +1,6 @@
 import { API_BASE } from "../config";
-import { fetchWithAuth } from "./fetchWithAuth";
+import { apiJson } from "./fetchWithAuth";
+import { useAuthStore } from "../stores/authStore";
 import type {
   UserProfile,
   StudyServer,
@@ -10,263 +11,303 @@ import type {
 } from "../types";
 
 const BASE = `${API_BASE}/api/collab`;
-const request = fetchWithAuth;
+
+// ── Envelope shapes ────────────────────────────────────────────────────────────
+// Backend convention: `{ ok: true, ...payload }`. We unwrap the payload field
+// at the call site so callers receive the bare domain type.
+
+interface OkProfile { ok: true; profile: UserProfile }
+interface OkFriends { ok: true; friends: UserProfile[] }
+interface OkRoom { ok: true; room: StudyServer }
+interface OkRooms { ok: true; rooms: StudyServer[] }
+interface OkTemplates { ok: true; templates: ServerTemplate[] }
+interface OkMembers { ok: true; members: ServerMemberInfo[] }
+interface OkInvite { ok: true; inviteCode: string }
+interface OkChannel { ok: true; channel: Channel }
+interface OkChannels { ok: true; channels: Channel[] }
+interface OkMessage { ok: true; message: ChannelMessage }
+interface OkMessages { ok: true; messages: ChannelMessage[] }
+interface OkResult { ok: true; success?: boolean; message?: string }
+
+function currentUserId(): string {
+  const id = useAuthStore.getState().user?.id;
+  if (!id) throw new Error("Not authenticated");
+  return id;
+}
 
 // ===== Profiles =====
 export const profilesApi = {
-  create(nickname: string, avatar?: string) {
-    return request<UserProfile>(`${BASE}/profiles`, {
+  async create(nickname: string, avatar?: string): Promise<UserProfile> {
+    const r = await apiJson<OkProfile>(`${BASE}/profiles`, {
       method: "POST",
       body: JSON.stringify({ nickname, avatar }),
     });
+    return r.profile;
   },
 
-  get(id: string) {
-    return request<UserProfile>(`${BASE}/profiles/${id}`);
+  async get(id: string): Promise<UserProfile> {
+    const r = await apiJson<OkProfile>(`${BASE}/profiles/${id}`);
+    return r.profile;
   },
 
-  update(id: string, updates: Partial<Pick<UserProfile, "nickname" | "avatar" | "bio" | "settings">>) {
-    return request<UserProfile>(`${BASE}/profiles/${id}`, {
+  async update(id: string, updates: Partial<Pick<UserProfile, "nickname" | "avatar" | "bio" | "settings">>): Promise<UserProfile> {
+    const r = await apiJson<OkProfile>(`${BASE}/profiles/${id}`, {
       method: "PATCH",
       body: JSON.stringify(updates),
     });
+    return r.profile;
   },
 
-  setStatus(id: string, status: UserProfile["status"]) {
-    return request<UserProfile>(`${BASE}/profiles/${id}/status`, {
+  async setStatus(id: string, status: UserProfile["status"]): Promise<UserProfile> {
+    const r = await apiJson<OkProfile>(`${BASE}/profiles/${id}/status`, {
       method: "PATCH",
       body: JSON.stringify({ status }),
     });
+    return r.profile;
   },
 
-  sendFriendRequest(id: string, friendCode: string) {
-    return request<{ success: boolean; message: string }>(`${BASE}/profiles/${id}/friend-request`, {
+  sendFriendRequest(id: string, friendCode: string): Promise<OkResult> {
+    return apiJson<OkResult>(`${BASE}/profiles/${id}/friend-request`, {
       method: "POST",
       body: JSON.stringify({ friendCode }),
     });
   },
 
-  acceptFriendRequest(id: string, fromId: string) {
-    return request(`${BASE}/profiles/${id}/friend-accept`, {
+  acceptFriendRequest(id: string, fromId: string): Promise<OkResult> {
+    return apiJson<OkResult>(`${BASE}/profiles/${id}/friend-accept`, {
       method: "POST",
       body: JSON.stringify({ fromId }),
     });
   },
 
-  rejectFriendRequest(id: string, fromId: string) {
-    return request(`${BASE}/profiles/${id}/friend-reject`, {
+  rejectFriendRequest(id: string, fromId: string): Promise<OkResult> {
+    return apiJson<OkResult>(`${BASE}/profiles/${id}/friend-reject`, {
       method: "POST",
       body: JSON.stringify({ fromId }),
     });
   },
 
-  removeFriend(id: string, friendId: string) {
-    return request(`${BASE}/profiles/${id}/friends/${friendId}`, {
+  async removeFriend(id: string, friendId: string): Promise<void> {
+    await apiJson<OkResult>(`${BASE}/profiles/${id}/friends/${friendId}`, {
       method: "DELETE",
     });
   },
 
-  getFriends(id: string) {
-    return request<UserProfile[]>(`${BASE}/profiles/${id}/friends`);
+  async getFriends(id: string): Promise<UserProfile[]> {
+    const r = await apiJson<OkFriends>(`${BASE}/profiles/${id}/friends`);
+    return r.friends ?? [];
   },
 };
 
-// ===== Servers =====
+// ===== Servers (collab namespace mounts roomController, so envelope uses `room`) =====
 export const serversApi = {
-  create(name: string, description: string, iconColor?: string, options?: {
+  async create(name: string, description: string, iconColor?: string, options?: {
     tags?: string[];
     university?: string;
     isPublic?: boolean;
     templateId?: string;
-  }) {
-    return request<StudyServer>(`${BASE}/servers`, {
+  }): Promise<StudyServer> {
+    const r = await apiJson<OkRoom>(`${BASE}/servers`, {
       method: "POST",
       body: JSON.stringify({ name, description, iconColor, ...options }),
     });
+    return r.room;
   },
 
-  get(id: string) {
-    return request<StudyServer>(`${BASE}/servers/${id}`);
+  async get(id: string): Promise<StudyServer> {
+    const r = await apiJson<OkRoom>(`${BASE}/servers/${id}`);
+    return r.room;
   },
 
-  getByInviteCode(code: string) {
-    return request<StudyServer>(`${BASE}/servers/invite/${code}`);
+  async getByInviteCode(code: string): Promise<StudyServer> {
+    const r = await apiJson<OkRoom>(`${BASE}/servers/invite/${code}`);
+    return r.room;
   },
 
-  getUserServers() {
-    return request<StudyServer[]>(`${BASE}/servers/user/me`);
+  async getUserServers(): Promise<StudyServer[]> {
+    // /user/:userId — pass real user id, not "me" literal
+    const r = await apiJson<OkRooms>(`${BASE}/servers/user/${currentUserId()}`);
+    return r.rooms ?? [];
   },
 
-  discover(search?: string, tags?: string[]) {
+  async discover(search?: string, tags?: string[]): Promise<StudyServer[]> {
     const params = new URLSearchParams();
     if (search) params.set("search", search);
     if (tags && tags.length) params.set("tag", tags.join(","));
-    return request<StudyServer[]>(`${BASE}/servers/discover?${params}`);
+    const r = await apiJson<OkRooms>(`${BASE}/servers/discover?${params}`);
+    return r.rooms ?? [];
   },
 
-  getTemplates() {
-    return request<ServerTemplate[]>(`${BASE}/servers/templates`);
+  async getTemplates(): Promise<ServerTemplate[]> {
+    const r = await apiJson<OkTemplates>(`${BASE}/servers/templates`);
+    return r.templates ?? [];
   },
 
-  update(id: string, updates: Partial<Pick<StudyServer, "name" | "description" | "iconColor" | "settings" | "tags" | "university">>) {
-    return request<StudyServer>(`${BASE}/servers/${id}`, {
+  async update(id: string, updates: Partial<Pick<StudyServer, "name" | "description" | "iconColor" | "settings" | "tags" | "university">>): Promise<StudyServer> {
+    const r = await apiJson<OkRoom>(`${BASE}/servers/${id}`, {
       method: "PATCH",
       body: JSON.stringify(updates),
     });
+    return r.room;
   },
 
-  join(id: string) {
-    return request<StudyServer>(`${BASE}/servers/${id}/join`, {
-      method: "POST",
-    });
+  async join(id: string): Promise<StudyServer> {
+    const r = await apiJson<OkRoom>(`${BASE}/servers/${id}/join`, { method: "POST" });
+    return r.room;
   },
 
-  joinByInvite(inviteCode: string) {
-    return request<StudyServer>(`${BASE}/servers/join-invite`, {
+  async joinByInvite(inviteCode: string): Promise<StudyServer> {
+    const r = await apiJson<OkRoom>(`${BASE}/servers/join-invite`, {
       method: "POST",
       body: JSON.stringify({ inviteCode }),
     });
+    return r.room;
   },
 
-  leave(id: string) {
-    return request(`${BASE}/servers/${id}/leave`, {
-      method: "POST",
-    });
+  async leave(id: string): Promise<void> {
+    await apiJson<OkResult>(`${BASE}/servers/${id}/leave`, { method: "POST" });
   },
 
-  kick(id: string, targetId: string) {
-    return request(`${BASE}/servers/${id}/kick`, {
+  async kick(id: string, targetId: string): Promise<void> {
+    await apiJson<OkResult>(`${BASE}/servers/${id}/kick`, {
       method: "POST",
       body: JSON.stringify({ targetId }),
     });
   },
 
-  delete(id: string) {
-    return request(`${BASE}/servers/${id}`, {
-      method: "DELETE",
-    });
+  async delete(id: string): Promise<void> {
+    await apiJson<OkResult>(`${BASE}/servers/${id}`, { method: "DELETE" });
   },
 
-  addCategory(id: string, name: string) {
-    return request<StudyServer>(`${BASE}/servers/${id}/categories`, {
+  async addCategory(id: string, name: string): Promise<StudyServer> {
+    const r = await apiJson<OkRoom>(`${BASE}/servers/${id}/categories`, {
       method: "POST",
       body: JSON.stringify({ name }),
     });
+    return r.room;
   },
 
-  regenerateInvite(id: string) {
-    return request<{ inviteCode: string }>(`${BASE}/servers/${id}/regenerate-invite`, {
-      method: "POST",
-    });
+  async regenerateInvite(id: string): Promise<string> {
+    const r = await apiJson<OkInvite>(`${BASE}/servers/${id}/regenerate-invite`, { method: "POST" });
+    return r.inviteCode;
   },
 
-  getMembers(id: string) {
-    return request<ServerMemberInfo[]>(`${BASE}/servers/${id}/members`);
+  async getMembers(id: string): Promise<ServerMemberInfo[]> {
+    const r = await apiJson<OkMembers>(`${BASE}/servers/${id}/members`);
+    return r.members ?? [];
   },
 };
 
 // ===== Channels =====
 export const channelsApi = {
-  create(serverId: string, data: {
+  async create(serverId: string, data: {
     categoryId: string;
     name: string;
     type: Channel["type"];
     toolType?: Channel["toolType"];
     lessonId?: string;
     lessonTitle?: string;
-  }) {
-    return request<Channel>(`${BASE}/servers/${serverId}/channels`, {
+  }): Promise<Channel> {
+    const r = await apiJson<OkChannel>(`${BASE}/servers/${serverId}/channels`, {
       method: "POST",
       body: JSON.stringify(data),
     });
+    return r.channel;
   },
 
-  getByServer(serverId: string) {
-    return request<Channel[]>(`${BASE}/servers/${serverId}/channels`);
+  async getByServer(serverId: string): Promise<Channel[]> {
+    const r = await apiJson<OkChannels>(`${BASE}/servers/${serverId}/channels`);
+    return r.channels ?? [];
   },
 
-  get(serverId: string, channelId: string) {
-    return request<Channel>(`${BASE}/servers/${serverId}/channels/${channelId}`);
+  async get(serverId: string, channelId: string): Promise<Channel> {
+    const r = await apiJson<OkChannel>(`${BASE}/servers/${serverId}/channels/${channelId}`);
+    return r.channel;
   },
 
-  update(serverId: string, channelId: string, updates: Partial<Pick<Channel, "name" | "lessonId" | "lessonTitle">>) {
-    return request<Channel>(`${BASE}/servers/${serverId}/channels/${channelId}`, {
+  async update(serverId: string, channelId: string, updates: Partial<Pick<Channel, "name" | "lessonId" | "lessonTitle">>): Promise<Channel> {
+    const r = await apiJson<OkChannel>(`${BASE}/servers/${serverId}/channels/${channelId}`, {
       method: "PATCH",
       body: JSON.stringify(updates),
     });
+    return r.channel;
   },
 
-  delete(serverId: string, channelId: string) {
-    return request(`${BASE}/servers/${serverId}/channels/${channelId}`, {
-      method: "DELETE",
-    });
+  async delete(serverId: string, channelId: string): Promise<void> {
+    await apiJson<OkResult>(`${BASE}/servers/${serverId}/channels/${channelId}`, { method: "DELETE" });
   },
 };
 
 // ===== Messages =====
 export const messagesApi = {
-  send(channelId: string, data: {
+  async send(channelId: string, data: {
     serverId: string;
     content: string;
     type?: ChannelMessage["type"];
     threadId?: string;
-  }) {
-    return request<ChannelMessage>(`${BASE}/channels/${channelId}/messages`, {
+  }): Promise<ChannelMessage> {
+    const r = await apiJson<OkMessage>(`${BASE}/channels/${channelId}/messages`, {
       method: "POST",
       body: JSON.stringify(data),
     });
+    return r.message;
   },
 
-  get(channelId: string, limit = 50, before?: string) {
+  async get(channelId: string, limit = 50, before?: string): Promise<ChannelMessage[]> {
     const params = new URLSearchParams({ limit: String(limit) });
     if (before) params.set("before", before);
-    return request<ChannelMessage[]>(`${BASE}/channels/${channelId}/messages?${params}`);
+    const r = await apiJson<OkMessages>(`${BASE}/channels/${channelId}/messages?${params}`);
+    return r.messages ?? [];
   },
 
-  getThread(channelId: string, threadId: string) {
-    return request<ChannelMessage[]>(`${BASE}/channels/${channelId}/threads/${threadId}`);
+  async getThread(channelId: string, threadId: string): Promise<ChannelMessage[]> {
+    const r = await apiJson<OkMessages>(`${BASE}/channels/${channelId}/threads/${threadId}`);
+    return r.messages ?? [];
   },
 
-  edit(channelId: string, messageId: string, content: string) {
-    return request<ChannelMessage>(`${BASE}/channels/${channelId}/messages/${messageId}`, {
+  async edit(channelId: string, messageId: string, content: string): Promise<ChannelMessage> {
+    const r = await apiJson<OkMessage>(`${BASE}/channels/${channelId}/messages/${messageId}`, {
       method: "PATCH",
       body: JSON.stringify({ content }),
     });
+    return r.message;
   },
 
-  delete(channelId: string, messageId: string) {
-    return request(`${BASE}/channels/${channelId}/messages/${messageId}`, {
-      method: "DELETE",
-    });
+  async delete(channelId: string, messageId: string): Promise<void> {
+    await apiJson<OkResult>(`${BASE}/channels/${channelId}/messages/${messageId}`, { method: "DELETE" });
   },
 
-  react(channelId: string, messageId: string, emoji: string) {
-    return request<ChannelMessage>(`${BASE}/channels/${channelId}/messages/${messageId}/react`, {
+  async react(channelId: string, messageId: string, emoji: string): Promise<ChannelMessage> {
+    const r = await apiJson<OkMessage>(`${BASE}/channels/${channelId}/messages/${messageId}/react`, {
       method: "POST",
       body: JSON.stringify({ emoji }),
     });
+    return r.message;
   },
 
-  pin(channelId: string, messageId: string, serverId: string) {
-    return request<ChannelMessage>(`${BASE}/channels/${channelId}/messages/${messageId}/pin`, {
+  async pin(channelId: string, messageId: string, serverId: string): Promise<ChannelMessage> {
+    const r = await apiJson<OkMessage>(`${BASE}/channels/${channelId}/messages/${messageId}/pin`, {
       method: "POST",
       body: JSON.stringify({ serverId }),
     });
+    return r.message;
   },
 };
 
 // ===== Lobby =====
 export const lobbyApi = {
-  getMessages(limit = 50, before?: string) {
+  async getMessages(limit = 50, before?: string): Promise<ChannelMessage[]> {
     const params = new URLSearchParams({ limit: String(limit) });
     if (before) params.set("before", before);
-    return request<ChannelMessage[]>(`${BASE}/lobby/messages?${params}`);
+    const r = await apiJson<OkMessages>(`${BASE}/lobby/messages?${params}`);
+    return r.messages ?? [];
   },
 
-  send(content: string) {
-    return request<ChannelMessage>(`${BASE}/lobby/messages`, {
+  async send(content: string): Promise<ChannelMessage> {
+    const r = await apiJson<OkMessage>(`${BASE}/lobby/messages`, {
       method: "POST",
       body: JSON.stringify({ content }),
     });
+    return r.message;
   },
 };

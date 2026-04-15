@@ -62,27 +62,15 @@ export function useApp() {
   const canSubmit = useMemo(
     () =>
       !ui.isLoading &&
-      lesson.lectureText.trim().length > 0 &&
-      lesson.slidesText.trim().length > 0,
+      (lesson.lectureText.trim().length > 0 || lesson.slidesText.trim().length > 0),
     [ui.isLoading, lesson.lectureText, lesson.slidesText]
   );
 
   useEffect(() => {
-    // Batch endpoint: 1 deduped request instead of 7 separate calls
-    dashboardApi.init().then((data) => {
-      if (data?.ok) {
-        if (data.lessons) lesson.setLessons(data.lessons);
-        if (data.courses) setCourses(data.courses);
-      } else {
-        lesson.fetchLessons();
-        fetchCourses();
-        notificationApi.check().catch(() => {});
-      }
-    }).catch(() => {
-      lesson.fetchLessons();
-      fetchCourses();
-      notificationApi.check().catch(() => {});
-    });
+    // Dashboard prefetch + session validation are owned by AuthGuard
+    // (see components/auth/AuthGuard.tsx). useApp only fires the lightweight
+    // notification check here — it's not part of the initial-paint data set.
+    notificationApi.check().catch(() => {});
   }, []);
 
   useEffect(() => {

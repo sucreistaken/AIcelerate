@@ -172,7 +172,7 @@ describe("shareService", () => {
       expect(mockFindByIdAndUpdate).toHaveBeenCalledWith(
         "share-mock-1",
         { $inc: { accessCount: 1 } },
-        { new: true }
+        { returnDocument: 'after' }
       );
       expect(result).not.toBeNull();
       expect(result!.shareId).toBe("share-mock-1");
@@ -209,7 +209,7 @@ describe("shareService", () => {
             }),
           },
         },
-        { new: true }
+        { returnDocument: 'after' }
       );
       expect(result).not.toBeNull();
       expect(result!.comments).toHaveLength(1);
@@ -238,7 +238,7 @@ describe("shareService", () => {
             comments: expect.objectContaining({ author: "anonymous" }),
           },
         },
-        { new: true }
+        { returnDocument: 'after' }
       );
     });
   });

@@ -16,6 +16,7 @@ import SchedulerWidget from "./components/SchedulerWidget";
 import AppNavbar from "./components/layout/AppNavbar";
 import AppSidebar from "./components/layout/AppSidebar";
 import UploadDrawer from "./components/layout/UploadDrawer";
+import { CreateCourseModal } from "./components/course/CreateCourseModal";
 
 const SettingsPage = lazy(() => import("./components/settings/SettingsPage"));
 const AdminApp = lazy(() => import("./admin/AdminApp"));
@@ -118,6 +119,10 @@ export default function App() {
           <Suspense fallback={null}>
             <SettingsPage onClose={() => setShowSettings(false)} />
           </Suspense>
+        )}
+
+        {ui.showCreateCourseModal && (
+          <CreateCourseModal onClose={() => ui.setShowCreateCourseModal(false)} />
         )}
 
         <KeyboardShortcuts isOpen={showShortcuts} onClose={closeShortcuts} />

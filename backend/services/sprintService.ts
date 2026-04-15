@@ -24,7 +24,7 @@ export const sprintService = {
     return SprintModel.findOneAndUpdate(
       { userId: GLOBAL_USER },
       { $setOnInsert: { settings: DEFAULT_SETTINGS, sessions: [] } },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: 'after' }
     );
   },
 
@@ -44,7 +44,7 @@ export const sprintService = {
     const doc = await SprintModel.findOneAndUpdate(
       { userId: GLOBAL_USER },
       { $set: setFields },
-      { new: true, upsert: true }
+      { returnDocument: 'after', upsert: true }
     );
     return doc!.settings;
   },
@@ -88,7 +88,7 @@ export const sprintService = {
     const doc = await SprintModel.findOneAndUpdate(
       { userId: GLOBAL_USER, "sessions.id": sessionId },
       { $set: setFields },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!doc) return null;
