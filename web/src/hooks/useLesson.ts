@@ -1,4 +1,5 @@
 import { logger } from "../utils/logger";
+import toast from "react-hot-toast";
 // src/hooks/useLesson.ts
 import { useCallback } from 'react';
 import { useLessonStore } from '../stores/lessonStore';
@@ -302,12 +303,11 @@ export function useLesson() {
             } else {
                 store.setError(result.error || 'OCR process failed');
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
             logger.error(e);
             ui.setIsLoading(false);
-            // Show detailed alert to user
-            const msg = e.message?.replace(/^Error:\s*/, "") || "Upload failed.";
-            alert(`Error Occurred:\n${msg}`);
+            const msg = (e instanceof Error ? e.message : String(e)).replace(/^Error:\s*/, "") || "Upload failed.";
+            toast.error(msg);
         } finally {
             ui.setIsLoading(false);
         }

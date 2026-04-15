@@ -39,19 +39,32 @@ export default function AuthGuard({ children }: Props) {
     if (!token) return;
 
     let cancelled = false;
+    // Signal "background revalidation in progress" to the stores. Consumers
+    // that care (e.g. subtle syncing indicator in the navbar — planned) read
+    // `.revalidating` to show a non-blocking hint. Linear/Superhuman pattern.
+    useCourseStore.getState().setRevalidating(true);
+    useLessonStore.getState().setRevalidating(true);
+
     // Fire both in parallel, non-blocking. fetchMe handles its own auth-state
     // mutation; dashboardApi.init swallows errors and returns null.
     (async () => {
-      const [, dashData] = await Promise.all([
-        fetchMe(),
-        dashboardApi.init(),
-      ]);
-      if (cancelled || !dashData?.ok) return;
-      if (Array.isArray(dashData.lessons)) {
-        useLessonStore.getState().setLessons(dashData.lessons);
-      }
-      if (Array.isArray(dashData.courses)) {
-        useCourseStore.getState().setCourses(dashData.courses);
+      try {
+        const [, dashData] = await Promise.all([
+          fetchMe(),
+          dashboardApi.init(),
+        ]);
+        if (cancelled || !dashData?.ok) return;
+        if (Array.isArray(dashData.lessons)) {
+          useLessonStore.getState().setLessons(dashData.lessons);
+        }
+        if (Array.isArray(dashData.courses)) {
+          useCourseStore.getState().setCourses(dashData.courses);
+        }
+      } finally {
+        if (!cancelled) {
+          useCourseStore.getState().setRevalidating(false);
+          useLessonStore.getState().setRevalidating(false);
+        }
       }
     })();
 
@@ -59,6 +72,19 @@ export default function AuthGuard({ children }: Props) {
       cancelled = true;
     };
   }, [token, fetchMe]);
+
+  // Cross-tab auth sync: if another tab logs in/out, the persist middleware
+  // writes to localStorage under 'lc-auth'. Listen for that and rehydrate so
+  // this tab stays in sync (no stale authenticated UI after sibling tab logout).
+  useEffect(() => {
+    function onStorage(e: StorageEvent) {
+      if (e.key === "lc-auth" || e.key === null) {
+        void useAuthStore.persist.rehydrate?.();
+      }
+    }
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   if (!isAuthenticated) {
     if (authView === "register") {

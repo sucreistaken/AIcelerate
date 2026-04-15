@@ -417,6 +417,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'wizard.titlePlaceholder': 'Ders konusunu girin',
     'wizard.weekNumberLabel': 'Hafta Numarası',
     'wizard.optional': '(opsiyonel)',
+    'common.optional': 'Opsiyonel',
+    'common.optionalInline': 'opsiyonel',
     'wizard.weekPlaceholder': 'Ör: 3',
 
     // Lessons History (additional)
@@ -1375,6 +1377,8 @@ const translations: Record<Lang, Record<string, string>> = {
     'wizard.titlePlaceholder': 'Enter lesson topic',
     'wizard.weekNumberLabel': 'Week Number',
     'wizard.optional': '(optional)',
+    'common.optional': 'Optional',
+    'common.optionalInline': 'optional',
     'wizard.weekPlaceholder': 'e.g. 3',
 
     // Lessons History (additional)

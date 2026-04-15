@@ -48,8 +48,10 @@ describe("PaneInfoBanner", () => {
       />
     );
 
-    expect(screen.getByText("Tip one")).toBeInTheDocument();
-    expect(screen.getByText("Tip two")).toBeInTheDocument();
+    // Tips render as "{tip} →" — match by substring to stay robust against
+    // trivial separator tweaks.
+    expect(screen.getByText(/Tip one/)).toBeInTheDocument();
+    expect(screen.getByText(/Tip two/)).toBeInTheDocument();
   });
 
   it("hides banner and shows reopen button when dismissed", () => {

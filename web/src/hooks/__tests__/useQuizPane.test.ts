@@ -125,7 +125,9 @@ describe("useQuizPane", () => {
     );
     // userAnswers is empty, so evaluateAnswers should toast error
     await act(async () => { await result.current.evaluateAnswers(); });
-    expect(toast.default.error).toHaveBeenCalledWith("Lutfen en az bir soruyu cevaplayin.");
+    expect(toast.default.error).toHaveBeenCalledWith(
+      "Değerlendirme için en az bir soruyu cevaplamanız gerekiyor. Cevaplarınızı yazın ve tekrar deneyin."
+    );
     expect(mockApiFetch).not.toHaveBeenCalled();
   });
 

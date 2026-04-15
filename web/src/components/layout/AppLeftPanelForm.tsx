@@ -157,7 +157,7 @@ export default function AppLeftPanelForm({
 
       {/* Section 02 — Course info */}
       <section className="ingest-section">
-        <div className="ingest-eyebrow">Kurs Bilgisi</div>
+        <div className="ingest-eyebrow">{t("courseInfo.title")}</div>
         <div className="ingest-course">
           <CourseInfoSection lesson={lesson} ui={ui} />
         </div>
@@ -193,7 +193,7 @@ export default function AppLeftPanelForm({
       <section className="ingest-section">
         <div className="ingest-eyebrow">
           <span>{t("leftPanel.updateTranscript")}</span>
-          <span className="ingest-tag">Opsiyonel</span>
+          <span className="ingest-tag">{t("common.optional")}</span>
         </div>
         <div className="ingest-row">
           <label htmlFor="audio-upload" className="ingest-btn ingest-btn--ghost">
@@ -295,7 +295,7 @@ function LedgerRow({
       <span className="ingest-ledger__icon">{icon}</span>
       <span className="ingest-ledger__label">
         {label}
-        {optional && <span className="ingest-ledger__opt">· opsiyonel</span>}
+        {optional && <span className="ingest-ledger__opt">· {t("common.optionalInline")}</span>}
       </span>
       <span className="ingest-ledger__val">
         {has ? (

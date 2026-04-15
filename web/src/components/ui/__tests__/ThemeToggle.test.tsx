@@ -19,13 +19,14 @@ vi.mock("framer-motion", () => ({
   AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-// Mock the uiStore
-const mockToggleTheme = vi.fn();
-let mockTheme = "light";
+// Mock the uiStore. ThemeToggle reads `theme` and `setTheme` via
+// per-field selectors (post selector-migration) — the mock must honor both.
+const mockSetTheme = vi.fn();
+let mockTheme: "light" | "dark" | "system" = "light";
 
 vi.mock("../../../stores/uiStore", () => ({
-  useUiStore: (selector?: (state: { theme: string; toggleTheme: () => void }) => unknown) => {
-    const state = { theme: mockTheme, toggleTheme: mockToggleTheme };
+  useUiStore: (selector?: (state: { theme: string; setTheme: (t: string) => void }) => unknown) => {
+    const state = { theme: mockTheme, setTheme: mockSetTheme };
     return selector ? selector(state) : state;
   },
 }));
@@ -38,35 +39,35 @@ describe("ThemeToggle", () => {
     vi.clearAllMocks();
   });
 
-  it("renders a button with theme label", () => {
+  it("renders a button with a theme aria-label", () => {
     render(<ThemeToggle />);
     const button = screen.getByRole("button");
     expect(button).toBeInTheDocument();
     expect(button).toHaveAttribute("aria-label", expect.stringContaining("tema"));
   });
 
-  it("shows correct label for light theme", () => {
+  it("shows the 'Açık tema' title when theme is light", () => {
     mockTheme = "light";
     render(<ThemeToggle />);
     expect(screen.getByTitle("Açık tema")).toBeInTheDocument();
   });
 
-  it("shows correct label for dark theme", () => {
+  it("shows the 'Koyu tema' title when theme is dark", () => {
     mockTheme = "dark";
     render(<ThemeToggle />);
     expect(screen.getByTitle("Koyu tema")).toBeInTheDocument();
   });
 
-  it("shows correct label for system theme", () => {
+  it("treats 'system' as dark (follows current UI heuristic)", () => {
     mockTheme = "system";
     render(<ThemeToggle />);
-    expect(screen.getByTitle("Sistem")).toBeInTheDocument();
+    // ThemeToggle collapses `system` into the dark label/icon pair.
+    expect(screen.getByTitle("Koyu tema")).toBeInTheDocument();
   });
 
-  it("calls toggleTheme when clicked", () => {
+  it("calls setTheme when clicked", () => {
     render(<ThemeToggle />);
-    const button = screen.getByRole("button");
-    fireEvent.click(button);
-    expect(mockToggleTheme).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button"));
+    expect(mockSetTheme).toHaveBeenCalledTimes(1);
   });
 });

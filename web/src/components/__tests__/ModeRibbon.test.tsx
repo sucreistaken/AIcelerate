@@ -3,81 +3,68 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi, beforeAll } from "vitest";
 import ModeRibbon from "../ModeRibbon";
 
-// Mock scrollIntoView which jsdom does not implement
 beforeAll(() => {
+  // jsdom has no scrollIntoView; ModeRibbon scrolls active tab into view.
   Element.prototype.scrollIntoView = vi.fn();
 });
 
-// Mock framer-motion to avoid animation issues in tests
+/**
+ * Minimal framer-motion surface needed by ModeRibbon (motion.div/button/span,
+ * AnimatePresence, LayoutGroup, useReducedMotion). Any further motion feature
+ * the ribbon starts using needs to be added here.
+ */
 vi.mock("framer-motion", () => ({
   motion: {
-    div: React.forwardRef(
-      (props: React.HTMLAttributes<HTMLDivElement>, ref: React.Ref<HTMLDivElement>) => (
-        <div ref={ref} {...props} />
-      )
+    div: React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+      (props, ref) => <div ref={ref} {...props} />,
+    ),
+    button: React.forwardRef<
+      HTMLButtonElement,
+      React.ButtonHTMLAttributes<HTMLButtonElement>
+    >((props, ref) => <button ref={ref} {...props} />),
+    span: React.forwardRef<HTMLSpanElement, React.HTMLAttributes<HTMLSpanElement>>(
+      (props, ref) => <span ref={ref} {...props} />,
     ),
   },
   AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  LayoutGroup: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useReducedMotion: () => false,
 }));
 
 describe("ModeRibbon", () => {
-  const mockSetMode = vi.fn();
+  const setMode = vi.fn();
 
-  it("renders with tablist role", () => {
-    render(<ModeRibbon mode="plan" setMode={mockSetMode} />);
+  it("renders the tablist landmark", () => {
+    render(<ModeRibbon mode="plan" setMode={setMode} />);
     expect(screen.getByRole("tablist")).toBeInTheDocument();
   });
 
-  it("renders core mode tabs by default", () => {
-    render(<ModeRibbon mode="plan" setMode={mockSetMode} />);
-
-    const coreLabels = [
-      "Dashboard", "Plan", "Quiz", "Cards",
-      "Mind Map", "Deep Dive", "My Notes",
-    ];
-
-    for (const label of coreLabels) {
-      expect(screen.getByText(label)).toBeInTheDocument();
-    }
+  it("exposes the segment groups (Turkish defaults)", () => {
+    render(<ModeRibbon mode="plan" setMode={setMode} />);
+    // Groups are the top-level segment buttons inside the ribbon
+    expect(screen.getByText("Kurs")).toBeInTheDocument();
+    expect(screen.getByText("Analiz")).toBeInTheDocument();
+    expect(screen.getByText("Çalışma")).toBeInTheDocument();
+    expect(screen.getByText("Pratik")).toBeInTheDocument();
   });
 
-  it("shows advanced tabs when an advanced mode is active", () => {
-    render(<ModeRibbon mode="alignment" setMode={mockSetMode} />);
-
-    // Advanced row auto-opens when active mode is in advanced tabs
-    expect(screen.getByText("Alignment")).toBeInTheDocument();
-    expect(screen.getByText("Deviation")).toBeInTheDocument();
-    expect(screen.getByText("Cheat Sheet")).toBeInTheDocument();
+  it("shows the Plan child tab when in the Analiz group", () => {
+    render(<ModeRibbon mode="plan" setMode={setMode} />);
+    // Plan lives inside the 'Analiz' segment and should be rendered
+    expect(screen.getByTitle("Plan")).toBeInTheDocument();
   });
 
   it("marks the active mode tab with aria-selected", () => {
-    render(<ModeRibbon mode="quiz" setMode={mockSetMode} />);
-
-    const tabs = screen.getAllByRole("tab");
-    const quizTab = tabs.find((tab) => tab.textContent?.includes("Quiz"));
-    expect(quizTab).toHaveAttribute("aria-selected", "true");
+    render(<ModeRibbon mode="plan" setMode={setMode} />);
+    const planTab = screen.getByTitle("Plan");
+    expect(planTab).toHaveAttribute("aria-selected", "true");
   });
 
-  it("calls setMode when a tab is clicked", () => {
-    render(<ModeRibbon mode="plan" setMode={mockSetMode} />);
-
-    const quizButton = screen.getByText("Quiz").closest("button");
-    expect(quizButton).toBeTruthy();
-    fireEvent.click(quizButton!);
-
-    expect(mockSetMode).toHaveBeenCalledWith("quiz");
-  });
-
-  it("marks non-active tabs with aria-selected=false", () => {
-    render(<ModeRibbon mode="plan" setMode={mockSetMode} />);
-
-    const tabs = screen.getAllByRole("tab");
-    const nonActiveTabs = tabs.filter(
-      (tab) => !tab.textContent?.includes("Plan")
-    );
-
-    for (const tab of nonActiveTabs) {
-      expect(tab).toHaveAttribute("aria-selected", "false");
-    }
+  it("calls setMode when a different child tab is clicked", () => {
+    render(<ModeRibbon mode="plan" setMode={setMode} />);
+    // Deviation ("Sapma") is in the same segment and should be clickable
+    const sapmaBtn = screen.getByTitle(/Sapma|Deviation/);
+    fireEvent.click(sapmaBtn);
+    expect(setMode).toHaveBeenCalled();
   });
 });

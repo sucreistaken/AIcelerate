@@ -111,7 +111,6 @@ export default function LoginPage({ onSwitchToRegister }: Props) {
                   className="auth-field-pwd-toggle"
                   onClick={() => setShowPassword((v) => !v)}
                   aria-label={showPassword ? "Hide password" : "Show password"}
-                  tabIndex={-1}
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>

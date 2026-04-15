@@ -44,7 +44,7 @@ export const useNotesStore = create<NotesState>()(
 
             addNote: (content, source, lessonId, title, tags) => {
                 const newNote: Note = {
-                    id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                    id: `note-${crypto.randomUUID()}`,
                     content,
                     source,
                     lessonId,

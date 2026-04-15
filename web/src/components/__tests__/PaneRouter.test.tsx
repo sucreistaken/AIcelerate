@@ -118,10 +118,8 @@ describe("PaneRouter", () => {
     expect(await screen.findByTestId("pane-mindmap")).toBeInTheDocument();
   });
 
-  it("renders CourseDashboard for mode 'course-dashboard'", async () => {
-    render(<PaneRouter mode="course-dashboard" lesson={buildLessonProp()} ui={buildUiProp()} />);
-    expect(await screen.findByTestId("pane-course-dashboard")).toBeInTheDocument();
-  });
+  // CourseDashboard was removed from the router (courses now managed via
+  // sidebar + dashboard). Route gone; no test needed.
 
   it("renders DeepDivePane for mode 'deep-dive'", async () => {
     render(<PaneRouter mode="deep-dive" lesson={buildLessonProp()} ui={buildUiProp()} />);

@@ -27,7 +27,6 @@ export type { TabsProps, TabsListProps, TabsTriggerProps, TabsContentProps } fro
 export { Skeleton, CardSkeleton, ListSkeleton, TableSkeleton, QuizSkeleton, FlashcardSkeleton, DeepDiveSkeleton } from "./Skeleton";
 export { ProgressRing } from "./ProgressRing";
 export { StreakBadge } from "./StreakBadge";
-export { ProgressStepper } from "./ProgressStepper";
 export { EmptyState, NoPlanEmpty, NoQuizEmpty, NoLessonsEmpty, NoCheatSheetEmpty, NoFlashcardsEmpty, NoNotesEmpty, NoMindMapEmpty, NoRoomsEmpty } from "./EmptyState";
 export { ThemeToggle } from "./ThemeToggle";
 export { ToastProvider } from "./Toast";

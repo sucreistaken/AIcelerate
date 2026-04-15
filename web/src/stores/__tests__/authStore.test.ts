@@ -8,6 +8,7 @@ vi.mock("../../services/authApi", () => ({
     register: vi.fn(),
     login: vi.fn(),
     me: vi.fn(),
+    logout: vi.fn(),
     changePassword: vi.fn(),
     deleteAccount: vi.fn(),
   },
@@ -125,7 +126,7 @@ describe("authStore", () => {
   });
 
   // ---- logout ----
-  it("logout clears user state and removes token from localStorage", () => {
+  it("logout clears user state and removes token from localStorage", async () => {
     useAuthStore.setState({
       user: mockUser,
       token: "jwt-token-123",
@@ -133,7 +134,7 @@ describe("authStore", () => {
     });
     localStorage.setItem("lc_token", "jwt-token-123");
 
-    useAuthStore.getState().logout();
+    await useAuthStore.getState().logout();
 
     const state = useAuthStore.getState();
     expect(state.user).toBeNull();
@@ -223,10 +224,11 @@ describe("authStore", () => {
       });
     });
 
-    it("logout() also resets courseStore and lessonStore", () => {
+    it("logout() also resets courseStore and lessonStore", async () => {
+      mockedAuthApi.logout = vi.fn().mockResolvedValue(undefined);
       useAuthStore.setState({ user: mockUser, token: "t", isAuthenticated: true });
 
-      useAuthStore.getState().logout();
+      await useAuthStore.getState().logout();
 
       expect(useCourseStore.getState().courses).toEqual([]);
       expect(useCourseStore.getState().currentCourseId).toBeNull();

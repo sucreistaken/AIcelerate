@@ -11,9 +11,16 @@ const ALLOWED_FORMATS = ['audio/mpeg', 'audio/wav', 'audio/mp4', 'audio/x-m4a', 
 const ALLOWED_EXTENSIONS = ['.mp3', '.wav', '.mp4', '.m4a', '.webm'];
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 
+// Module-scoped accessors — stable references so useCallback deps don't churn.
+// Consumers invoke these at call time to read the latest store state without
+// subscribing the component to every unrelated field change.
+const store = () => useLessonStore.getState();
+const ui = () => useUiStore.getState();
+
 export function useTranscription() {
-    const store = useLessonStore();
-    const ui = useUiStore();
+    // Reactive subscription — only re-render when `stt` slice changes (which
+    // is what we actually expose to callers).
+    const stt = useUiStore((s) => s.stt);
     const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const streamCtrlRef = useRef<AbortController | null>(null);
     const segmentCountRef = useRef(0);
@@ -24,38 +31,38 @@ export function useTranscription() {
         segmentCountRef.current++;
         if (segmentCountRef.current % 5 !== 1) return;
 
-        ui.setSttProgress({ toast: txt });
+        ui().setSttProgress({ toast: txt });
         if (toastTimerRef.current) {
             clearTimeout(toastTimerRef.current);
         }
         toastTimerRef.current = setTimeout(() => {
-            ui.setSttProgress({ toast: null });
+            ui().setSttProgress({ toast: null });
         }, 4000);
-    }, [ui]);
+    }, []);
 
     const startTranscription = useCallback(async (file: File) => {
-        const { currentLessonId } = store;
+        const { currentLessonId } = store();
 
         if (!currentLessonId) {
-            store.setError('First create or select a lesson (lessonId needed).');
+            store().setError('First create or select a lesson (lessonId needed).');
             return;
         }
 
         // File validation
         const ext = '.' + file.name.split('.').pop()?.toLowerCase();
         if (!ALLOWED_FORMATS.includes(file.type) && !ALLOWED_EXTENSIONS.includes(ext)) {
-            store.setError(`Desteklenmeyen dosya formatı: ${ext || file.type}. Kabul edilen formatlar: MP3, WAV, MP4, M4A, WebM`);
+            store().setError(`Desteklenmeyen dosya formatı: ${ext || file.type}. Kabul edilen formatlar: MP3, WAV, MP4, M4A, WebM`);
             return;
         }
         if (file.size > MAX_FILE_SIZE) {
-            store.setError(`Dosya çok büyük: ${(file.size / 1024 / 1024).toFixed(1)}MB. Maksimum: 100MB`);
+            store().setError(`Dosya çok büyük: ${(file.size / 1024 / 1024).toFixed(1)}MB. Maksimum: 100MB`);
             return;
         }
 
         segmentCountRef.current = 0;
         transcriptionStartRef.current = Date.now();
-        store.setError(null);
-        ui.setSttProgress({
+        store().setError(null);
+        ui().setSttProgress({
             progress: 0,
             now: null,
             status: 'Loading...',
@@ -66,14 +73,14 @@ export function useTranscription() {
             const result = await uploadApi.startTranscribe(file, currentLessonId);
 
             if (!result.ok) {
-                store.setError(result.error || 'Start transcribe error');
-                ui.setSttProgress({ status: 'Failed to start ❌' });
+                store().setError(result.error || 'Start transcribe error');
+                ui().setSttProgress({ status: 'Failed to start ❌' });
                 return;
             }
 
             // Clear transcript for new transcription
-            store.setLectureText('');
-            ui.setSttProgress({ status: 'Transcribing...' });
+            store().setLectureText('');
+            ui().setSttProgress({ status: 'Transcribing...' });
 
             // Stream transcription progress via fetch-based SSE (Bearer-auth capable,
             // unlike native EventSource which can't set Authorization).
@@ -85,7 +92,7 @@ export function useTranscription() {
                 {
                     onEvent: (msg) => {
                         if (msg.type === 'meta') {
-                            ui.setSttProgress({
+                            ui().setSttProgress({
                                 status: `Model: ${msg.model} • Duration: ${((msg.duration as number) / 60).toFixed(1)} min`,
                             });
                             return;
@@ -93,7 +100,7 @@ export function useTranscription() {
 
                         if (msg.type === 'log') {
                             if (typeof msg.message === 'string' && msg.message.trim()) {
-                                ui.setSttProgress({
+                                ui().setSttProgress({
                                     status: `Preparing... (${msg.message.trim().slice(0, 60)})`,
                                 });
                             }
@@ -114,7 +121,7 @@ export function useTranscription() {
                                         etaStr = ` • ~${Math.round(remaining)}s kaldı`;
                                     }
                                 }
-                                ui.setSttProgress({
+                                ui().setSttProgress({
                                     progress: p,
                                     now: { start: msg.start, end: msg.end },
                                     status: `Transcribing ${fmtTime(msg.start)}–${fmtTime(msg.end)} (${p}%)${etaStr}`,
@@ -125,7 +132,7 @@ export function useTranscription() {
                             if (msg.text) {
                                 const line = `[${formatTime(msg.start as number)} – ${formatTime(msg.end as number)}] ${msg.text}`;
                                 const currentText = useLessonStore.getState().lectureText;
-                                store.setLectureText(
+                                store().setLectureText(
                                     currentText ? currentText + '\n' + line : line
                                 );
                             }
@@ -133,14 +140,14 @@ export function useTranscription() {
                         }
 
                         if (msg.type === 'error') {
-                            store.setError((msg.message as string) || 'Transcribe error');
-                            ui.setSttProgress({ status: 'Error ❌', now: null });
+                            store().setError((msg.message as string) || 'Transcribe error');
+                            ui().setSttProgress({ status: 'Error ❌', now: null });
                             streamCtrlRef.current?.abort();
                             return;
                         }
 
                         if (msg.type === 'done') {
-                            ui.setSttProgress({
+                            ui().setSttProgress({
                                 progress: 100,
                                 status: 'Done ✅',
                                 now: null,
@@ -151,39 +158,39 @@ export function useTranscription() {
                         }
                     },
                     onError: (err) => {
-                        store.setError(err);
-                        ui.setSttProgress({ status: 'Connection error ❌', now: null });
+                        store().setError(err);
+                        ui().setSttProgress({ status: 'Connection error ❌', now: null });
                     },
                     onClose: () => {
                         streamCtrlRef.current = null;
                     },
                 },
             );
-        } catch (e: any) {
-            store.setError(e.message || 'Start transcribe error');
-            ui.setSttProgress({ status: 'Failed to start ❌' });
+        } catch (e: unknown) {
+            store().setError((e instanceof Error ? e.message : String(e)) || 'Start transcribe error');
+            ui().setSttProgress({ status: 'Failed to start ❌' });
         }
-    }, [store, ui, showToast]);
+    }, [showToast]);
 
     const clearTranscription = useCallback(() => {
-        store.setLectureText('');
-        ui.resetStt();
+        store().setLectureText('');
+        ui().resetStt();
         streamCtrlRef.current?.abort();
         streamCtrlRef.current = null;
-    }, [store, ui]);
+    }, []);
 
     const cancelTranscription = useCallback(() => {
         streamCtrlRef.current?.abort();
         streamCtrlRef.current = null;
-        ui.setSttProgress({
+        ui().setSttProgress({
             status: 'Cancelled',
             now: null,
         });
-    }, [ui]);
+    }, []);
 
     return {
         // State from ui store
-        stt: ui.stt,
+        stt: stt,
         // Actions
         startTranscription,
         clearTranscription,
