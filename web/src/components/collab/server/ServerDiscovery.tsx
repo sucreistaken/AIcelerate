@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { ArrowRight, Info, Plus, Search, SearchX, Sparkles } from "lucide-react";
 import toast from "react-hot-toast";
 import { serversApi } from "../../../services/collabApi";
 import { useServerStore } from "../../../stores/serverStore";
 import { useProfileStore } from "../../../stores/profileStore";
+import { t } from "../../../utils/i18n";
 import type { StudyServer } from "../../../types";
 import LobbyChat from "../chat/LobbyChat";
-import { t } from "../../../utils/i18n";
 
 interface Props {
   onCreateServer?: () => void;
@@ -40,7 +41,7 @@ export default function ServerDiscovery({ onCreateServer }: Props) {
 
   useEffect(() => {
     fetchServers();
-  }, []);
+  }, [fetchServers]);
 
   const handleSearch = () => {
     fetchServers(search.trim());
@@ -56,17 +57,16 @@ export default function ServerDiscovery({ onCreateServer }: Props) {
     try {
       await joinPublicServer(server.id);
       await selectServer(server.id);
-      toast.success(`${server.name} çalışma odasına katıldınız!`);
-    } catch (err: any) {
-      toast.error(err?.message || "Katılınamadı");
+      toast.success(`${server.name} ${t("studyHub.joinedRoom")}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : t("studyHub.joinFailed");
+      toast.error(msg || t("studyHub.joinFailed"));
     } finally {
       setJoiningId(null);
     }
   };
 
-  const isAlreadyMember = (serverId: string) => {
-    return userServers.some((s) => s.id === serverId);
-  };
+  const isAlreadyMember = (serverId: string) => userServers.some((s) => s.id === serverId);
 
   const hasNoServers = userServers.length === 0;
 
@@ -80,18 +80,18 @@ export default function ServerDiscovery({ onCreateServer }: Props) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
         >
-          <div className="sh-discovery__welcome-icon">A</div>
+          <div className="sh-discovery__welcome-icon" aria-hidden="true">
+            <Sparkles size={22} strokeWidth={1.5} />
+          </div>
           <h2 className="sh-discovery__title">
-            {hasNoServers ? "Çalışma Platformuna Hoş Geldin!" : "Ana Sayfa"}
+            {hasNoServers ? t("studyHub.welcomeTitle") : t("studyHub.homeTitle")}
           </h2>
           <p className="sh-discovery__subtitle">
-            {hasNoServers
-              ? "Birlikte çalışmaya başlamak için bir çalışma odası oluştur veya mevcut bir odaya katıl"
-              : "Yeni çalışma odaları keşfet veya mevcut odalarına dön"}
+            {hasNoServers ? t("studyHub.discoveryDesc") : t("studyHub.discoveryDescAlt")}
           </p>
         </motion.div>
 
-        {/* Quick action cards - shown prominently when user has no servers */}
+        {/* Primary action stack — shown when the user has no servers */}
         {hasNoServers && (
           <motion.div
             className="sh-discovery__actions"
@@ -99,25 +99,33 @@ export default function ServerDiscovery({ onCreateServer }: Props) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.15 }}
           >
-            <div className="sh-action-card sh-action-card--primary" onClick={onCreateServer}>
-              <div className="sh-action-card__icon">+</div>
-              <div className="sh-action-card__content">
-                <h3 className="sh-action-card__title">Oda Oluştur</h3>
-                <p className="sh-action-card__desc">Hazır şablonlarla hızlıca çalışma odası kur</p>
+            <button
+              type="button"
+              className="sh-action-card sh-action-card--primary"
+              onClick={onCreateServer}
+            >
+              <div className="sh-action-card__icon" aria-hidden="true">
+                <Plus size={18} strokeWidth={1.75} />
               </div>
-              <span className="sh-action-card__arrow">→</span>
-            </div>
+              <div className="sh-action-card__content">
+                <h3 className="sh-action-card__title">{t("studyHub.createRoom")}</h3>
+                <p className="sh-action-card__desc">{t("studyHub.createRoomDesc")}</p>
+              </div>
+              <ArrowRight className="sh-action-card__arrow" size={16} strokeWidth={1.75} aria-hidden="true" />
+            </button>
 
-            <div className="sh-onboarding-hint">
-              <div className="sh-onboarding-hint__icon">i</div>
+            <div className="sh-onboarding-hint" role="note">
+              <div className="sh-onboarding-hint__icon" aria-hidden="true">
+                <Info size={14} strokeWidth={1.75} />
+              </div>
               <div className="sh-onboarding-hint__text">
-                <strong>Nasıl çalışır?</strong> Oda oluştur → Arkadaşlarını davet et → Birlikte quiz çöz, flashcard çalış, sprint yap!
+                <strong>{t("studyHub.howItWorks")}</strong> {t("studyHub.howItWorksText")}
               </div>
             </div>
           </motion.div>
         )}
 
-        {/* Quick actions bar - shown when user has servers */}
+        {/* Quick bar — shown when the user already has servers */}
         {!hasNoServers && (
           <motion.div
             className="sh-discovery__quick-bar"
@@ -125,62 +133,72 @@ export default function ServerDiscovery({ onCreateServer }: Props) {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3, delay: 0.1 }}
           >
-            <button className="sh-quick-btn" onClick={onCreateServer}>
-              <span className="sh-quick-btn__icon">+</span>
-              <span>Oda Oluştur</span>
+            <button type="button" className="sh-quick-btn" onClick={onCreateServer}>
+              <span className="sh-quick-btn__icon" aria-hidden="true">
+                <Plus size={14} strokeWidth={2} />
+              </span>
+              <span>{t("studyHub.createRoom")}</span>
             </button>
           </motion.div>
         )}
 
-        {/* Tab bar: Keşfet | Sohbet */}
-        <div className="sh-discovery__tabs">
+        {/* Tab bar */}
+        <div className="sh-discovery__tabs" role="tablist">
           <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "discover"}
             className={`sh-discovery__tab ${activeTab === "discover" ? "sh-discovery__tab--active" : ""}`}
             onClick={() => setActiveTab("discover")}
           >
-            Kesfet
+            {t("studyHub.tabDiscover")}
           </button>
           <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "chat"}
             className={`sh-discovery__tab ${activeTab === "chat" ? "sh-discovery__tab--active" : ""}`}
             onClick={() => setActiveTab("chat")}
           >
-            Sohbet
+            {t("studyHub.tabChat")}
           </button>
         </div>
 
-        {/* TAB CONTENT */}
         {activeTab === "discover" && (
           <>
-            {/* Search section */}
             <motion.div
               className="sh-discovery__search-section"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.3, delay: 0.2 }}
             >
-              <h3 className="sh-discovery__section-title">
-                Herkese Açık Çalışma Odalarını Keşfet
-              </h3>
+              <h3 className="sh-discovery__section-title">{t("studyHub.discoverTitle")}</h3>
               <div className="sh-discovery__search">
-                <div className="sh-discovery__search-icon">?</div>
+                <Search
+                  className="sh-discovery__search-icon"
+                  size={14}
+                  strokeWidth={1.75}
+                  aria-hidden="true"
+                />
                 <input
                   className="sh-discovery__input"
-                  placeholder="Çalışma odası, ders veya üniversite ara..."
+                  placeholder={t("studyHub.searchPlaceholder")}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   onKeyDown={handleKeyDown}
+                  aria-label={t("studyHub.searchPlaceholder")}
                 />
                 <button
-                  className="btn btn--primary sh-discovery__search-btn"
+                  type="button"
+                  className="sh-discovery__search-btn"
                   onClick={handleSearch}
                   disabled={loading}
                 >
-                  {loading ? "..." : t("collab.search")}
+                  {loading ? "…" : t("collab.search")}
                 </button>
               </div>
             </motion.div>
 
-            {/* Results */}
             <div className="sh-discovery__results">
               <AnimatePresence mode="wait">
                 {loading && servers.length === 0 && (
@@ -201,24 +219,27 @@ export default function ServerDiscovery({ onCreateServer }: Props) {
                   <motion.div
                     key="empty"
                     className="sh-discovery__empty"
-                    initial={{ opacity: 0, scale: 0.95 }}
+                    initial={{ opacity: 0, scale: 0.98 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0 }}
                   >
-                    <div className="sh-discovery__empty-icon">
-                      {search ? "?" : "--"}
+                    <div className="sh-discovery__empty-icon" aria-hidden="true">
+                      <SearchX size={28} strokeWidth={1.4} />
                     </div>
                     <p className="sh-discovery__empty-title">
-                      {search ? "Sonuç bulunamadı" : "Henüz herkese açık çalışma odası yok"}
+                      {search ? t("studyHub.resultsEmpty") : t("studyHub.noPublicRooms")}
                     </p>
                     <p className="sh-discovery__empty-desc">
-                      {search
-                        ? "Farklı anahtar kelimeler deneyin"
-                        : "İlk herkese açık odayı siz oluşturun!"}
+                      {search ? t("studyHub.tryDifferent") : t("studyHub.createFirstPublic")}
                     </p>
                     {!search && (
-                      <button className="btn btn--primary" onClick={onCreateServer} style={{ marginTop: 16 }}>
-                        Oda Oluştur
+                      <button
+                        type="button"
+                        className="btn btn--primary"
+                        onClick={onCreateServer}
+                        style={{ marginTop: 16 }}
+                      >
+                        {t("studyHub.createRoom")}
                       </button>
                     )}
                   </motion.div>
@@ -227,6 +248,7 @@ export default function ServerDiscovery({ onCreateServer }: Props) {
 
               {servers.map((server, index) => {
                 const isMember = isAlreadyMember(server.id);
+                const memberCount = server.memberCount || server.memberIds.length;
                 return (
                   <motion.div
                     key={server.id}
@@ -238,6 +260,7 @@ export default function ServerDiscovery({ onCreateServer }: Props) {
                     <div
                       className="sh-server-card__icon"
                       style={{ background: server.iconColor }}
+                      aria-hidden="true"
                     >
                       {server.name.charAt(0).toUpperCase()}
                     </div>
@@ -253,7 +276,7 @@ export default function ServerDiscovery({ onCreateServer }: Props) {
                       )}
                       <div className="sh-server-card__meta">
                         <span className="sh-server-card__members">
-                          {server.memberCount || server.memberIds.length} kişi
+                          {memberCount} {t("studyHub.memberUnit")}
                         </span>
                         {server.tags && server.tags.length > 0 && (
                           <div className="sh-server-card__tags">
@@ -267,18 +290,20 @@ export default function ServerDiscovery({ onCreateServer }: Props) {
                     <div className="sh-server-card__action">
                       {isMember ? (
                         <button
+                          type="button"
                           className="btn btn--ghost sh-server-card__btn"
                           onClick={() => selectServer(server.id)}
                         >
-                          Git →
+                          {t("studyHub.go")}
                         </button>
                       ) : (
                         <button
+                          type="button"
                           className="btn btn--primary sh-server-card__btn"
                           onClick={() => handleJoin(server)}
                           disabled={joiningId === server.id}
                         >
-                          {joiningId === server.id ? "..." : "Katıl"}
+                          {joiningId === server.id ? "…" : t("studyHub.join")}
                         </button>
                       )}
                     </div>

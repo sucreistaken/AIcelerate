@@ -34,6 +34,19 @@
   --text-3xl: 28px;
   --text-4xl: 32px;
 
+  /* --- Font Families (Campus Quartz direction) --- */
+  --font-display: "Instrument Serif", ui-serif, Georgia, "Times New Roman", serif;
+  --font-body: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* --- Semantic accents (study-hub scoped) --- */
+  --mention: #f87171;           /* coral — mention/reply highlight */
+  --mention-soft: color-mix(in srgb, #f87171 16%, transparent);
+  --presence-online: #4ade80;
+  --presence-idle: #fbbf24;
+  --presence-dnd: #ef4444;
+  --presence-offline: color-mix(in srgb, var(--text) 32%, transparent);
+
   /* --- Font Weights --- */
   --font-normal: 400;
   --font-medium: 500;

@@ -1993,7 +1993,10 @@ code,
 }
 
 .modal {
-  width: min(400px, 90vw);
+  width: min(420px, 92vw);
+  max-height: min(88vh, 88dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 20px;
@@ -2004,6 +2007,13 @@ code,
   transform-origin: 50% 45%;
   animation: modalPop 0.25s cubic-bezier(.18, .9, .25, 1) both;
   text-align: center;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sh-hairline, var(--border)) transparent;
+}
+.modal::-webkit-scrollbar { width: 6px; }
+.modal::-webkit-scrollbar-thumb {
+  background: var(--sh-hairline, var(--border));
+  border-radius: 999px;
 }
 
 @keyframes modalPop {

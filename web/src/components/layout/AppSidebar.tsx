@@ -92,6 +92,15 @@ interface AppSidebarProps {
 }
 
 export default function AppSidebar({ onOpenUpload }: AppSidebarProps) {
+  // Defer transition activation until after first paint so width changes
+  // from store rehydration (collapsed state) don't visibly animate.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() =>
+      requestAnimationFrame(() => setHydrated(true)),
+    );
+    return () => cancelAnimationFrame(id);
+  }, []);
   // Per-field selectors — AppSidebar is mounted app-wide and would otherwise
   // re-render on every unrelated UI tick (theme, stt progress, modal toggles,
   // loading flags) and every lesson/course revalidation tick. Narrow reads
@@ -170,7 +179,7 @@ export default function AppSidebar({ onOpenUpload }: AppSidebarProps) {
 
   return (
     <aside
-      className={`app-sidebar${collapsed ? " app-sidebar--collapsed" : ""}`}
+      className={`app-sidebar${collapsed ? " app-sidebar--collapsed" : ""}${hydrated ? " is-hydrated" : ""}`}
       role="navigation"
       aria-label={t("sidebar.navigation")}
     >

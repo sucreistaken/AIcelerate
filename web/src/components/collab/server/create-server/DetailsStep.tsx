@@ -98,18 +98,30 @@ export default function DetailsStep({
         </div>
       </div>
 
-      <div className="mb-4 sh-toggle-row">
-        <label className="sh-label" style={{ marginBottom: 0 }}>Herkese Açık</label>
-        <button
-          type="button"
-          className={`sh-toggle ${isPublic ? "sh-toggle--active" : ""}`}
-          onClick={() => setIsPublic(!isPublic)}
-        >
-          <span className="sh-toggle__knob" />
-        </button>
-        <span style={{ fontSize: "var(--text-xs)", opacity: 0.5 }}>
-          {isPublic ? "Herkes keşfedebilir ve katılabilir" : "Sadece davet ile katılım"}
-        </span>
+      <div className="mb-4">
+        <label className="sh-label">Görünürlük</label>
+        <div className="sh-visibility-seg" role="radiogroup" aria-label="Görünürlük">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={isPublic}
+            className={`sh-visibility-seg__opt ${isPublic ? "sh-visibility-seg__opt--active" : ""}`}
+            onClick={() => setIsPublic(true)}
+          >
+            <span className="sh-visibility-seg__title">Herkese Açık</span>
+            <span className="sh-visibility-seg__desc">Herkes keşfedip katılabilir</span>
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={!isPublic}
+            className={`sh-visibility-seg__opt ${!isPublic ? "sh-visibility-seg__opt--active" : ""}`}
+            onClick={() => setIsPublic(false)}
+          >
+            <span className="sh-visibility-seg__title">Sadece Davet</span>
+            <span className="sh-visibility-seg__desc">Yalnızca davet linkiyle</span>
+          </button>
+        </div>
       </div>
 
       {error && <p style={{ color: "var(--danger)", marginBottom: 12 }}>{error}</p>}

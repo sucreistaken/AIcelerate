@@ -1,5 +1,7 @@
 import { useEffect } from "react";
+import { Hash, Users } from "lucide-react";
 import { useMessageStore } from "../../../stores/messageStore";
+import { t } from "../../../utils/i18n";
 import MessageList from "./MessageList";
 import MessageInput from "./MessageInput";
 
@@ -15,31 +17,34 @@ export default function FullChat({ channelId, serverId, channelName, memberCount
   const loadMessages = useMessageStore((s) => s.loadMessages);
 
   useEffect(() => {
-    if (channelId) {
-      loadMessages(channelId);
-    }
-  }, [channelId]);
+    if (channelId) loadMessages(channelId);
+  }, [channelId, loadMessages]);
 
   return (
     <div className="sh-full-chat">
-      {/* Header */}
-      <div className="sh-full-chat__header">
+      <header className="sh-full-chat__header">
         <div className="sh-full-chat__header-left">
-          <span className="sh-full-chat__hash">#</span>
+          <Hash
+            className="sh-full-chat__hash"
+            size={18}
+            strokeWidth={1.6}
+            aria-hidden="true"
+          />
           <h3 className="sh-full-chat__channel-name">{channelName}</h3>
         </div>
         {memberCount != null && (
-          <span className="sh-full-chat__member-count">{memberCount} üye</span>
+          <span className="sh-full-chat__member-count" aria-label={`${memberCount} ${t("studyHub.memberCount")}`}>
+            <Users size={14} strokeWidth={1.6} aria-hidden="true" />
+            <span>{memberCount}</span>
+          </span>
         )}
-      </div>
+      </header>
 
-      {/* Messages */}
       <div className="sh-full-chat__body">
         <MessageList channelId={channelId} />
       </div>
 
-      {/* Input */}
-      {!readOnly && (
+      {!readOnly ? (
         <div className="sh-full-chat__footer">
           <MessageInput
             channelId={channelId}
@@ -48,11 +53,9 @@ export default function FullChat({ channelId, serverId, channelName, memberCount
             disabled={false}
           />
         </div>
-      )}
-
-      {readOnly && (
-        <div className="sh-full-chat__readonly">
-          Bu kanal sadece duyurular içindir.
+      ) : (
+        <div className="sh-full-chat__readonly" role="note">
+          {t("studyHub.announcementReadonly")}
         </div>
       )}
     </div>

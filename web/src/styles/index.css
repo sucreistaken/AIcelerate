@@ -24,6 +24,7 @@
 @import "./components/tabs.css";
 
 @import "./components/study-hub.css";
+@import "./components/study-hub-tools.css";
 @import "./components/keyboard-shortcuts.css";
 @import "./components/onboarding.css";
 @import "./components/empty-state.css";

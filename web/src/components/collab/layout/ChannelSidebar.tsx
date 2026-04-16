@@ -1,30 +1,41 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useMemo, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import {
+  Brain,
+  ChevronDown,
+  Hash,
+  HelpCircle,
+  Home,
+  Layers,
+  Megaphone,
+  Network,
+  Plus,
+  StickyNote,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 import { useServerStore } from "../../../stores/serverStore";
+import { t } from "../../../utils/i18n";
 import type { Channel } from "../../../types";
 
-const TOOL_ICONS: Record<string, string> = {
-  "deep-dive": "D",
-  "flashcards": "F",
-  "mind-map": "M",
-  "notes": "N",
-  "quiz": "Q",
-  "sprint": "S",
+const TOOL_ICONS: Record<string, LucideIcon> = {
+  "deep-dive": Brain,
+  flashcards: Layers,
+  "mind-map": Network,
+  notes: StickyNote,
+  quiz: HelpCircle,
+  sprint: Zap,
 };
 
-const TOOL_DESCRIPTIONS: Record<string, string> = {
+// Short descriptions — kept local because they're tool-specific copy
+// and share TR↔EN translations through the same t() catalog later.
+const TOOL_DESCRIPTIONS_TR: Record<string, string> = {
   "deep-dive": "AI ile derinlemesine analiz",
-  "flashcards": "Kartlarla tekrar et",
+  flashcards: "Kartlarla tekrar et",
   "mind-map": "Konuyu görselleştir",
-  "notes": "Birlikte not al",
-  "quiz": "Bilgini test et",
-  "sprint": "Odaklanarak çalış",
-};
-
-const CHANNEL_TYPE_ICONS: Record<string, string> = {
-  text: "#",
-  "study-tool": "#",
-  announcement: "!",
+  notes: "Birlikte not al",
+  quiz: "Bilgini test et",
+  sprint: "Odaklanarak çalış",
 };
 
 interface Props {
@@ -34,177 +45,238 @@ interface Props {
   onNavigate?: (panel: number) => void;
 }
 
-export default function ChannelSidebar({ onInvite, onServerSettings, onCreateChannel, onNavigate }: Props) {
+export default function ChannelSidebar({
+  onInvite,
+  onServerSettings,
+  onCreateChannel,
+  onNavigate,
+}: Props) {
   const servers = useServerStore((s) => s.servers);
   const activeServerId = useServerStore((s) => s.activeServerId);
-  const server = activeServerId ? servers.find((s) => s.id === activeServerId) ?? null : null;
   const channels = useServerStore((s) => s.channels);
   const activeChannelId = useServerStore((s) => s.activeChannelId);
   const selectChannel = useServerStore((s) => s.selectChannel);
   const loading = useServerStore((s) => s.loading);
-  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  const reduceMotion = useReducedMotion();
+
+  const server = useMemo(
+    () => (activeServerId ? servers.find((s) => s.id === activeServerId) ?? null : null),
+    [servers, activeServerId],
+  );
+
+  const { toolChannels, chatChannels } = useMemo(() => {
+    if (!server) return { toolChannels: [] as Channel[], chatChannels: [] as Channel[] };
+    const tools: Channel[] = [];
+    const chats: Channel[] = [];
+    for (const cat of server.categories) {
+      const catChannels = channels.filter((ch) => cat.channelIds.includes(ch.id));
+      for (const ch of catChannels) {
+        if (ch.type === "study-tool") tools.push(ch);
+        else chats.push(ch);
+      }
+    }
+    return { toolChannels: tools, chatChannels: chats };
+  }, [server, channels]);
 
   if (!server) {
     return (
-      <div className="sh-channel-sidebar">
+      <aside className="sh-channel-sidebar" aria-label={t("studyHub.panelChannels")}>
         <div className="sh-channel-sidebar__empty">
-          <p>Bir çalışma odası seçin veya yeni oda oluşturun</p>
+          <div className="sh-channel-sidebar__empty-icon" aria-hidden="true">
+            <Home size={26} strokeWidth={1.4} />
+          </div>
+          <p>{t("studyHub.noRoomSelected")}</p>
         </div>
-      </div>
+      </aside>
     );
   }
 
-  const toggleSection = (sectionId: string) => {
-    setCollapsedSections((prev) => {
+  const toggle = (id: string) =>
+    setCollapsed((prev) => {
       const next = new Set(prev);
-      if (next.has(sectionId)) next.delete(sectionId);
-      else next.add(sectionId);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
-  };
 
-  const getChannelIcon = (ch: Channel) => {
-    if (ch.type === "study-tool" && ch.toolType) return TOOL_ICONS[ch.toolType] || "#";
-    return CHANNEL_TYPE_ICONS[ch.type] || "#";
-  };
-
-  // Collect all channels across all categories
-  const toolChannels: Channel[] = [];
-  const chatChannels: Channel[] = [];
-
-  for (const cat of server.categories) {
-    const catChannels = channels.filter((ch) => cat.channelIds.includes(ch.id));
-    for (const ch of catChannels) {
-      if (ch.type === "study-tool") {
-        toolChannels.push(ch);
-      } else {
-        chatChannels.push(ch);
-      }
-    }
-  }
-
-  const handleChannelClick = (ch: Channel) => {
+  const selectCh = (ch: Channel) => {
     selectChannel(ch.id);
-    onNavigate?.(2); // Go to main content on mobile
+    onNavigate?.(2);
   };
 
-  // Find first category to allow adding channels
   const firstCatId = server.categories[0]?.id;
-
-  const isToolsCollapsed = collapsedSections.has("tools");
-  const isChatCollapsed = collapsedSections.has("chat");
+  const toolsCollapsed = collapsed.has("tools");
+  const chatCollapsed = collapsed.has("chat");
 
   return (
-    <div className="sh-channel-sidebar">
-      {/* Server header */}
-      <div className="sh-channel-sidebar__header" onClick={onServerSettings}>
+    <aside className="sh-channel-sidebar" aria-label={t("studyHub.panelChannels")}>
+      <button
+        type="button"
+        className="sh-channel-sidebar__header"
+        onClick={onServerSettings}
+        aria-label={server.name}
+      >
         <h3 className="sh-channel-sidebar__server-name">{server.name}</h3>
-        <span className="sh-channel-sidebar__chevron">▾</span>
-      </div>
+        <ChevronDown
+          className="sh-channel-sidebar__chevron"
+          size={16}
+          strokeWidth={1.6}
+          aria-hidden="true"
+        />
+      </button>
 
-      {/* Channel list */}
       <div className="sh-channel-sidebar__list">
         {loading && channels.length === 0 && (
-          <div className="sh-channel-sidebar__loading">
+          <div className="sh-channel-sidebar__loading" aria-live="polite">
             <div className="sh-skeleton sh-skeleton--channel" />
             <div className="sh-skeleton sh-skeleton--channel" />
             <div className="sh-skeleton sh-skeleton--channel" />
           </div>
         )}
 
-        {/* TOOLS section */}
         {toolChannels.length > 0 && (
-          <div className="sh-category">
-            <div className="sh-category__header" onClick={() => toggleSection("tools")}>
-              <span className={`sh-category__arrow ${isToolsCollapsed ? "sh-category__arrow--collapsed" : ""}`}>
-                ▾
-              </span>
-              <span className="sh-category__name">ARAÇLAR</span>
+          <section className={`sh-category ${toolsCollapsed ? "sh-category--collapsed" : ""}`}>
+            <button
+              type="button"
+              className="sh-category__header"
+              onClick={() => toggle("tools")}
+              aria-expanded={!toolsCollapsed}
+            >
+              <ChevronDown
+                className="sh-category__arrow"
+                size={12}
+                strokeWidth={2}
+                aria-hidden="true"
+              />
+              <span className="sh-category__name">{t("studyHub.categoryTools")}</span>
               {firstCatId && (
                 <button
+                  type="button"
                   className="sh-category__add"
                   onClick={(e) => {
                     e.stopPropagation();
                     onCreateChannel(firstCatId);
                   }}
-                  title="Araç ekle"
+                  aria-label={t("studyHub.addTool")}
+                  title={t("studyHub.addTool")}
                 >
-                  +
+                  <Plus size={12} strokeWidth={2} aria-hidden="true" />
                 </button>
               )}
-            </div>
-            {!isToolsCollapsed && (
-              <div className="sh-channel-tools">
-                {toolChannels.map((ch) => (
-                  <motion.div
-                    key={ch.id}
-                    className={`sh-channel-tool ${activeChannelId === ch.id ? "sh-channel-tool--active" : ""}`}
-                    onClick={() => handleChannelClick(ch)}
-                    whileHover={{ x: -2, y: -2 }}
-                    whileTap={{ x: 2, y: 2 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 20 }}
-                  >
-                    <span className="sh-channel-tool__icon">{getChannelIcon(ch)}</span>
-                    <div className="sh-channel-tool__info">
-                      <span className="sh-channel-tool__name">{ch.name}</span>
-                      {ch.toolType && TOOL_DESCRIPTIONS[ch.toolType] && (
-                        <span className="sh-channel-tool__desc">{TOOL_DESCRIPTIONS[ch.toolType]}</span>
+            </button>
+            {!toolsCollapsed && (
+              <div className="sh-channel-tools" role="list">
+                {toolChannels.map((ch) => {
+                  const Icon = ch.toolType ? TOOL_ICONS[ch.toolType] ?? Hash : Hash;
+                  const isActive = activeChannelId === ch.id;
+                  return (
+                    <motion.button
+                      key={ch.id}
+                      type="button"
+                      role="listitem"
+                      className={`sh-channel-tool ${isActive ? "sh-channel-tool--active" : ""}`}
+                      onClick={() => selectCh(ch)}
+                      whileHover={reduceMotion ? {} : { y: -1 }}
+                      whileTap={reduceMotion ? {} : { y: 0 }}
+                      transition={{ duration: 0.16 }}
+                      aria-current={isActive ? "page" : undefined}
+                    >
+                      <span className="sh-channel-tool__icon" aria-hidden="true">
+                        <Icon size={14} strokeWidth={1.75} />
+                      </span>
+                      <div className="sh-channel-tool__info">
+                        <span className="sh-channel-tool__name">{ch.name}</span>
+                        {ch.toolType && TOOL_DESCRIPTIONS_TR[ch.toolType] && (
+                          <span className="sh-channel-tool__desc">
+                            {TOOL_DESCRIPTIONS_TR[ch.toolType]}
+                          </span>
+                        )}
+                      </div>
+                      {ch.lessonId && (
+                        <span
+                          className="sh-channel-tool__material-dot"
+                          title={ch.lessonTitle}
+                          aria-label="linked"
+                        />
                       )}
-                    </div>
-                    {ch.lessonId && <span className="sh-channel-tool__material-dot" title={ch.lessonTitle} />}
-                  </motion.div>
-                ))}
+                    </motion.button>
+                  );
+                })}
               </div>
             )}
-          </div>
+          </section>
         )}
 
-        {/* CHAT section */}
         {chatChannels.length > 0 && (
-          <div className="sh-category">
-            <div className="sh-category__header" onClick={() => toggleSection("chat")}>
-              <span className={`sh-category__arrow ${isChatCollapsed ? "sh-category__arrow--collapsed" : ""}`}>
-                ▾
-              </span>
-              <span className="sh-category__name">SOHBET</span>
-            </div>
-            {!isChatCollapsed &&
-              chatChannels.map((ch) => (
-                <div
-                  key={ch.id}
-                  className={`sh-channel ${activeChannelId === ch.id ? "sh-channel--active" : ""}`}
-                  onClick={() => handleChannelClick(ch)}
-                >
-                  <span className="sh-channel__icon">{getChannelIcon(ch)}</span>
-                  <span className="sh-channel__name">{ch.name}</span>
-                </div>
-              ))}
-          </div>
+          <section className={`sh-category ${chatCollapsed ? "sh-category--collapsed" : ""}`}>
+            <button
+              type="button"
+              className="sh-category__header"
+              onClick={() => toggle("chat")}
+              aria-expanded={!chatCollapsed}
+            >
+              <ChevronDown
+                className="sh-category__arrow"
+                size={12}
+                strokeWidth={2}
+                aria-hidden="true"
+              />
+              <span className="sh-category__name">{t("studyHub.categoryChat")}</span>
+            </button>
+            {!chatCollapsed && (
+              <div role="list">
+                {chatChannels.map((ch) => {
+                  const isActive = activeChannelId === ch.id;
+                  const Icon = ch.type === "announcement" ? Megaphone : Hash;
+                  return (
+                    <button
+                      key={ch.id}
+                      type="button"
+                      role="listitem"
+                      className={`sh-channel ${isActive ? "sh-channel--active" : ""}`}
+                      onClick={() => selectCh(ch)}
+                      aria-current={isActive ? "page" : undefined}
+                    >
+                      <span className="sh-channel__icon" aria-hidden="true">
+                        <Icon size={14} strokeWidth={1.75} />
+                      </span>
+                      <span className="sh-channel__name">{ch.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </section>
         )}
 
-        {/* If no channels at all, show hint */}
         {toolChannels.length === 0 && chatChannels.length === 0 && !loading && (
           <div className="sh-channel-sidebar__empty">
-            <p>Henüz araç eklenmemiş</p>
+            <p>{t("studyHub.noToolsYet")}</p>
             {firstCatId && (
               <button
+                type="button"
                 className="btn btn--primary btn--sm"
                 onClick={() => onCreateChannel(firstCatId)}
                 style={{ marginTop: 8 }}
               >
-                Araç Ekle
+                {t("studyHub.addToolBtn")}
               </button>
             )}
           </div>
         )}
       </div>
 
-      {/* Bottom actions */}
       <div className="sh-channel-sidebar__footer">
-        <button className="sh-channel-sidebar__invite-btn" onClick={onInvite}>
-          Davet Et
+        <button
+          type="button"
+          className="sh-channel-sidebar__invite-btn"
+          onClick={onInvite}
+        >
+          {t("studyHub.invite")}
         </button>
       </div>
-    </div>
+    </aside>
   );
 }

@@ -94,7 +94,10 @@ export function registerMessageHandlers(
       return cb?.({ ok: false, error: "Rate limited" });
     }
     try {
-      if (!(await verifyChannelMember(userId, d.channelId))) {
+      // Lobby is open to every authenticated user — no server membership to
+      // verify. `messageService.delete` still enforces authorship.
+      const isLobby = d.channelId === "global-lobby";
+      if (!isLobby && !(await verifyChannelMember(userId, d.channelId))) {
         return cb?.({ ok: false, error: "Not a member of this channel" });
       }
 
@@ -118,7 +121,8 @@ export function registerMessageHandlers(
       return cb?.({ ok: false, error: "Rate limited" });
     }
     try {
-      if (!(await verifyChannelMember(userId, d.channelId))) {
+      const isLobby = d.channelId === "global-lobby";
+      if (!isLobby && !(await verifyChannelMember(userId, d.channelId))) {
         return cb?.({ ok: false, error: "Not a member of this channel" });
       }
 

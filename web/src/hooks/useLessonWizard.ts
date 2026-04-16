@@ -38,7 +38,7 @@ export function useLessonWizard() {
   const ui = useUiStore();
   const transcription = useTranscription();
   const streaming = useStreamingAnalysis();
-  const completionTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const completionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [state, setState] = useState<WizardState>({
     ...INITIAL,
     selectedCourseId: courseStore.currentCourseId,
@@ -181,7 +181,7 @@ export function useLessonWizard() {
 
   // Cleanup completion timer on unmount
   useEffect(() => {
-    return () => { clearTimeout(completionTimerRef.current); };
+    return () => { if (completionTimerRef.current) clearTimeout(completionTimerRef.current); };
   }, []);
 
   return {

@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { Home, Plus } from "lucide-react";
 import { useServerStore } from "../../../stores/serverStore";
 import { useProfileStore } from "../../../stores/profileStore";
+import { t } from "../../../utils/i18n";
 
 interface Props {
   onCreateServer: () => void;
@@ -15,94 +17,106 @@ export default function ServerSidebar({ onCreateServer, onNavigate }: Props) {
   const deselectServer = useServerStore((s) => s.deselectServer);
   const profile = useProfileStore((s) => s.profile);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const reduceMotion = useReducedMotion();
 
   const handleServerClick = (serverId: string) => {
     selectServer(serverId);
-    onNavigate?.(1); // Go to channel panel on mobile
+    onNavigate?.(1);
   };
 
   const handleHomeClick = () => {
     deselectServer();
-    onNavigate?.(2); // Go to main content (discovery) on mobile
+    onNavigate?.(2);
   };
 
+  const spring = reduceMotion
+    ? { duration: 0 }
+    : { type: "spring" as const, stiffness: 400, damping: 17 };
+  const hover = reduceMotion ? {} : { scale: 1.06, y: -1 };
+  const tap = reduceMotion ? {} : { scale: 0.94 };
+
   return (
-    <div className="sh-server-sidebar">
-      {/* Home button */}
-      <motion.div
+    <nav className="sh-server-sidebar" aria-label="Servers">
+      <motion.button
+        type="button"
         className={`sh-server-icon ${!activeServerId ? "sh-server-icon--active" : ""}`}
         style={{ background: "var(--accent-2)" }}
-        title="Ana Sayfa"
+        title={t("studyHub.home")}
+        aria-label={t("studyHub.home")}
+        aria-current={!activeServerId ? "page" : undefined}
         onClick={handleHomeClick}
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.92 }}
-        transition={{ type: "spring", stiffness: 400, damping: 17 }}
+        whileHover={hover}
+        whileTap={tap}
+        transition={spring}
       >
-        <span style={{ fontSize: "18px", fontWeight: 700 }}>LC</span>
-      </motion.div>
+        <Home size={18} strokeWidth={1.75} aria-hidden="true" color="white" />
+      </motion.button>
 
-      <div className="sh-server-divider" />
+      <div className="sh-server-divider" role="separator" />
 
-      {/* Server list */}
       {servers.map((server) => {
         const isActive = server.id === activeServerId;
         const isHovered = server.id === hoveredId;
         return (
-          <motion.div
+          <motion.button
             key={server.id}
+            type="button"
             className={`sh-server-icon ${isActive ? "sh-server-icon--active" : ""}`}
             style={{ background: server.iconColor }}
             title={server.name}
+            aria-label={server.name}
+            aria-current={isActive ? "page" : undefined}
             onClick={() => handleServerClick(server.id)}
             onMouseEnter={() => setHoveredId(server.id)}
             onMouseLeave={() => setHoveredId(null)}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.92 }}
-            transition={{ type: "spring", stiffness: 400, damping: 17 }}
+            whileHover={hover}
+            whileTap={tap}
+            transition={spring}
           >
-            {/* Pill indicator */}
             <AnimatePresence>
               {(isActive || isHovered) && (
-                <motion.div
+                <motion.span
                   layoutId="server-pill"
                   className="sh-server-pill"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
+                  aria-hidden="true"
                 />
               )}
             </AnimatePresence>
             <span className="sh-server-icon__letter">
               {server.name.charAt(0).toUpperCase()}
             </span>
-          </motion.div>
+          </motion.button>
         );
       })}
 
-      {/* Add server button */}
-      <motion.div
+      <motion.button
+        type="button"
         className="sh-server-icon sh-server-icon--add"
-        title="Oda Oluştur"
+        title={t("studyHub.createRoom")}
+        aria-label={t("studyHub.createRoom")}
         onClick={onCreateServer}
-        whileHover={{ scale: 1.1, rotate: 90 }}
-        whileTap={{ scale: 0.9 }}
-        transition={{ type: "spring", stiffness: 300, damping: 15 }}
+        whileHover={reduceMotion ? {} : { scale: 1.06, rotate: 90 }}
+        whileTap={tap}
+        transition={spring}
       >
-        <span style={{ fontSize: "22px", lineHeight: 1 }}>+</span>
-      </motion.div>
+        <Plus size={18} strokeWidth={1.75} aria-hidden="true" />
+      </motion.button>
 
-      {/* User avatar at bottom */}
       {profile && (
         <div
           className="sh-server-icon sh-server-icon--user"
-          style={{ background: profile.avatar, marginTop: "auto" }}
+          style={{ background: profile.avatar }}
           title={`${profile.nickname} (${profile.friendCode})`}
+          aria-label={profile.nickname}
         >
           <span className="sh-server-icon__letter">
             {profile.nickname.charAt(0).toUpperCase()}
           </span>
         </div>
       )}
-    </div>
+    </nav>
   );
 }

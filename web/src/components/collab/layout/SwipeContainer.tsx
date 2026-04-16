@@ -1,5 +1,6 @@
-import { useRef } from "react";
-import { motion, useMotionValue, useTransform, animate, PanInfo } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { motion, useMotionValue, animate, type PanInfo } from "framer-motion";
+import { t } from "../../../utils/i18n";
 
 interface Props {
   activePanel: number;
@@ -7,77 +8,79 @@ interface Props {
   children: React.ReactNode[];
 }
 
-const PANEL_LABELS = ["Sunucular", "Kanallar", "İçerik"];
+const PANEL_KEYS = ["studyHub.panelServers", "studyHub.panelChannels", "studyHub.panelContent"] as const;
 const DRAG_THRESHOLD = 50;
+const VELOCITY_THRESHOLD = 500;
+const SPRING = { type: "spring" as const, stiffness: 300, damping: 30 };
 
 export default function SwipeContainer({ activePanel, onPanelChange, children }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const x = useMotionValue(0);
   const panelCount = children.length;
 
-  // Animate to active panel when it changes externally
-  const targetX = -activePanel * window.innerWidth;
+  // Track width via ResizeObserver — fixes orientation change / browser chrome changes.
+  const [width, setWidth] = useState<number>(
+    typeof window !== "undefined" ? window.innerWidth : 0,
+  );
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) setWidth(entry.contentRect.width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Snap to active panel when width or activePanel changes (external navigation).
+  useEffect(() => {
+    if (width <= 0) return;
+    const target = -activePanel * width;
+    const controls = animate(x, target, SPRING);
+    return () => controls.stop();
+  }, [activePanel, width, x]);
 
   const handleDragEnd = (_: unknown, info: PanInfo) => {
     const offset = info.offset.x;
     const velocity = info.velocity.x;
 
     let newPanel = activePanel;
-    if (offset < -DRAG_THRESHOLD || velocity < -500) {
+    if (offset < -DRAG_THRESHOLD || velocity < -VELOCITY_THRESHOLD) {
       newPanel = Math.min(activePanel + 1, panelCount - 1);
-    } else if (offset > DRAG_THRESHOLD || velocity > 500) {
+    } else if (offset > DRAG_THRESHOLD || velocity > VELOCITY_THRESHOLD) {
       newPanel = Math.max(activePanel - 1, 0);
     }
 
     onPanelChange(newPanel);
-    animate(x, -newPanel * window.innerWidth, {
-      type: "spring",
-      stiffness: 300,
-      damping: 30,
-    });
   };
 
-  // Sync x when activePanel changes programmatically
-  const animateToPanel = () => {
-    animate(x, targetX, {
-      type: "spring",
-      stiffness: 300,
-      damping: 30,
-    });
-  };
-
-  // Keep x in sync with activePanel
-  if (Math.abs(x.get() - targetX) > 1 && !x.isAnimating()) {
-    animateToPanel();
-  }
-
-  // Compute drag constraints
-  const minX = -(panelCount - 1) * window.innerWidth;
+  const minX = -(panelCount - 1) * width;
 
   return (
     <div className="sh-swipe-container" ref={containerRef}>
-      {/* Panel indicator dots */}
-      <div className="sh-swipe-dots">
-        {PANEL_LABELS.map((label, i) => (
-          <button
-            key={i}
-            className={`sh-swipe-dot ${activePanel === i ? "sh-swipe-dot--active" : ""}`}
-            onClick={() => {
-              onPanelChange(i);
-              animate(x, -i * window.innerWidth, {
-                type: "spring",
-                stiffness: 300,
-                damping: 30,
-              });
-            }}
-            title={label}
-          >
-            <span className="sh-swipe-dot__label">{label}</span>
-          </button>
-        ))}
+      <div className="sh-swipe-dots" role="tablist" aria-label="Panels">
+        {PANEL_KEYS.slice(0, panelCount).map((key, i) => {
+          const label = t(key);
+          const isActive = activePanel === i;
+          return (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              aria-controls={`sh-panel-${i}`}
+              className={`sh-swipe-dot ${isActive ? "sh-swipe-dot--active" : ""}`}
+              onClick={() => onPanelChange(i)}
+              title={label}
+            >
+              <span className="sh-swipe-dot__label">{label}</span>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Panels */}
       <motion.div
         className="sh-swipe-track"
         style={{ x }}
@@ -88,7 +91,12 @@ export default function SwipeContainer({ activePanel, onPanelChange, children }:
         dragMomentum={false}
       >
         {children.map((child, i) => (
-          <div key={i} className="sh-swipe-panel">
+          <div
+            key={i}
+            id={`sh-panel-${i}`}
+            role="tabpanel"
+            className="sh-swipe-panel"
+          >
             {child}
           </div>
         ))}

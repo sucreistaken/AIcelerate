@@ -11,7 +11,7 @@ export default function LobbyChat() {
 
   useEffect(() => {
     loadMessages(LOBBY_CHANNEL_ID);
-  }, []);
+  }, [loadMessages]);
 
   return (
     <div className="sh-lobby-chat">

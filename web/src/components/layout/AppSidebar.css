@@ -14,6 +14,10 @@
   top: 45px;
   overflow: hidden;
   z-index: 10;
+  /* No transition until hydrated — prevents the 260↔56 flash from store
+     rehydration (uiStore.leftPanelCollapsed loads after first paint). */
+}
+.app-sidebar.is-hydrated {
   transition: width var(--duration-base) var(--ease-in-out);
 }
 

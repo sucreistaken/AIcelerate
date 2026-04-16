@@ -37,7 +37,6 @@ export default function CreateChannelModal({ open, categoryId, onClose }: Props)
     setError("");
     try {
       await createChannel(activeServerId, {
-        userId: profile.id,
         categoryId,
         name: name.trim(),
         type,

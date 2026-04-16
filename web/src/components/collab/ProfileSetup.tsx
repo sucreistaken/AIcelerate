@@ -92,27 +92,23 @@ export default function ProfileSetup() {
             </div>
           </div>
 
-          {/* Preview */}
-          <motion.div
-            className="sh-profile-setup__preview"
-            animate={{ borderColor: color + "40" }}
-            transition={{ duration: 0.3 }}
-          >
-            <motion.div
+          {/* Preview — static layout, no scale animation (was jittering on every
+              keystroke and distorting the avatar inside the flex row). */}
+          <div className="sh-profile-setup__preview" style={{ borderColor: color + "40" }}>
+            <div
               className="sh-profile-setup__avatar"
               style={{ background: color }}
-              animate={{ scale: nickname ? 1 : 0.9 }}
-              transition={{ duration: 0.2 }}
+              aria-hidden="true"
             >
               {(nickname || "?").charAt(0).toUpperCase()}
-            </motion.div>
+            </div>
             <div>
               <span className="sh-profile-setup__preview-name">
                 {nickname || t("studyHub.nickname")}
               </span>
               <span className="sh-profile-setup__preview-status">{t("studyHub.online")}</span>
             </div>
-          </motion.div>
+          </div>
 
           {error && (
             <motion.p

@@ -5,6 +5,7 @@ import { useMessageStore } from "../../../stores/messageStore";
 import { useChannelToolStore } from "../../../stores/channelToolStore";
 import { getCollabSocket } from "../../../services/socket";
 import { useMediaQuery } from "../../../hooks/useMediaQuery";
+import { t } from "../../../utils/i18n";
 import ProfileSetup from "../ProfileSetup";
 import ServerSidebar from "./ServerSidebar";
 import ChannelSidebar from "./ChannelSidebar";
@@ -157,7 +158,7 @@ export default function StudyHub() {
       <div className="sh-container sh-container--mobile">
         {disconnected && (
           <div className="sh-reconnect-banner">
-            Bağlantı koptu, yeniden bağlanılıyor...
+            {t("studyHub.reconnecting")}
           </div>
         )}
         <SwipeContainer activePanel={activePanel} onPanelChange={setActivePanel}>
@@ -182,7 +183,7 @@ export default function StudyHub() {
     <div className="sh-container">
       {disconnected && (
         <div className="sh-reconnect-banner">
-          Bağlantı koptu, yeniden bağlanılıyor...
+          {t("studyHub.reconnecting")}
         </div>
       )}
       {sidebarContent}

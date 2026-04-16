@@ -130,7 +130,6 @@ function PaneRouter({ mode, lesson, ui }: PaneRouterProps) {
                 currentLessonId={lesson.currentLessonId}
                 setMode={ui.setMode}
                 setQuiz={lesson.setQuiz}
-                lang={ui.language}
                 onSelectLesson={(id: string) => {
                   lesson.setCurrentLessonId(id);
                   ui.setMode("plan");

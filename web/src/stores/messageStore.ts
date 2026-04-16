@@ -60,7 +60,9 @@ export const useMessageStore = create<MessageState>((set, get) => ({
 
     const oldestId = existing[0].id;
     try {
-      const older = await messagesApi.get(channelId, 50, oldestId);
+      const older = channelId === "global-lobby"
+        ? await lobbyApi.getMessages(50, oldestId)
+        : await messagesApi.get(channelId, 50, oldestId);
       set((s) => ({
         messagesByChannel: {
           ...s.messagesByChannel,

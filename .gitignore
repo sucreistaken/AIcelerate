@@ -56,3 +56,7 @@ playwright-report/
 docs/plans/
 PLAN-*.md
 CLAUDE.md
+
+# ── Graphify knowledge graph output (auto-rebuilt by post-commit hook,
+#    ~1100 files: graph.json + GRAPH_REPORT.md + wiki/ + cache/) ──
+graphify-out/
